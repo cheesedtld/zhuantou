@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>小手机</title>
+<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.loli.net">
+<link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
+<link href="https://fonts.loli.net/css2?family=Dancing+Script:wght@700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0"
+  }
+}
+</script>
+</head>
+<body>
+<div id="phone-container">
+<div id="home-indicator"></div>
+<div class="status-bar text-dark" id="status-bar">
+<div class="sb-left" id="clock">12:00</div>
+<div class="dynamic-island"><div class="island-camera"></div></div>
+<div class="sb-right">
+<svg width="22" height="11" viewBox="0 0 22 11" fill="currentColor">
+<path d="M4 5 l1.5 2.5 h-3 z" />
+<path d="M4 11 l-1.5 -2.5 h3 z" />
+<path d="M7 5.5h2v6H7v-6zm4-3h2v9H11v-9zm4-3h2v12h-2V-.5z"></path>
+</svg>
+<svg id="battery-icon" width="22" height="11" viewBox="0 0 25 11" fill="currentColor"><rect x="0.5" y="0.5" width="20" height="10" rx="2.5" stroke="currentColor" fill="none"></rect><path d="M23 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path><rect id="battery-fill" x="2.5" y="2.5" width="16" height="6" rx="1" fill="currentColor"></rect></svg>
+</div>
+</div>
+<div id="home-screen" class="screen">
+<div id="home-clock">12:00</div>
+<div class="app-grid">
+<div class="app-item" onclick="openMessageList()">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/basil:wechat-solid.svg'); mask-image: url('https://api.iconify.design/basil:wechat-solid.svg');"></div></div>
+<span class="app-name">聊天</span>
+</div>
+<div class="app-item">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:forum-rounded.svg'); mask-image: url('https://api.iconify.design/material-symbols:forum-rounded.svg');"></div></div>
+<span class="app-name">论坛</span>
+</div>
+<div class="app-item">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/fa-brands:discord.svg'); mask-image: url('https://api.iconify.design/fa-brands:discord.svg');"></div></div>
+<span class="app-name">Discord</span>
+</div>
+<div class="app-item">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><text x=\'50%25\' y=\'50%25\' dy=\'.35em\' font-family=\'Arial\' font-weight=\'900\' font-size=\'14\' text-anchor=\'middle\'>ST</text></svg>'); mask-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><text x=\'50%25\' y=\'50%25\' dy=\'.35em\' font-family=\'Arial\' font-weight=\'900\' font-size=\'14\' text-anchor=\'middle\'>ST</text></svg>');"></div></div>
+<span class="app-name">SillyTavern</span>
+</div>
+<div class="app-item" onclick="openUserSettings()">
+    <div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/tabler:mood-edit.svg'); mask-image: url('https://api.iconify.design/tabler:mood-edit.svg');"></div></div>
+    <span class="app-name">user设置</span>
+</div>
+<div class="app-item" onclick="openCharacterSetup('world')">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/bxs:book-heart.svg'); mask-image: url('https://api.iconify.design/bxs:book-heart.svg');"></div></div>
+<span class="app-name">世界书</span>
+</div>
+<div class="app-item" onclick="openNpcSettings()">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/game-icons:love-mystery.svg'); mask-image: url('https://api.iconify.design/game-icons:love-mystery.svg');"></div></div>
+<span class="app-name">角色设置</span>
+</div>
+<div class="app-item" onclick="openBeautifySettings()">
+<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/fluent-emoji-high-contrast:artist-palette.svg'); mask-image: url('https://api.iconify.design/fluent-emoji-high-contrast:artist-palette.svg');"></div></div>
+<span class="app-name">美化</span>
+</div>
+<div class="app-item" onclick="openSettings()">
+<div class="app-icon-box app-icon-style"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L3.16 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></div>
+<span class="app-name">设置</span>
+</div>
+</div>
+</div>
+<div id="message-list-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title">消息</span>
+<div class="header-btn header-btn-right" onclick="showAddActionSheet()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path></svg></div>
+</div>
+</div>
+<div class="message-list-body" id="message-list-body">
+<!-- 列表项将由 JS 动态生成 -->
+</div>
+<div id="bottom-nav">
+    <div class="nav-item active">
+        <div class="nav-icon"><div class="nav-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/tabler:message-circle-2.svg'); mask-image: url('https://api.iconify.design/tabler:message-circle-2.svg');"></div></div>
+        <div class="nav-label">消息</div>
+    </div>
+    <div class="nav-item">
+        <div class="nav-icon"><div class="nav-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/iconoir:compass.svg'); mask-image: url('https://api.iconify.design/iconoir:compass.svg');"></div></div>
+        <div class="nav-label">动态</div>
+    </div>
+    <div class="nav-item">
+        <div class="nav-icon"><div class="nav-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/clarity:avatar-line.svg'); mask-image: url('https://api.iconify.design/clarity:avatar-line.svg');"></div></div>
+        <div class="nav-label">我</div>
+    </div>
+</div>
+</div>
+<div id="chat-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title" id="header-title">{{char}}</span>
+<div class="header-btn header-btn-right" onclick="openChatSettings()"><svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="#181818"></circle><circle cx="12" cy="12" r="1.6" fill="#181818"></circle><circle cx="18" cy="12" r="1.6" fill="#181818"></circle></svg></div>
+</div>
+</div>
+<div id="chat-messages"></div>
+<div id="love-effect-layer" class="love-effect-container"></div>
+
+<!-- 媒体预览条 -->
+<div id="media-preview-bar">
+    <div class="preview-item">
+        <img id="preview-image" src="" style="display:none">
+        <div id="preview-file-icon" class="preview-file-icon" style="display:none">🎵</div>
+        <div class="preview-close" onclick="clearPreview()">×</div>
+    </div>
+</div>
+
+<div id="input-bar">
+<button id="plus-button" class="toolbar-btn" title="更多功能"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+<button id="emoji-button" class="toolbar-btn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9" stroke-width="2" stroke-linecap="round"></line><line x1="15" y1="9" x2="15.01" y2="9" stroke-width="2" stroke-linecap="round"></line></svg></button>
+<textarea id="message-input" placeholder="输入消息..." rows="1"></textarea>
+<button id="send-button">发送</button>
+</div>
+<input type="file" id="photo-upload-input" accept="image/*" style="display: none;">
+<input type="file" id="audio-upload-input" accept="audio/*" style="display: none;">
+<input type="file" id="video-upload-input" accept="video/*" style="display: none;">
+<input type="file" id="settings-file-input" accept="image/*" style="display: none;">
+<div id="action-menu">
+<div class="action-item" onclick="handleAction('photo')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div><span>照片</span></div>
+<div class="action-item" onclick="handleAction('voice')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg></div><span>语音</span></div>
+<div class="action-item" onclick="handleAction('call')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg></div><span>通话</span></div>
+<div class="action-item" onclick="handleAction('camera')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg></div><span>相机</span></div>
+<div class="action-item" onclick="handleAction('location')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></div><span>位置</span></div>
+<div class="action-item" onclick="handleAction('transfer')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M7 10h14l-4-4"></path><path d="M17 14H3l4 4"></path></svg></div><span>转账</span></div>
+<div class="action-item" onclick="handleAction('file')"><div class="action-icon-box"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div><span>文件</span></div>
+</div>
+<div id="emoji-menu"></div>
+</div>
+<div id="settings-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="closeSettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title">设置</span>
+</div>
+</div>
+<div class="settings-body">
+    <!-- API 设置 -->
+    <div>
+        <div class="settings-section-title">API 设置</div>
+        <div class="setting-group">
+            <div class="setting-row">
+                <label>API 地址</label>
+                <input type="text" id="set-api-endpoint" class="setting-input" placeholder="https://api.openai.com/v1">
+            </div>
+            <div class="setting-row">
+                <label>API Key</label>
+                <input type="password" id="set-api-key" class="setting-input" placeholder="sk-...">
+            </div>
+            <div class="setting-row">
+                <label>模型</label>
+                <div style="display: flex; gap: 5px; flex: 1; min-width: 0;">
+                    <select id="set-api-model" class="setting-input" style="flex: 1; min-width: 0;">
+                        <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                    </select>
+                    <button onclick="refreshModelList()" class="action-btn" style="padding: 0 10px; white-space: nowrap; background: linear-gradient(135deg, #ff9a9e, #fecfef); color: white; border: none; border-radius: 8px; font-size: 12px;">刷新</button>
+                </div>
+            </div>
+            <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 5px;">
+                <label>系统提示词 (System Prompt)</label>
+                <textarea id="set-system-prompt" class="setting-input" style="height: 80px; width: 100%; resize: vertical; box-sizing: border-box; font-family: sans-serif;" placeholder="你是一个智能助手..."></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="settings-footer" style="padding: 10px;">
+<button class="modal-btn btn-save" style="width: 100%; padding: 8px; border-radius: 12px; font-size: 13px;" onclick="saveApiSettings()">保存</button>
+</div>
+</div>
+
+<!-- 美化设置页面 -->
+<div id="beautify-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="closeBeautifySettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title">美化</span>
+</div>
+</div>
+<div class="settings-body">
+    <!-- 个性化 -->
+    <div>
+        <div class="settings-section-title">个性化</div>
+        <div class="setting-group">
+            <div class="setting-row"><label>主屏幕壁纸</label> <div><button class="file-upload-label" onclick="triggerSettingsUpload('home-bg')">上传图片</button> <img id="preview-home-bg" class="preview-img" src=""></div></div>
+            <div class="setting-row"><label>自定义时间</label> <input type="text" id="set-custom-time" class="setting-input-sm" style="width: 80px;" placeholder="HH:MM"></div>
+        </div>
+    </div>
+
+    <!-- 图标与文字 -->
+    <div>
+        <div class="settings-section-title">图标与文字</div>
+        <div class="setting-group">
+            <div class="setting-row"><label>图标底色</label> <input type="color" id="set-icon-bg" class="color-picker"></div>
+            <div class="setting-row"><label>图标图案</label> <input type="color" id="set-icon-color" class="color-picker"></div>
+            <div class="setting-row"><label>字体颜色</label> <input type="color" id="set-home-text-color" class="color-picker"></div>
+        </div>
+    </div>
+
+    <!-- 自定义CSS -->
+    <div>
+        <div class="settings-section-title">自定义CSS</div>
+        <div class="setting-group">
+            <style>
+                #set-custom-css::-webkit-scrollbar { display: none; }
+            </style>
+            <textarea id="set-custom-css" class="setting-input" style="height: 200px; font-family: monospace; font-size: 12px; width: 100%; box-sizing: border-box; border: none; resize: vertical; padding: 10px; outline: none; scrollbar-width: none; -ms-overflow-style: none;" placeholder="输入CSS代码..."></textarea>
+        </div>
+    </div>
+</div>
+<div class="settings-footer" style="padding: 10px;">
+<button class="modal-btn btn-save" style="width: 100%; padding: 8px; border-radius: 12px; font-size: 13px;" onclick="saveBeautifySettings()">保存并应用</button>
+</div>
+</div>
+<div id="input-modal" class="modal-overlay">
+<div class="modal-box">
+<div class="modal-title" id="modal-title">输入内容</div>
+<div id="modal-inputs-container"></div>
+<div class="modal-actions"><button class="modal-btn btn-cancel" onclick="closeModal()">取消</button><button class="modal-btn btn-grey" id="modal-confirm-btn">发送</button></div>
+</div>
+</div>
+
+<div id="update-modal" class="modal-overlay">
+    <div class="modal-box" style="background: #fff0f5; border: 3px solid #ffb6c1; border-radius: 25px; box-shadow: 0 10px 30px rgba(255,182,193,0.4);">
+        <div class="modal-title" style="color: #ff69b4; font-family: 'Ma Shan Zheng', cursive; font-size: 22px;">🦋 更新啦 </div>
+        <style>
+            #update-content::-webkit-scrollbar { display: none; }
+        </style>
+        <div id="update-content" style="font-size: 14px; color: #888; line-height: 1.8; max-height: 300px; overflow-y: auto; text-align: left; padding: 15px; white-space: pre-wrap; background: rgba(255,255,255,0.6); border-radius: 15px; margin: 10px 0; scrollbar-width: none; -ms-overflow-style: none;"></div>
+        <div class="modal-actions">
+            <button class="modal-btn btn-grey" onclick="closeUpdateModal()" style="width: 100%; background: #ffb6c1; color: white; border: none; font-weight: bold; border-radius: 20px;">我知道啦</button>
+        </div>
+    </div>
+</div>
+
+<div id="add-contact-modal" class="modal-overlay">
+<div class="modal-box">
+<div class="modal-title" id="add-contact-title">发起聊天</div>
+<div id="add-contact-private-section">
+    <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 15px;">
+        <label style="font-size: 14px; color: #666;">选择我的身份</label>
+        <select id="private-chat-user-select" class="modal-input" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background: #f9f9f9;"></select>
+    </div>
+    <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+        <label style="font-size: 14px; color: #666;">选择聊天对象</label>
+        <select id="private-chat-npc-select" class="modal-input" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background: #f9f9f9;"></select>
+    </div>
+</div>
+<div id="add-contact-group-section" style="display:none">
+<input type="text" id="group-name-input" class="modal-input" placeholder="群聊名称" style="margin-bottom:8px;">
+<!-- 人数输入已移除，改为动态添加名字行 -->
+<div class="setting-row" style="padding: 10px 0; border: none; display: flex; justify-content: space-between; align-items: center;">
+    <label style="font-size: 14px; color: #666;">我加入群聊</label> 
+    <label class="switch">
+        <input type="checkbox" id="group-join-toggle">
+        <span class="slider round"></span>
+    </label>
+</div>
+<div style="font-size:12px;color:#888;margin-bottom:8px;">提示：如果头像列表中没有 <code>{{user}}</code>，则表示你不在该群里；开启“我加入群聊”会把你加入成员列表。</div>
+<div id="group-names-container"></div>
+</div>
+<div class="modal-actions">
+<button class="modal-btn btn-cancel" onclick="closeAddContactModal()">取消</button>
+<button class="modal-btn btn-grey" onclick="confirmAddContact()">确认</button>
+</div>
+</div>
+</div>
+<div id="chat-settings-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="closeChatSettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title">聊天设置</span>
+</div>
+</div>
+<div class="settings-body">
+
+    <!-- 当前用户选择（横向全宽，无标题） -->
+    <div class="user-selector-bar-wrapper" id="user-selector-bar">
+        <!-- 由JS动态生成横向用户选择列表 -->
+    </div>
+    <select id="user-selector" style="display:none;"></select>
+
+    <!-- 头像设置 -->
+    <div>
+        <div class="settings-section-title">头像设置</div>
+        <div class="setting-group no-border" style="background: transparent; box-shadow: none;">
+             <div id="avatar-settings-container" class="avatar-grid"></div>
+        </div>
+    </div>
+
+    <!-- 气泡与字体 -->
+    <div>
+        <div class="settings-section-title">气泡与字体</div>
+        <div class="setting-group">
+            <div class="setting-row"><label>对方气泡/文字</label> <div><input type="color" id="set-char-bubble" class="color-picker"> <input type="color" id="set-char-text" class="color-picker"></div></div>
+            <div class="setting-row"><label>我方气泡/文字</label> <div><input type="color" id="set-user-bubble" class="color-picker"> <input type="color" id="set-user-text" class="color-picker"></div></div>
+            <div class="setting-row"><label>字体大小</label> <div><input type="number" id="set-font-size" class="setting-input-sm" placeholder="14" style="width: 60px;"> px</div></div>
+        </div>
+    </div>
+
+    <!-- 颜色设置 -->
+    <div>
+        <div class="settings-section-title">颜色设置</div>
+        <div class="setting-group">
+            <div class="setting-row"><label>名字/时间</label> <div><input type="color" id="set-msg-name-color" class="color-picker"> <input type="color" id="set-msg-time-color" class="color-picker"></div></div>
+            <div class="setting-row"><label>界面</label> <div><input type="color" id="set-interface-color" class="color-picker"></div></div>
+        </div>
+    </div>
+
+    <!-- 按钮设置 -->
+    <div>
+        <div class="settings-section-title">按钮设置</div>
+        <div class="setting-group">
+            <div class="setting-row"><label>按钮颜色</label> <div><input type="color" id="set-chat-btn-text" class="color-picker"></div></div>
+        </div>
+    </div>
+
+    <!-- 拉黑设置 -->
+    <div>
+        <div class="settings-section-title">拉黑设置</div>
+        <div class="setting-group">
+            <div class="setting-row">
+                <label>拒收对方消息</label> 
+                <label class="switch">
+                    <input type="checkbox" id="set-block-char">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <label>消息被对方绝收</label> 
+                <label class="switch">
+                    <input type="checkbox" id="set-block-user">
+                    <span class="slider round"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <!-- 背景设置 -->
+    <div>
+        <div class="settings-section-title">背景设置</div>
+        <div class="setting-group">
+            <div class="setting-row"><label>聊天背景</label> <div><button class="file-upload-label" onclick="triggerSettingsUpload('chat-bg')">上传图片</button> <img id="preview-chat-bg" class="preview-img" src=""></div></div>
+        </div>
+    </div>
+
+
+</div>
+<div class="settings-footer" style="display: flex; gap: 8px; padding: 10px;">
+<button class="modal-btn btn-delete-chat" onclick="deleteCurrentChat()" style="flex: 1; border-radius: 12px; padding: 8px 0; background: #f2f2f2; color: #333; font-size: 13px;">删除聊天</button>
+<button class="modal-btn btn-save" onclick="saveChatSettings()" style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px;">保存配置</button>
+</div>
+</div>
+
+<div id="call-screen" class="screen" style="background: linear-gradient(180deg, #2b2b2b 0%, #1a1a1a 100%); color: #fff; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px 40px 20px; z-index: 100; box-sizing: border-box; display: none;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <div id="call-name" style="font-size: 26px; font-weight: 600; letter-spacing: 1px;">{{char}}</div>
+        </div>
+        <div id="call-timer" style="font-size: 16px; opacity: 0.6; font-variant-numeric: tabular-nums; position: relative; top: -2px;">00:00</div>
+    </div>
+    
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px; flex: 1; justify-content: center; width: 100%;">
+        <div style="position: relative;">
+            <img id="call-avatar" src="" style="width: 120px; height: 120px; border-radius: 20px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+            <div class="ripple-ring"></div>
+        </div>
+        
+        <!-- Middle Message Area -->
+        <div id="call-chat-container" style="width: 100%; padding: 0 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; height: 200px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;">
+            <!-- Call bubbles will be injected here -->
+        </div>
+        <style>
+            #call-chat-container::-webkit-scrollbar { display: none; }
+            .call-bubble {
+                max-width: 80%;
+                padding: 8px 12px;
+                border-radius: 16px;
+                font-size: 14px;
+                line-height: 1.4;
+                word-break: break-word;
+                animation: fadeIn 0.3s ease;
+            }
+            .call-bubble.sent {
+                align-self: flex-end;
+                background: #666666;
+                color: #fff;
+                border-bottom-right-radius: 4px;
+            }
+            .call-bubble.received {
+                align-self: flex-start;
+                background: #333333;
+                color: #fff;
+                border-bottom-left-radius: 4px;
+            }
+            @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+            @keyframes jump-exclamation {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-5px); }
+            }
+            .jumping-exclamation {
+                display: inline-block;
+                font-weight: bold;
+                font-size: 18px;
+                animation: jump-exclamation 0.6s infinite;
+            }
+        </style>
+    </div>
+
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 30px;">
+        <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 25px; backdrop-filter: blur(10px);">
+            <input type="text" id="call-input" placeholder="我想说..." style="flex: 1; height: 32px; line-height: 32px; padding: 0 15px; border-radius: 20px; border: none; outline: none; background: transparent; color: #fff; font-size: 15px; margin-top: 6px;">
+            <button onclick="sendCallMessage()" style="width: 32px; height: 32px; border-radius: 50%; border: none; background: #333; color: #888; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: opacity 0.2s; padding: 0; margin-left: 5px;">
+                <div style="width: 20px; height: 20px; background-color: currentColor; -webkit-mask: url('https://api.iconify.design/typcn:phone.svg') no-repeat center / contain; mask: url('https://api.iconify.design/typcn:phone.svg') no-repeat center / contain;"></div>
+            </button>
+        </div>
+        
+        <div style="display: flex; justify-content: space-around; align-items: center;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; opacity: 0.5; cursor: not-allowed;">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center;">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="#fff"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                </div>
+                <span style="font-size: 12px; font-weight: 500;">录音</span>
+            </div>
+            
+            <div onclick="endVoiceCall()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; transition: transform 0.1s;">
+                <div style="width: 64px; height: 64px; border-radius: 50%; background: #ff3b30; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 15px rgba(255, 59, 48, 0.3);">
+                    <img src="https://api.iconify.design/majesticons:phone-hangup.svg?color=white" width="32" height="32">
+                </div>
+                <span style="font-size: 12px; font-weight: 500;">挂断</span>
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes ripple { 0% { transform: scale(1); opacity: 0.4; } 100% { transform: scale(1.5); opacity: 0; } }
+        .ripple-ring { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 20px; border: 2px solid rgba(255,255,255,0.5); animation: ripple 2s infinite; z-index: -1; display: none; }
+        #call-screen.speaking .ripple-ring { display: block; }
+        
+        @keyframes wave-jump {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .jumping-dot {
+            display: inline-block;
+            animation: wave-jump 1s infinite;
+            font-size: 32px; /* 点大一些 */
+            margin: 0 4px;   /* 距离宽一些 */
+            line-height: 10px; /* 防止撑开高度 */
+        }
+        .jumping-dot:nth-child(1) { animation-delay: 0s; }
+        .jumping-dot:nth-child(2) { animation-delay: 0.1s; }
+        .jumping-dot:nth-child(3) { animation-delay: 0.2s; }
+    </style>
+</div>
+
+<div id="incoming-call-screen" class="screen" style="display:none; background: linear-gradient(180deg, #2b2b2b 0%, #1a1a1a 100%); color: #fff; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px 80px 20px; z-index: 110;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
+        <div id="incoming-call-name" style="font-size: 26px; font-weight: 600;">{{char}}</div>
+        <div style="font-size: 16px; opacity: 0.6;">邀请你进行语音通话...</div>
+    </div>
+    
+    <div style="position: relative;">
+        <img id="incoming-call-avatar" src="" style="width: 120px; height: 120px; border-radius: 50%; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+        <div class="ripple-ring" style="display:block;"></div>
+    </div>
+
+    <div style="width: 100%; display: flex; justify-content: space-around; align-items: center;">
+        <div onclick="declineIncomingCall()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: #ff3b30; display: flex; align-items: center; justify-content: center;">
+                <img src="https://api.iconify.design/majesticons:phone-hangup.svg?color=white" width="32" height="32">
+            </div>
+            <span style="font-size: 12px;">拒绝</span>
+        </div>
+        
+        <div onclick="acceptIncomingCall()" style="display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: #30d158; display: flex; align-items: center; justify-content: center;">
+                <img src="https://api.iconify.design/majesticons:phone.svg?color=white" width="32" height="32">
+            </div>
+            <span style="font-size: 12px;">接听</span>
+        </div>
+    </div>
+</div>
+
+<div id="cropper-modal" class="modal-overlay" style="z-index: 300;">
+    <div class="modal-box" style="width: 90%; height: 80%; max-width: 500px; max-height: 800px; padding: 0; background: #000; display: flex; flex-direction: column;">
+        <div style="flex: 1; position: relative; overflow: hidden; background: #333;">
+            <img id="cropper-image" src="" style="max-width: 100%; display: block;">
+        </div>
+        <div class="modal-actions" style="padding: 15px; background: #fff; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px; justify-content: space-between;">
+             <button class="modal-btn btn-cancel" onclick="closeCropper()">取消</button>
+             <button class="modal-btn btn-confirm" onclick="confirmCrop()">裁剪并使用</button>
+        </div>
+    </div>
+</div>
+
+<!-- Character Setup Screen - NPC列表 -->
+<div id="character-setup-screen" class="screen">
+    <div class="app-header pink-header">
+        <div class="header-content">
+            <div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+            <span class="header-title">角色设置</span>
+            <div class="header-btn header-btn-right" onclick="openNpcCreatePage()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path></svg></div>
+        </div>
+    </div>
+    <div id="npc-list-container" class="pink-scroll-area"></div>
+</div>
+
+<!-- NPC Create/Edit Screen (全页面，与User创建页面一致) -->
+<div id="npc-create-screen" class="screen">
+    <div class="app-header pink-header">
+        <div class="header-content">
+            <div class="header-btn" onclick="closeNpcCreatePage()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+            <span class="header-title" id="npc-create-title">创建角色</span>
+            <div class="header-btn header-btn-right" onclick="saveNpc()">
+                <span style="font-size: 14px; color: #007aff; font-weight: bold;">保存</span>
+            </div>
+        </div>
+    </div>
+    <div class="user-create-body pink-scroll-area">
+        <!-- 头像 -->
+        <div class="uc-avatar-section">
+            <img id="npc-avatar-preview" class="uc-avatar" src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" onclick="document.getElementById('npc-avatar-input').click()">
+            <input type="file" id="npc-avatar-input" accept="image/*" style="display:none">
+            <div class="uc-avatar-hint">点击更换头像</div>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <label>姓名</label>
+                <input type="text" id="npc-name-input-page" class="uc-input" placeholder="角色名字">
+            </div>
+            <div class="uc-field">
+                <label>昵称</label>
+                <input type="text" id="npc-nickname-input-page" class="uc-input" placeholder="昵称/别名（可选）">
+            </div>
+            <div class="uc-field">
+                <label>性别</label>
+                <div class="uc-gender-group">
+                    <label class="uc-gender-option selected" data-value="female">
+                        <input type="radio" name="npc-gender-page" value="female" checked> 女
+                    </label>
+                    <label class="uc-gender-option" data-value="male">
+                        <input type="radio" name="npc-gender-page" value="male"> 男
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 人设 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <div class="uc-field-header">
+                    <label>人设</label>
+                    <span class="uc-token-count" id="npc-desc-token">0 tokens</span>
+                </div>
+                <textarea id="npc-desc-input-page" class="uc-textarea" placeholder="描述角色的性格、外貌、背景故事..."></textarea>
+            </div>
+        </div>
+
+        <!-- 世界书 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <label>世界书</label>
+                <select id="npc-worldbook-select" class="uc-select">
+                    <option value="">不使用世界书</option>
+                </select>
+                <div class="uc-hint">选择一个世界书来设定故事背景</div>
+            </div>
+        </div>
+
+        <!-- 子NPC列表 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <div class="uc-field-header">
+                    <label>关联NPC</label>
+                    <button class="uc-add-npc-btn" onclick="addSubNpcToNpc()">+ 添加NPC</button>
+                </div>
+                <div id="npc-sub-npc-list" class="uc-npc-list">
+                </div>
+            </div>
+        </div>
+
+        <div style="height: 30px;"></div>
+    </div>
+</div>
+
+<!-- User Settings Screen (User列表) -->
+<div id="user-settings-screen" class="screen">
+    <div class="app-header pink-header">
+        <div class="header-content">
+            <div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+            <span class="header-title">我的角色</span>
+            <div class="header-btn header-btn-right" onclick="openUserCreatePage()"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path></svg></div>
+        </div>
+    </div>
+    <div id="user-list-container" class="pink-scroll-area"></div>
+</div>
+
+<!-- User Create/Edit Screen (全页面) -->
+<div id="user-create-screen" class="screen">
+    <div class="app-header pink-header">
+        <div class="header-content">
+            <div class="header-btn" onclick="closeUserCreatePage()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+            <span class="header-title" id="user-create-title">创建角色</span>
+            <div class="header-btn header-btn-right" onclick="saveUser()">
+                <span style="font-size: 14px; color: #007aff; font-weight: bold;">保存</span>
+            </div>
+        </div>
+    </div>
+    <div class="user-create-body pink-scroll-area">
+        <!-- 头像 -->
+        <div class="uc-avatar-section">
+            <img id="user-avatar-preview" class="uc-avatar" src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" onclick="document.getElementById('user-avatar-input').click()">
+            <input type="file" id="user-avatar-input" accept="image/*" style="display:none">
+            <div class="uc-avatar-hint">点击更换头像</div>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <label>昵称</label>
+                <input type="text" id="user-name-input" class="uc-input" placeholder="给角色起个名字吧~">
+            </div>
+            <div class="uc-field">
+                <label>性别</label>
+                <div class="uc-gender-group">
+                    <label class="uc-gender-option selected" data-value="female">
+                        <input type="radio" name="user-gender" value="female" checked> 女
+                    </label>
+                    <label class="uc-gender-option" data-value="male">
+                        <input type="radio" name="user-gender" value="male"> 男
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 人设 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <div class="uc-field-header">
+                    <label>人设</label>
+                    <span class="uc-token-count" id="user-desc-token">0 tokens</span>
+                </div>
+                <textarea id="user-desc-input" class="uc-textarea" placeholder="描述角色的性格、外貌、背景故事..."></textarea>
+            </div>
+        </div>
+
+        <!-- 世界书 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <label>世界书</label>
+                <select id="user-worldbook-select" class="uc-select">
+                    <option value="">不使用世界书</option>
+                </select>
+                <div class="uc-hint">选择一个世界书来设定故事背景</div>
+            </div>
+        </div>
+
+        <!-- NPC列表 -->
+        <div class="uc-card">
+            <div class="uc-field">
+                <div class="uc-field-header">
+                    <label>NPC 角色</label>
+                    <button class="uc-add-npc-btn" onclick="addNpcToUser()">+ 添加NPC</button>
+                </div>
+                <div id="user-npc-list" class="uc-npc-list">
+                    <!-- NPC cards will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+
+        <div style="height: 30px;"></div>
+    </div>
+</div>
+
+</div>
+
+<div id="add-action-sheet-overlay" class="action-sheet-overlay" onclick="hideAddActionSheet()"></div>
+<div id="add-action-sheet" class="action-popup">
+    <div class="action-popup-item" onclick="openAddContactModal('private')">
+        <div class="action-popup-icon"><svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg></div>
+        <span>发起私聊</span>
+    </div>
+    <div class="action-popup-item" onclick="openAddContactModal('group')">
+        <div class="action-popup-icon"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+        <span>发起群聊</span>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
