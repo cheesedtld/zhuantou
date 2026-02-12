@@ -67,10 +67,6 @@
 <div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/game-icons:love-mystery.svg'); mask-image: url('https://api.iconify.design/game-icons:love-mystery.svg');"></div></div>
 <span class="app-name">角色设置</span>
 </div>
-<div class="app-item" onclick="openBeautifySettings()">
-<div class="app-icon-box app-icon-style"><div class="app-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/fluent-emoji-high-contrast:artist-palette.svg'); mask-image: url('https://api.iconify.design/fluent-emoji-high-contrast:artist-palette.svg');"></div></div>
-<span class="app-name">美化</span>
-</div>
 <div class="app-item" onclick="openSettings()">
 <div class="app-icon-box app-icon-style"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L3.16 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></div>
 <span class="app-name">设置</span>
@@ -144,15 +140,75 @@
 </div>
 <div id="emoji-menu"></div>
 </div>
+<!-- 设置导航页面 -->
 <div id="settings-screen" class="screen">
 <div class="app-header">
 <div class="header-content">
 <div class="header-btn" onclick="closeSettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
-<span class="header-title">设置</span>
+<span class="header-title">手机设置</span>
+<div class="header-btn header-btn-right" style="visibility:hidden;"></div>
+</div>
+</div>
+<div class="settings-nav-body">
+    <!-- 时间设置 -->
+    <div class="settings-nav-card" style="cursor:default;">
+        <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
+            <div class="settings-nav-icon-img" style="-webkit-mask-image: url('https://api.iconify.design/mdi:clock-outline.svg'); mask-image: url('https://api.iconify.design/mdi:clock-outline.svg'); background-color: #e88a9a;"></div>
+        </div>
+        <div class="settings-nav-text" style="flex:1;">
+            <div class="settings-nav-title">自定义时间</div>
+            <div class="settings-nav-subtitle">设置状态栏显示时间</div>
+        </div>
+        <input type="text" id="set-custom-time" class="setting-input-sm" style="width: 70px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 4px 8px; font-size: 13px;" placeholder="HH:MM">
+    </div>
+
+    <!-- 外观设置 -->
+    <div class="settings-nav-card" onclick="openBeautifySettings()">
+        <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
+            <div class="settings-nav-icon-img" style="-webkit-mask-image: url('https://api.iconify.design/fluent-emoji-high-contrast:artist-palette.svg'); mask-image: url('https://api.iconify.design/fluent-emoji-high-contrast:artist-palette.svg'); background-color: #e88a9a;"></div>
+        </div>
+        <div class="settings-nav-text">
+            <div class="settings-nav-title">外观设置</div>
+            <div class="settings-nav-subtitle">主题 · 图标 · 字体</div>
+        </div>
+        <svg class="settings-nav-arrow" viewBox="0 0 24 24"><path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </div>
+
+    <!-- API设置 -->
+    <div class="settings-nav-card" onclick="openApiSettings()">
+        <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
+            <div class="settings-nav-icon-img" style="-webkit-mask-image: url('https://api.iconify.design/ant-design:api-outlined.svg'); mask-image: url('https://api.iconify.design/ant-design:api-outlined.svg'); background-color: #e88a9a;"></div>
+        </div>
+        <div class="settings-nav-text">
+            <div class="settings-nav-title">API设置</div>
+            <div class="settings-nav-subtitle">密钥 · 端点 · 文档</div>
+        </div>
+        <svg class="settings-nav-arrow" viewBox="0 0 24 24"><path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </div>
+
+    <!-- 数据设置 -->
+    <div class="settings-nav-card" onclick="openDataSettings()">
+        <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
+            <div class="settings-nav-icon-img" style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:database-outline.svg'); mask-image: url('https://api.iconify.design/material-symbols:database-outline.svg'); background-color: #e88a9a;"></div>
+        </div>
+        <div class="settings-nav-text">
+            <div class="settings-nav-title">数据设置</div>
+            <div class="settings-nav-subtitle">备份 · 恢复 · 清除</div>
+        </div>
+        <svg class="settings-nav-arrow" viewBox="0 0 24 24"><path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+    </div>
+</div>
+</div>
+
+<!-- API设置子页面 -->
+<div id="api-settings-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="closeApiSettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title">API设置</span>
 </div>
 </div>
 <div class="settings-body">
-    <!-- API 设置 -->
     <div>
         <div class="settings-section-title">API 设置</div>
         <div class="setting-group">
@@ -185,12 +241,41 @@
 </div>
 </div>
 
+<!-- 数据设置子页面 -->
+<div id="data-settings-screen" class="screen">
+<div class="app-header">
+<div class="header-content">
+<div class="header-btn" onclick="closeDataSettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
+<span class="header-title">数据设置</span>
+</div>
+</div>
+<div class="settings-body">
+    <div>
+        <div class="settings-section-title">数据管理</div>
+        <div class="setting-group">
+            <div class="setting-row" style="cursor:pointer" onclick="exportAllData()">
+                <label style="cursor:pointer">备份数据</label>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            </div>
+            <div class="setting-row" style="cursor:pointer" onclick="importAllData()">
+                <label style="cursor:pointer">恢复数据</label>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            </div>
+            <div class="setting-row" style="cursor:pointer" onclick="clearAllData()">
+                <label style="cursor:pointer; color:#e53935;">清除所有数据</label>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e53935" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
 <!-- 美化设置页面 -->
 <div id="beautify-screen" class="screen">
 <div class="app-header">
 <div class="header-content">
 <div class="header-btn" onclick="closeBeautifySettings()"><svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path></svg></div>
-<span class="header-title">美化</span>
+<span class="header-title">外观设置</span>
 </div>
 </div>
 <div class="settings-body">
@@ -199,7 +284,6 @@
         <div class="settings-section-title">个性化</div>
         <div class="setting-group">
             <div class="setting-row"><label>主屏幕壁纸</label> <div><button class="file-upload-label" onclick="triggerSettingsUpload('home-bg')">上传图片</button> <img id="preview-home-bg" class="preview-img" src=""></div></div>
-            <div class="setting-row"><label>自定义时间</label> <input type="text" id="set-custom-time" class="setting-input-sm" style="width: 80px;" placeholder="HH:MM"></div>
         </div>
     </div>
 
@@ -250,34 +334,45 @@
 </div>
 
 <div id="add-contact-modal" class="modal-overlay">
-<div class="modal-box">
-<div class="modal-title" id="add-contact-title">发起聊天</div>
+<div class="modal-box group-modal-cute">
+<div class="modal-title group-modal-title" id="add-contact-title">发起聊天</div>
 <div id="add-contact-private-section">
-    <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 15px;">
-        <label style="font-size: 14px; color: #666;">选择我的身份</label>
-        <select id="private-chat-user-select" class="modal-input" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background: #f9f9f9;"></select>
+    <div class="group-modal-field">
+        <label class="group-modal-label">选择我的身份</label>
+        <select id="private-chat-user-select" class="group-modal-select"></select>
     </div>
-    <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
-        <label style="font-size: 14px; color: #666;">选择聊天对象</label>
-        <select id="private-chat-npc-select" class="modal-input" style="width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #ddd; background: #f9f9f9;"></select>
+    <div class="group-modal-field">
+        <label class="group-modal-label">选择聊天对象</label>
+        <select id="private-chat-npc-select" class="group-modal-select"></select>
     </div>
 </div>
 <div id="add-contact-group-section" style="display:none">
-<input type="text" id="group-name-input" class="modal-input" placeholder="群聊名称" style="margin-bottom:8px;">
-<!-- 人数输入已移除，改为动态添加名字行 -->
-<div class="setting-row" style="padding: 10px 0; border: none; display: flex; justify-content: space-between; align-items: center;">
-    <label style="font-size: 14px; color: #666;">我加入群聊</label> 
-    <label class="switch">
-        <input type="checkbox" id="group-join-toggle">
-        <span class="slider round"></span>
-    </label>
+    <div class="group-modal-field">
+        <label class="group-modal-label">群聊名称</label>
+        <input type="text" id="group-name-input" class="group-modal-input" placeholder="输入群聊名称">
+    </div>
+    
+    <div class="group-modal-field">
+        <label class="group-modal-label">选择群主 (User)</label>
+        <select id="group-chat-user-select" class="group-modal-select"></select>
+    </div>
+
+    <div class="group-modal-field">
+        <div class="group-modal-label-row">
+            <label class="group-modal-label">群成员 (角色)</label>
+            <button type="button" class="group-add-role-btn" onclick="addGroupNpcSelect()">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                <span>添加</span>
+            </button>
+        </div>
+        <div id="group-npc-select-list" class="group-npc-select-list">
+            <!-- 动态添加的角色下拉框 -->
+        </div>
+    </div>
 </div>
-<div style="font-size:12px;color:#888;margin-bottom:8px;">提示：如果头像列表中没有 <code>{{user}}</code>，则表示你不在该群里；开启“我加入群聊”会把你加入成员列表。</div>
-<div id="group-names-container"></div>
-</div>
-<div class="modal-actions">
-<button class="modal-btn btn-cancel" onclick="closeAddContactModal()">取消</button>
-<button class="modal-btn btn-grey" onclick="confirmAddContact()">确认</button>
+<div class="modal-actions" style="margin-top: 14px; gap: 10px;">
+<button class="modal-btn group-modal-cancel" onclick="closeAddContactModal()">取消</button>
+<button class="modal-btn group-modal-confirm" onclick="confirmAddContact()">确认</button>
 </div>
 </div>
 </div>
