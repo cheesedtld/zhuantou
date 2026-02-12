@@ -1,8 +1,5 @@
  (function() {
 
-// Global Variables
-const APP_VERSION = '20260131-2'; // 更新版本号
-const UPDATE_LOG = `【更新 v1.0】`;
 
 function checkUpdate() {
     const lastVersion = localStorage.getItem('faye-phone-version');
@@ -105,14 +102,20 @@ function hideAddActionSheet() {
 }
 
 function openAddContactModal(type = 'private') {
+    console.log('openAddContactModal called with type:', type);
     hideAddActionSheet();
+    
+    // Robustly get modal if global var is missing
+    if (!addContactModal) {
+        addContactModal = document.getElementById('add-contact-modal');
+    }
+
     if(addContactModal) {
         addContactModal.classList.add('show');
         
         // Reset inputs
-        document.getElementById('group-name-input').value = '';
-        const gnc = document.getElementById('group-names-container');
-        if (gnc) { gnc.innerHTML = ''; addGroupNameRow(gnc, false, '', false); }
+        const groupNameInput = document.getElementById('group-name-input');
+        if (groupNameInput) groupNameInput.value = '';
         
         // Show/Hide sections based on type
         const privateSection = document.getElementById('add-contact-private-section');
@@ -120,28 +123,18 @@ function openAddContactModal(type = 'private') {
         const title = document.getElementById('add-contact-title');
         
         if (type === 'private') {
-            privateSection.style.display = 'block';
-            groupSection.style.display = 'none';
-            title.textContent = '发起私聊';
+            if (privateSection) privateSection.style.display = 'block';
+            if (groupSection) groupSection.style.display = 'none';
+            if (title) title.textContent = '发起私聊';
             populatePrivateChatSelects();
         } else {
-            privateSection.style.display = 'none';
-            groupSection.style.display = 'block';
-            title.textContent = '发起群聊';
-            
-            // Reset toggle logic for group
-            const toggle = document.getElementById('group-join-toggle');
-            if (toggle) {
-                try {
-                    const myName = '{{user}}';
-                    let present = false;
-                    if (appSettings.memberAvatars) {
-                        present = Object.prototype.hasOwnProperty.call(appSettings.memberAvatars, myName) || Object.prototype.hasOwnProperty.call(appSettings.memberAvatars, '{{user}}');
-                    }
-                    toggle.checked = !!present;
-                } catch (e) { toggle.checked = false; }
-            }
+            if (privateSection) privateSection.style.display = 'none';
+            if (groupSection) groupSection.style.display = 'block';
+            if (title) title.textContent = '发起群聊';
+            populateGroupChatSelects();
         }
+    } else {
+        console.error('Add Contact Modal not found!');
     }
 }
 
@@ -151,73 +144,192 @@ function populatePrivateChatSelects() {
     
     if (!userSelect || !npcSelect) return;
     
-    userSelect.innerHTML = '';
-    npcSelect.innerHTML = '';
+    userSelect.innerHTML = '<option value="">请选择用户...</option>';
+    npcSelect.innerHTML = '<option value="">请选择角色...</option>';
     
     // Populate Users
-    if (appSettings.userCharacters && appSettings.userCharacters.length > 0) {
-        appSettings.userCharacters.forEach((user, index) => {
+    if (userCharacters && Array.isArray(userCharacters)) {
+        userCharacters.forEach((user, index) => {
             const option = document.createElement('option');
             option.value = index; // Use index as value
-            option.textContent = user.name;
+            option.textContent = user.name || `User ${index + 1}`;
             if (appSettings.currentUserId === index) {
                 option.selected = true;
             }
             userSelect.appendChild(option);
         });
-    } else {
-        const option = document.createElement('option');
-        option.textContent = '无可用角色';
-        userSelect.appendChild(option);
     }
     
     // Populate NPCs
-    if (appSettings.npcCharacters && appSettings.npcCharacters.length > 0) {
-        appSettings.npcCharacters.forEach((npc, index) => {
+    if (npcCharacters && Array.isArray(npcCharacters)) {
+        npcCharacters.forEach((npc, index) => {
             const option = document.createElement('option');
             option.value = index; // Use index as value
-            option.textContent = npc.name;
+            option.textContent = npc.name || `NPC ${index + 1}`;
             npcSelect.appendChild(option);
         });
-    } else {
-        const option = document.createElement('option');
-        option.textContent = '无可用NPC';
-        npcSelect.appendChild(option);
     }
+}
+
+function populateGroupChatSelects() {
+    const userSelect = document.getElementById('group-chat-user-select');
+    const npcSelectList = document.getElementById('group-npc-select-list');
+    
+    if (!userSelect) return;
+    
+    userSelect.innerHTML = '<option value="">请选择...</option>';
+    
+    // Populate Users
+    if (userCharacters && Array.isArray(userCharacters)) {
+        userCharacters.forEach((user, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = user.name || `User ${index + 1}`;
+            if (appSettings.currentUserId === index) {
+                option.selected = true;
+            }
+            userSelect.appendChild(option);
+        });
+    }
+    
+    // Reset NPC select list and add one default row
+    if (npcSelectList) {
+        npcSelectList.innerHTML = '';
+        if (npcCharacters && npcCharacters.length > 0) {
+            addGroupNpcSelect();
+        } else {
+            npcSelectList.innerHTML = '<div class="group-npc-empty-hint">暂无可选角色，请先创建角色~</div>';
+        }
+    }
+}
+
+// 获取已选中的NPC索引列表
+function getSelectedNpcIndices() {
+    const selectList = document.getElementById('group-npc-select-list');
+    if (!selectList) return [];
+    const selects = selectList.querySelectorAll('select');
+    const selected = [];
+    selects.forEach(sel => {
+        if (sel.value !== '') {
+            selected.push(parseInt(sel.value));
+        }
+    });
+    return selected;
+}
+
+// 添加一个新的NPC角色下拉框
+function addGroupNpcSelect() {
+    const selectList = document.getElementById('group-npc-select-list');
+    if (!selectList) return;
+    
+    // 移除空状态提示
+    const emptyHint = selectList.querySelector('.group-npc-empty-hint');
+    if (emptyHint) emptyHint.remove();
+    
+    // 获取已被选中的NPC索引
+    const selectedIndices = getSelectedNpcIndices();
+    
+    // 检查是否还有可选角色
+    const availableNpcs = (npcCharacters || []).filter((_, idx) => !selectedIndices.includes(idx));
+    if (availableNpcs.length === 0) {
+        showToast('所有角色都已添加啦~');
+        return;
+    }
+    
+    const row = document.createElement('div');
+    row.className = 'group-npc-row';
+    
+    const select = document.createElement('select');
+    select.innerHTML = '<option value="">请选择角色...</option>';
+    
+    // 只显示未被选中的角色
+    if (npcCharacters && Array.isArray(npcCharacters)) {
+        npcCharacters.forEach((npc, index) => {
+            if (!selectedIndices.includes(index)) {
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = npc.name || `NPC ${index + 1}`;
+                select.appendChild(option);
+            }
+        });
+    }
+    
+    // 当选择改变时，更新其他下拉框的可选项
+    select.addEventListener('change', () => {
+        refreshGroupNpcOptions();
+    });
+    
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'group-npc-remove-btn';
+    removeBtn.innerHTML = '×';
+    removeBtn.onclick = function() {
+        row.style.animation = 'npcRowSlideIn 0.2s ease reverse';
+        setTimeout(() => {
+            row.remove();
+            refreshGroupNpcOptions();
+            // 如果没有行了，显示空状态
+            if (selectList.children.length === 0) {
+                selectList.innerHTML = '<div class="group-npc-empty-hint">点击上方 "添加" 按钮添加群成员~</div>';
+            }
+        }, 180);
+    };
+    
+    row.appendChild(select);
+    row.appendChild(removeBtn);
+    selectList.appendChild(row);
+    
+    // 滚动到底部
+    selectList.scrollTop = selectList.scrollHeight;
+}
+
+// 刷新所有NPC下拉框的可选项（排除已被其他行选中的）
+function refreshGroupNpcOptions() {
+    const selectList = document.getElementById('group-npc-select-list');
+    if (!selectList) return;
+    
+    const allSelects = selectList.querySelectorAll('select');
+    
+    // 收集每个 select 的当前选中值
+    const currentValues = [];
+    allSelects.forEach(sel => {
+        currentValues.push(sel.value);
+    });
+    
+    // 对每个 select 重新填充 options
+    allSelects.forEach((sel, i) => {
+        const myValue = currentValues[i];
+        // 其他行已选中的值（排除自己）
+        const othersSelected = currentValues.filter((v, j) => j !== i && v !== '').map(v => parseInt(v));
+        
+        sel.innerHTML = '<option value="">请选择角色...</option>';
+        if (npcCharacters && Array.isArray(npcCharacters)) {
+            npcCharacters.forEach((npc, index) => {
+                if (!othersSelected.includes(index)) {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.textContent = npc.name || `NPC ${index + 1}`;
+                    if (String(index) === myValue) {
+                        option.selected = true;
+                    }
+                    sel.appendChild(option);
+                }
+            });
+        }
+    });
 }
 
 function closeAddContactModal() {
     if(addContactModal) addContactModal.classList.remove('show');
 }
 
-function switchContactTab(type) {
-    const tabs = document.querySelectorAll('.contact-type-tabs .tab');
-    const privateSection = document.getElementById('add-contact-private-section');
-    const groupSection = document.getElementById('add-contact-group-section');
-    
-    tabs.forEach(t => t.classList.remove('active'));
-    
-    if(type === 'private') {
-        tabs[0].classList.add('active');
-        privateSection.style.display = 'block';
-        groupSection.style.display = 'none';
-    } else {
-        tabs[1].classList.add('active');
-        privateSection.style.display = 'none';
-        groupSection.style.display = 'block';
-        // Ensure at least one name input row is present
-        try { renderGroupInputs(); } catch(e) {}
-    }
+
+function switchContactTab() {
+    // Stub - no longer needed
 }
 
 function renderGroupInputs() {
-    const container = document.getElementById('group-names-container');
-    if (!container) return;
-    // 如果为空，初始化一行输入
-    if (container.children.length === 0) {
-        // 首行不可删除（没有减号）
-        addGroupNameRow(container, true, '', false);
-    }
+    // No longer needed with new select-based UI
 }
 
 function addGroupNameRow(container, focus=false, value='', removable=true) {
@@ -299,31 +411,37 @@ function confirmAddContact() {
         // 群聊逻辑
         const groupName = document.getElementById('group-name-input').value.trim();
         if (!groupName) {
-            alert('请输入群聊名称');
+            showToast('请输入群聊名称');
             return;
         }
 
-        const joinToggle = document.getElementById('group-join-toggle');
-        const joinGroup = joinToggle ? joinToggle.checked : false;
+        const userSelect = document.getElementById('group-chat-user-select');
 
-        const inputs = document.querySelectorAll('#group-names-container input');
-        const names = [];
-        
-        // 如果开启“我加入群聊”，将自己加入第一位
-        if (joinGroup) {
-            const myName = '{{user}}';
-            names.push(myName);
+        if (!userSelect.value) {
+            showToast('请选择群主');
+            return;
         }
 
-        inputs.forEach(inp => {
-            if(inp.value.trim()) names.push(inp.value.trim());
+        const names = [];
+        
+        // Add User (Owner)
+        const userIndex = parseInt(userSelect.value);
+        if (userCharacters[userIndex]) {
+            names.push(userCharacters[userIndex].name);
+            // Update current user to the selected group owner
+            appSettings.currentUserId = userIndex;
+        }
+
+        // Add NPCs from dynamic select list
+        const selectedNpcIndices = getSelectedNpcIndices();
+        selectedNpcIndices.forEach(npcIndex => {
+            if (npcCharacters[npcIndex]) {
+                names.push(npcCharacters[npcIndex].name);
+            }
         });
 
-        // 验证人数：如果不加入群聊，至少需要输入2个成员
-        // 如果加入群聊，算上自己至少2人，即输入至少1人
-        const minInputs = joinGroup ? 1 : 2;
-        if(names.length < 2) { // Total length check
-            alert(joinGroup ? '除自己外至少需要1个成员' : '群聊至少需要2个成员');
+        if(names.length < 2) {
+            showToast('群聊至少需要2个成员');
             return;
         }
         
@@ -347,8 +465,8 @@ function confirmAddContact() {
         const userSelect = document.getElementById('private-chat-user-select');
         const npcSelect = document.getElementById('private-chat-npc-select');
         
-        if (!userSelect.value || !npcSelect.value) {
-            alert('请选择我的身份和聊天对象');
+        if (userSelect.value === '' || npcSelect.value === '') {
+            showToast('请选择用户和角色');
             return;
         }
         
@@ -360,8 +478,8 @@ function confirmAddContact() {
         saveSettingsToStorage();
         
         // Get NPC name
-        if (!appSettings.npcCharacters) appSettings.npcCharacters = [];
-        const npc = appSettings.npcCharacters[npcIndex];
+        // if (!appSettings.npcCharacters) appSettings.npcCharacters = [];
+        const npc = npcCharacters[npcIndex];
         if (!npc) {
             console.error('NPC not found at index:', npcIndex);
             return;
@@ -466,6 +584,7 @@ if(messageListScreen && messageListScreen.style.display === 'flex') {
 }
 
 if(settingsScreen && settingsScreen.style.display === 'flex') {
+    saveTimeSettings();
     settingsScreen.style.display = 'none';
     if(homeScreen) homeScreen.style.display = 'flex';
     updateStatusBar('home');
@@ -475,15 +594,36 @@ if(settingsScreen && settingsScreen.style.display === 'flex') {
 const beautifyScreenBack = document.getElementById('beautify-screen');
 if(beautifyScreenBack && beautifyScreenBack.style.display === 'flex') {
     beautifyScreenBack.style.display = 'none';
-    if(homeScreen) homeScreen.style.display = 'flex';
-    updateStatusBar('home');
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    updateStatusBar('settings');
+    return;
+}
+
+const apiSettingsScreenBack = document.getElementById('api-settings-screen');
+if(apiSettingsScreenBack && apiSettingsScreenBack.style.display === 'flex') {
+    apiSettingsScreenBack.style.display = 'none';
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    updateStatusBar('settings');
+    return;
+}
+
+const dataSettingsScreenBack = document.getElementById('data-settings-screen');
+if(dataSettingsScreenBack && dataSettingsScreenBack.style.display === 'flex') {
+    dataSettingsScreenBack.style.display = 'none';
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    updateStatusBar('settings');
     return;
 }
 
 if(userSettingsScreen && userSettingsScreen.style.display === 'flex') {
     userSettingsScreen.style.display = 'none';
-    if(homeScreen) homeScreen.style.display = 'flex';
-    updateStatusBar('home');
+    if (_userSettingsFrom === 'settings') {
+        if(settingsScreen) settingsScreen.style.display = 'flex';
+        updateStatusBar('settings');
+    } else {
+        if(homeScreen) homeScreen.style.display = 'flex';
+        updateStatusBar('home');
+    }
     return;
 }
 
@@ -543,7 +683,7 @@ function renderMessageList() {
             if (body.includes('|视频|')) return '[视频]';
             if (body.includes('|文件|')) return '[文件]';
             if (body.includes('|位置|')) return '[位置]';
-            if (body.includes('|转账|')) return '[转账]';
+            if (body.includes('|转账|') || body.includes('|TRANS|')) return '[转账]';
             if (body.includes('|表情包|')) return '[表情包]';
         }
         // Strip quotes and return a snippet
@@ -587,21 +727,64 @@ function renderMessageList() {
 }
 
 function openSettings() {
-// Load API Settings
-document.getElementById('set-api-endpoint').value = appSettings.apiEndpoint || 'https://api.openai.com/v1';
-document.getElementById('set-api-key').value = appSettings.apiKey || '';
-document.getElementById('set-api-model').innerHTML = `<option value="${appSettings.apiModel || 'gpt-3.5-turbo'}">${appSettings.apiModel || 'gpt-3.5-turbo'}</option>`;
-document.getElementById('set-system-prompt').value = appSettings.systemPrompt || '你是一个智能助手。';
+    if(homeScreen) homeScreen.style.display = 'none';
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    // 加载时间设置到导航页
+    let displayTime = '';
+    if (appSettings.timeOffset) {
+        const now = new Date();
+        const target = new Date(now.getTime() + appSettings.timeOffset);
+        displayTime = `${target.getHours().toString().padStart(2,'0')}:${target.getMinutes().toString().padStart(2,'0')}`;
+    } else {
+        displayTime = appSettings.customTime || '';
+    }
+    const timeInput = document.getElementById('set-custom-time');
+    if (timeInput) timeInput.value = displayTime;
+    updateStatusBar('settings');
+}
 
-if(homeScreen) homeScreen.style.display = 'none';
-if(settingsScreen) settingsScreen.style.display = 'flex';
-updateStatusBar('settings');
+function saveTimeSettings() {
+    const timeInput = document.getElementById('set-custom-time').value;
+    if (timeInput && /^\d{1,2}:\d{2}$/.test(timeInput)) {
+        const now = new Date();
+        const [h, m] = timeInput.split(':');
+        const target = new Date(now);
+        target.setHours(parseInt(h));
+        target.setMinutes(parseInt(m));
+        target.setSeconds(0);
+        appSettings.timeOffset = target.getTime() - now.getTime();
+        appSettings.customTime = timeInput;
+    } else {
+        appSettings.timeOffset = 0;
+        appSettings.customTime = '';
+    }
+    saveSettingsToStorage();
 }
 
 function closeSettings() {
+    saveTimeSettings();
     if(settingsScreen) settingsScreen.style.display = 'none';
     if(homeScreen) homeScreen.style.display = 'flex';
     updateStatusBar('home');
+}
+
+function openApiSettings() {
+    document.getElementById('set-api-endpoint').value = appSettings.apiEndpoint || 'https://api.openai.com/v1';
+    document.getElementById('set-api-key').value = appSettings.apiKey || '';
+    document.getElementById('set-api-model').innerHTML = `<option value="${appSettings.apiModel || 'gpt-3.5-turbo'}">${appSettings.apiModel || 'gpt-3.5-turbo'}</option>`;
+    document.getElementById('set-system-prompt').value = appSettings.systemPrompt || '你是一个智能助手。';
+
+    if(settingsScreen) settingsScreen.style.display = 'none';
+    const apiScreen = document.getElementById('api-settings-screen');
+    if(apiScreen) apiScreen.style.display = 'flex';
+    updateStatusBar('settings');
+}
+
+function closeApiSettings() {
+    const apiScreen = document.getElementById('api-settings-screen');
+    if(apiScreen) apiScreen.style.display = 'none';
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    updateStatusBar('settings');
 }
 
 function saveApiSettings() {
@@ -610,7 +793,82 @@ function saveApiSettings() {
     appSettings.apiModel = document.getElementById('set-api-model').value;
     appSettings.systemPrompt = document.getElementById('set-system-prompt').value;
     saveSettingsToStorage();
-    closeSettings();
+    closeApiSettings();
+}
+
+function openDataSettings() {
+    if(settingsScreen) settingsScreen.style.display = 'none';
+    const dataScreen = document.getElementById('data-settings-screen');
+    if(dataScreen) dataScreen.style.display = 'flex';
+    updateStatusBar('settings');
+}
+
+function closeDataSettings() {
+    const dataScreen = document.getElementById('data-settings-screen');
+    if(dataScreen) dataScreen.style.display = 'none';
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    updateStatusBar('settings');
+}
+
+function exportAllData() {
+    try {
+        const allData = {};
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key.startsWith('faye-phone')) {
+                allData[key] = localStorage.getItem(key);
+            }
+        }
+        const blob = new Blob([JSON.stringify(allData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `phone-backup-${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('✅ 备份成功');
+    } catch(e) {
+        showToast('❌ 备份失败');
+    }
+}
+
+function importAllData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                for (const [key, value] of Object.entries(data)) {
+                    localStorage.setItem(key, value);
+                }
+                showToast('✅ 恢复成功，刷新页面生效');
+                setTimeout(() => location.reload(), 1500);
+            } catch(err) {
+                showToast('❌ 文件格式错误');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+function clearAllData() {
+    if (!confirm('确定要清除所有数据吗？此操作不可恢复！')) return;
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith('faye-phone')) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    showToast('✅ 数据已清除');
+    setTimeout(() => location.reload(), 1500);
 }
 
 function openBeautifySettings() {
@@ -618,19 +876,9 @@ document.getElementById('set-icon-bg').value = appSettings.iconBg;
 document.getElementById('set-icon-color').value = appSettings.iconColor;
 document.getElementById('set-home-text-color').value = appSettings.homeTextColor;
 document.getElementById('set-custom-css').value = appSettings.customCss || '';
-
-let displayTime = '';
-if (appSettings.timeOffset) {
-    const now = new Date();
-    const target = new Date(now.getTime() + appSettings.timeOffset);
-    displayTime = `${target.getHours().toString().padStart(2,'0')}:${target.getMinutes().toString().padStart(2,'0')}`;
-} else {
-    displayTime = appSettings.customTime || '';
-}
-document.getElementById('set-custom-time').value = displayTime;
 document.getElementById('preview-home-bg').src = appSettings.homeBg || '';
 
-if(homeScreen) homeScreen.style.display = 'none';
+if(settingsScreen) settingsScreen.style.display = 'none';
 const beautifyScreen = document.getElementById('beautify-screen');
 if(beautifyScreen) beautifyScreen.style.display = 'flex';
 updateStatusBar('settings');
@@ -639,8 +887,8 @@ updateStatusBar('settings');
 function closeBeautifySettings() {
     const beautifyScreen = document.getElementById('beautify-screen');
     if(beautifyScreen) beautifyScreen.style.display = 'none';
-    if(homeScreen) homeScreen.style.display = 'flex';
-    updateStatusBar('home');
+    if(settingsScreen) settingsScreen.style.display = 'flex';
+    updateStatusBar('settings');
 }
 
 async function saveBeautifySettings() {
@@ -648,21 +896,6 @@ appSettings.iconBg = document.getElementById('set-icon-bg').value;
 appSettings.iconColor = document.getElementById('set-icon-color').value;
 appSettings.homeTextColor = document.getElementById('set-home-text-color').value;
 appSettings.customCss = document.getElementById('set-custom-css').value;
-
-const timeInput = document.getElementById('set-custom-time').value;
-if (timeInput && /^\d{1,2}:\d{2}$/.test(timeInput)) {
-    const now = new Date();
-    const [h, m] = timeInput.split(':');
-    const target = new Date(now);
-    target.setHours(parseInt(h));
-    target.setMinutes(parseInt(m));
-    target.setSeconds(0);
-    appSettings.timeOffset = target.getTime() - now.getTime();
-    appSettings.customTime = timeInput; 
-} else {
-    appSettings.timeOffset = 0;
-    appSettings.customTime = '';
-}
 
 applySettings();
 
@@ -1288,6 +1521,21 @@ else if (type === 'call') { startVoiceCall(); }
 else if (type === 'camera') { if(videoInput) videoInput.click(); }
 }
 
+function showToast(message) {
+    let toast = document.querySelector('.cute-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.className = 'cute-toast';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.add('show');
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2000);
+}
+
 function openModal(title, fields, confirmCallback) {
 modalTitle.textContent = title; modalInputsContainer.innerHTML = '';
 fields.forEach(field => {
@@ -1316,7 +1564,7 @@ currentConfirmAction = confirmCallback; modal.classList.add('show');
 }
 
 async function sendLocation(addr) { try { const t = getTime(); const u = '{{user}}'; const h = appSettings.blockUser ? `[${u}|位置|${t}|!]` : `[${u}|位置|${t}]`; renderMessageToUI({ header: h, body: addr, isUser: true, type: 'location' }); } catch (e) {} }
-async function sendTransfer(amt, note) { try { const t = getTime(); const u = '{{user}}'; const h = appSettings.blockUser ? `[${u}|转账|${t}|!]` : `[${u}|转账|${t}]`; renderMessageToUI({ header: h, body: `${amt}|${note||''}`, isUser: true, type: 'transfer' }); } catch (e) {} }
+async function sendTransfer(amt, note) { try { const t = getTime(); const u = '{{user}}'; const h = appSettings.blockUser ? `[${u}|TRANS|${t}|!]` : `[${u}|TRANS|${t}]`; renderMessageToUI({ header: h, body: `${amt}|${note||''}`, isUser: true, type: 'transfer' }); } catch (e) {} }
 async function sendFile(fn) { try { const t = getTime(); const u = '{{user}}'; const h = appSettings.blockUser ? `[${u}|文件|${t}|!]` : `[${u}|文件|${t}]`; renderMessageToUI({ header: h, body: fn, isUser: true, type: 'file' }); } catch (e) {} }
 async function sendVoice(dur, txt) { try { const t = getTime(); const u = '{{user}}'; const h = appSettings.blockUser ? `[${u}|语音|${t}|!]` : `[${u}|语音|${t}]`; renderMessageToUI({ header: h, body: `${dur}|${txt||''}`, isUser: true, type: 'voice' }); } catch (e) {} }
 async function sendPhoto(base64) { try { const t = getTime(); const u = '{{user}}'; renderMessageToUI({ header: `[${u}|图片|${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) {} }
@@ -1434,7 +1682,7 @@ if (text) {
 // 3. 触发AI回复逻辑：只有输入框为空且本次没有发送文件时才触发AI
 // AI generation is disabled in standalone mode.
 // renderMessageList(); // 暂不刷新列表，避免跳动，sendMessage只更新当前聊天窗口
-if (text || fileSent) {
+if (!text && !fileSent) {
     triggerGenerate();
 }
 }
@@ -1708,8 +1956,8 @@ if (transferStatusMatch) {
 
 
 // NEW: 处理撤回消息
-if (msg.header && msg.header.includes('|撤回|')) {
-    const row = document.createElement('div'); 
+if (msg.header && (msg.header.includes('|撤回|') || msg.header.includes('|RECALL'))) {
+    const row = document.createElement('div');
     row.className = 'message-row system';
     row.style.justifyContent = 'center';
     row.style.margin = '10px 0';
@@ -1728,10 +1976,13 @@ if (msg.header && msg.header.includes('|撤回|')) {
          if (parts.length > 0 && parts[0]) displayName = parts[0];
     }
     
-    const isVoice = msg.header.includes('语音');
+    const isVoice = msg.header.includes('语音') || msg.header.includes('VOC');
     const typeText = isVoice ? '语音' : '信息';
     
-    el.textContent = `${displayName}撤回了一条${typeText}：${msg.body}`;
+    el.textContent = `${displayName}撤回了一条${typeText}`;
+    if (msg.body && msg.body.trim()) {
+        el.textContent += `：${msg.body}`;
+    }
     el.dataset.fullHeader = msg.header;
     el.dataset.rawBody = msg.body;
     
@@ -1795,14 +2046,16 @@ container.appendChild(nameEl);
 const wrapper = document.createElement('div'); wrapper.className = 'msg-wrapper';
 
 let el;
-const isLoc = msg.type === 'location' || (msg.header && msg.header.includes('位置'));
-const isTra = (msg.type === 'transfer' || (msg.header && msg.header.includes('转账'))) && !(msg.header && (msg.header.includes('已接收') || msg.header.includes('已退还')));
-const isFile = msg.type === 'file' || (msg.header && msg.header.includes('文件'));
-const isVoice = msg.type === 'voice' || (msg.header && msg.header.includes('语音'));
+const isLoc = msg.type === 'location' || (msg.header && (msg.header.includes('位置') || msg.header.includes('|LOC|')));
+const isTra = (msg.type === 'transfer' || (msg.header && (msg.header.includes('转账') || msg.header.includes('TRANS')))) && !(msg.header && (msg.header.includes('已接收') || msg.header.includes('已退还')));
+const isFile = msg.type === 'file' || (msg.header && (msg.header.includes('文件') || msg.header.includes('|FILE|')));
+const isVoice = msg.type === 'voice' || (msg.header && (msg.header.includes('语音') || msg.header.includes('|VOC|')));
 const isVideo = msg.type === 'video' || (msg.header && msg.header.includes('视频'));
-let isPhoto = msg.type === 'photo' || (msg.header && msg.header.includes('图片'));
+let isPhoto = msg.type === 'photo' || (msg.header && (msg.header.includes('图片') || msg.header.includes('|IMG|')));
 const isSticker = msg.type === 'sticker' || (msg.header && msg.header.includes('表情包'));
 const isCallMsg = msg.type === 'call_message' || msg.type === 'call_end' || msg.type === 'call_reject' || (msg.header && (msg.header.includes('通话') || msg.header.includes('挂断') || msg.header.includes('拒接')));
+const isLink = msg.type === 'link' || (msg.header && msg.header.includes('|LINK|'));
+const isDeliver = msg.type === 'deliver' || (msg.header && (msg.header.includes('|DELIVER|') || msg.header.includes('|ORDER|')));
 
 const timeMatch = msg.header ? msg.header.match(/\|(\d{2}:\d{2})/) : null;
 const timeStr = timeMatch ? timeMatch[1] : getTime();
@@ -1819,13 +2072,13 @@ if (thoughtMatch) { displayBody = thoughtMatch[1].trim(); displayThought = thoug
 const rawBodyForHistory = displayBody;
 
 // Auto-detect Pollinations AI images or Markdown images OR <img> tag images
-if (!isLoc && !isTra && !isFile && !isVoice && !isSticker && !isCallMsg) {
-    if (/^!\[.*?\]\(.*?\)$/.test(displayBody) || 
+if (!isLoc && !isTra && !isFile && !isVoice && !isSticker && !isCallMsg && !isLink && !isDeliver) {
+    if (/^!\[.*?\]\(.*?\)$/.test(displayBody) ||
         /^https?:\/\/image\.pollinations\.ai\/prompt\//.test(displayBody) ||
         /^<img>.*?<\/img>$/.test(displayBody)) {
         isPhoto = true;
         // Ensure header has |图片| tag for consistency
-        if (msg.header && !msg.header.includes('图片')) {
+        if (msg.header && !msg.header.includes('图片') && !msg.header.includes('IMG')) {
             const parts = msg.header.replace(/^\[|\]$|^【|】$/g, '').split('|');
             if (parts.length >= 2) {
                 const t = parts.pop();
@@ -1843,20 +2096,49 @@ if (isPhoto) {
 
 // Quote Parsing
 let quoteHtml = '';
-const quoteRegex = /「`回复 (.*?)[：:](.*?)`」/;
-const quoteMatch = displayBody.match(quoteRegex);
-if (quoteMatch) {
-    const qName = quoteMatch[1];
-    const qText = quoteMatch[2];
-    // Remove quote from body
-    displayBody = displayBody.replace(quoteMatch[0], '').trim();
-    // Build Quote HTML
-    quoteHtml = `<div class="msg-quote"><div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
+
+// 1. Try New Format: [名字|REP|引用类型|时间]引用内容|回复内容
+const newQuoteRegex = /^\[(.*?)\|REP\|(.*?)\|(.*?)\](.*?)\|(.*)$/s;
+const newQuoteMatch = displayBody.match(newQuoteRegex);
+
+if (newQuoteMatch) {
+    const qName = newQuoteMatch[1];
+    const qType = newQuoteMatch[2];
+    const qTime = newQuoteMatch[3];
+    const qContent = newQuoteMatch[4];
+    const replyContent = newQuoteMatch[5];
+
+    displayBody = replyContent.trim();
+    
+    quoteHtml = `<div class="msg-quote">
+        <div class="msg-quote-content">
+            <div style="display:flex;justify-content:space-between;opacity:0.7;font-size:12px;margin-bottom:2px;">
+                <span>${qName}</span>
+                <span>${qTime}</span>
+            </div>
+            <div style="color:#666;">${qContent}</div>
+        </div>
+    </div>`;
+} else {
+    // 2. Fallback to Old Format
+    const quoteRegex = /「`回复 (.*?)[：:](.*?)`」/;
+    const quoteMatch = displayBody.match(quoteRegex);
+    if (quoteMatch) {
+        const qName = quoteMatch[1];
+        const qText = quoteMatch[2];
+        // Remove quote from body
+        displayBody = displayBody.replace(quoteMatch[0], '').trim();
+        // Build Quote HTML
+        quoteHtml = `<div class="msg-quote"><div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
+    }
 }
 
 if (isLoc) {
-el = document.createElement('div'); el.className = `location-card ${msg.isUser ? 'sent' : 'received'}`;
-el.innerHTML = `<div class="location-info"><div class="location-name">${displayBody}</div></div><div class="location-map"><svg class="location-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></div>`;
+    const parts = displayBody.split('|');
+    const placeName = parts[0];
+    const address = parts[1] || '';
+    el = document.createElement('div'); el.className = `location-card ${msg.isUser ? 'sent' : 'received'}`;
+    el.innerHTML = `<div class="location-info"><div class="location-name">${placeName}</div><div class="location-address" style="font-size:12px;opacity:0.8;margin-top:2px;">${address}</div></div><div class="location-map"><svg class="location-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></div>`;
 } else if (isTra) {
     const parts = displayBody.split('|');
     const amount = parts[0] || '¥ 0.00';
@@ -1880,8 +2162,46 @@ if (status === 'pending') {
     };
 }
 } else if (isFile) {
-el = document.createElement('div'); el.className = `file-card ${msg.isUser ? 'sent' : 'received'}`;
-el.innerHTML = `<div class="file-info"><div class="file-name">${displayBody}</div><div class="file-size">128 KB</div></div><div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#eee"></path><polyline points="14 2 14 8 20 8" fill="#ddd"></polyline><text x="50%" y="18" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">FILE</text></svg></div>`;
+    const parts = displayBody.split('|');
+    const fileName = parts[0];
+    const fileSize = parts[1] || 'Unknown';
+    el = document.createElement('div'); el.className = `file-card ${msg.isUser ? 'sent' : 'received'}`;
+    el.innerHTML = `<div class="file-info"><div class="file-name">${fileName}</div><div class="file-size">${fileSize}</div></div><div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#eee"></path><polyline points="14 2 14 8 20 8" fill="#ddd"></polyline><text x="50%" y="18" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">FILE</text></svg></div>`;
+} else if (isLink) {
+    const parts = displayBody.split('|');
+    const title = parts[0] || 'Product';
+    const price = parts[1] || '';
+    const imgUrl = parts[2] || '';
+    
+    el = document.createElement('div'); el.className = `link-card ${msg.isUser ? 'sent' : 'received'}`;
+    el.innerHTML = `
+        <div class="link-content">
+            <div class="link-title">${title}</div>
+            <div class="link-price">${price}</div>
+        </div>
+        <div class="link-image">
+            ${imgUrl ? `<img src="${imgUrl}" onerror="this.style.display='none'">` : '<div class="link-placeholder">LINK</div>'}
+        </div>
+    `;
+} else if (isDeliver) {
+    const parts = displayBody.split('|');
+    const shopName = parts[0] || 'Delivery';
+    const summary = parts[1] || '';
+    const total = parts[2] || '';
+    
+    el = document.createElement('div'); el.className = `deliver-card ${msg.isUser ? 'sent' : 'received'}`;
+    el.innerHTML = `
+        <div class="deliver-top">
+            <div class="deliver-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
+            <div class="deliver-shop">${shopName}</div>
+        </div>
+        <div class="deliver-mid">
+            <div class="deliver-summary">${summary}</div>
+        </div>
+        <div class="deliver-bottom">
+            <div class="deliver-total">${total}</div>
+        </div>
+    `;
 } else if (isCallMsg) {
     el = document.createElement('div');
     el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'}`;
@@ -2260,20 +2580,53 @@ function showMessageActionMenu(el) {
 }
 
 function executeQuote(el) {
-    let text = '';
-    if (el.classList.contains('bubble')) text = el.textContent;
-    else if (el.dataset.fullHeader) {
-        text = el.textContent || '[媒体消息]';
-    }
-    
     const row = el.closest('.message-row');
     const nameEl = row.querySelector('.msg-name');
     const name = nameEl ? nameEl.textContent : '对方';
     
-    // 使用反引号包裹引用内容，以便渲染时识别
-    const quoteText = `「\`回复 ${name}：${text}\`」`;
+    const timeEl = row.querySelector('.msg-time');
+    const time = timeEl ? timeEl.textContent : getTime();
+
+    let type = 'TXT';
+    let content = '';
+
+    if (el.classList.contains('bubble')) {
+        type = 'TXT';
+        content = el.textContent || '';
+        content = content.replace(/\|/g, '｜'); // Sanitize separator
+        if (content.length > 10) {
+            content = content.substring(0, 10) + '...';
+        }
+    } else if (el.classList.contains('photo-card') || el.classList.contains('sticker-bubble')) {
+        type = 'IMG';
+        content = '[图片]';
+    } else if (el.classList.contains('voice-card') || el.classList.contains('real-audio-card')) {
+        type = 'VOC';
+        content = '[语音]';
+    } else if (el.classList.contains('location-card')) {
+        type = 'LOC';
+        content = '[位置]';
+    } else if (el.classList.contains('transfer-card')) {
+        type = 'TRA';
+        content = '[转账]';
+    } else if (el.classList.contains('file-card')) {
+        type = 'FIL';
+        content = '[文件]';
+    } else if (el.querySelector('video') || (el.dataset.fullHeader && el.dataset.fullHeader.includes('视频'))) {
+         type = 'VID';
+         content = '[视频]';
+    } else {
+        type = 'TXT';
+        content = el.textContent || '[消息]';
+        content = content.replace(/\|/g, '｜');
+        if (content.length > 10) content = content.substring(0, 10) + '...';
+    }
+
+    // Format: [名字|REP|引用类型|时间]引用内容|
+    const quoteStr = `[${name}|REP|${type}|${time}]${content}|`;
+    
     const input = document.getElementById('message-input');
-    input.value = quoteText + input.value;
+    input.value = quoteStr + input.value;
     input.focus();
     adjustTextareaHeight();
 }
@@ -2322,16 +2675,42 @@ function executeEdit(el) {
         
         if (el.classList.contains('bubble')) {
             // Re-parse quote logic
-            const quoteRegex = /「`回复 (.*?)[：:](.*?)`」/;
-            const quoteMatch = newText.match(quoteRegex);
             let displayBody = newText;
             let quoteHtml = '';
-            
-            if (quoteMatch) {
-                const qName = quoteMatch[1];
-                const qText = quoteMatch[2];
-                displayBody = displayBody.replace(quoteMatch[0], '').trim();
-                quoteHtml = `<div class="msg-quote"><div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
+
+            // 1. Try New Format
+            const newQuoteRegex = /^\[(.*?)\|REP\|(.*?)\|(.*?)\](.*?)\|(.*)$/s;
+            const newQuoteMatch = newText.match(newQuoteRegex);
+
+            if (newQuoteMatch) {
+                const qName = newQuoteMatch[1];
+                const qType = newQuoteMatch[2];
+                const qTime = newQuoteMatch[3];
+                const qContent = newQuoteMatch[4];
+                const replyContent = newQuoteMatch[5];
+
+                displayBody = replyContent.trim();
+
+                quoteHtml = `<div class="msg-quote">
+                    <div class="msg-quote-content">
+                        <div style="display:flex;justify-content:space-between;opacity:0.7;font-size:12px;margin-bottom:2px;">
+                            <span>${qName}</span>
+                            <span>${qTime}</span>
+                        </div>
+                        <div style="color:#666;">${qContent}</div>
+                    </div>
+                </div>`;
+            } else {
+                // 2. Fallback to Old Format
+                const quoteRegex = /「`回复 (.*?)[：:](.*?)`」/;
+                const quoteMatch = newText.match(quoteRegex);
+                
+                if (quoteMatch) {
+                    const qName = quoteMatch[1];
+                    const qText = quoteMatch[2];
+                    displayBody = displayBody.replace(quoteMatch[0], '').trim();
+                    quoteHtml = `<div class="msg-quote"><div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
+                }
             }
             
             el.innerHTML = quoteHtml + displayBody.replace(/\n/g, '<br>');
@@ -2754,8 +3133,11 @@ function saveUsersToStorage() {
     localStorage.setItem('userCharacters', JSON.stringify(userCharacters));
 }
 
-function openUserSettings() {
+let _userSettingsFrom = 'home'; // Track where user-settings was opened from
+function openUserSettings(from) {
+    _userSettingsFrom = from || 'home';
     if (homeScreen) homeScreen.style.display = 'none';
+    if (settingsScreen) settingsScreen.style.display = 'none';
     const screen = document.getElementById('user-settings-screen');
     if (screen) screen.style.display = 'flex';
     updateStatusBar('settings');
@@ -3153,6 +3535,7 @@ window.openAddContactModal = openAddContactModal;
 window.closeAddContactModal = closeAddContactModal;
 window.switchContactTab = switchContactTab;
 window.renderGroupInputs = renderGroupInputs;
+window.addGroupNpcSelect = addGroupNpcSelect;
 window.confirmAddContact = confirmAddContact;
 window.closeChatSettings = closeChatSettings;
 window.deleteCurrentChat = deleteCurrentChat;
@@ -3194,6 +3577,10 @@ function setScreenDisplay(screenId = 'home-screen') {
     if (userSettingsScreen) userSettingsScreen.style.display = 'none';
     const beautifyScreen = document.getElementById('beautify-screen');
     if (beautifyScreen) beautifyScreen.style.display = 'none';
+    const apiSettingsScreen = document.getElementById('api-settings-screen');
+    if (apiSettingsScreen) apiSettingsScreen.style.display = 'none';
+    const dataSettingsScreen = document.getElementById('data-settings-screen');
+    if (dataSettingsScreen) dataSettingsScreen.style.display = 'none';
     if (document.getElementById('call-screen')) document.getElementById('call-screen').style.display = 'none';
 
     // Show the requested screen
@@ -3653,7 +4040,9 @@ async function triggerGenerate() {
         
         // System Prompt
         if (appSettings.systemPrompt) {
-            messages.push({ role: 'system', content: appSettings.systemPrompt });
+            messages.push({ role: 'system', content: appSettings.systemPrompt + "\n\n[System Note: You must hide your thinking process. Do not output <think> tags or reasoning content. Start your response directly. To send multiple separate message bubbles, use the delimiter '|||' to separate them.]" });
+        } else {
+             messages.push({ role: 'system', content: "You must hide your thinking process. Do not output <think> tags or reasoning content. Start your response directly. To send multiple separate message bubbles, use the delimiter '|||' to separate them." });
         }
 
         // Chat History (Last 20 messages)
@@ -3732,84 +4121,72 @@ async function handleGenerationResponse(stream) {
     const typing = document.querySelector('.message-row.received .typing-indicator');
     if (typing) typing.closest('.message-row').remove();
 
-    // Create a new message bubble for streaming
-    const t = getTime();
     const u = currentChatTarget || '{{char}}';
-    
-    // We need a custom render to support streaming updates
-    const row = document.createElement('div');
-    row.className = 'message-row received';
-    
     let avatarSrc = appSettings.charAvatar;
     if (appSettings.memberAvatars && appSettings.memberAvatars[u]) {
         avatarSrc = appSettings.memberAvatars[u];
     }
-    
-    const avatar = document.createElement('img');
-    avatar.className = 'message-avatar';
-    avatar.src = avatarSrc;
-    
-    const container = document.createElement('div');
-    container.className = 'msg-container';
-    
-    const nameEl = document.createElement('div');
-    nameEl.className = 'msg-name';
-    nameEl.textContent = u;
-    container.appendChild(nameEl);
-    
-    const wrapper = document.createElement('div');
-    wrapper.className = 'msg-bubble-wrapper';
-    
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.style.backgroundColor = appSettings.charBubble;
-    bubble.style.color = appSettings.charText;
-    
-    // Thinking Process Container
-    const thinkingContainer = document.createElement('div');
-    thinkingContainer.className = 'msg-thinking-container';
-    thinkingContainer.style.display = 'none'; // Hidden by default until content arrives
-    
-    const thinkingToggle = document.createElement('div');
-    thinkingToggle.className = 'thinking-toggle';
-    thinkingToggle.textContent = '思考过程';
-    thinkingToggle.onclick = () => {
-        thinkingContent.classList.toggle('visible');
-    };
-    
-    const thinkingContent = document.createElement('div');
-    thinkingContent.className = 'thinking-content';
-    
-    thinkingContainer.appendChild(thinkingToggle);
-    thinkingContainer.appendChild(thinkingContent);
-    bubble.appendChild(thinkingContainer);
 
-    // Main Content Span
-    const contentSpan = document.createElement('span');
-    bubble.appendChild(contentSpan);
-    
-    wrapper.appendChild(bubble);
-    
-    // Meta (Time)
-    const metaContainer = document.createElement('div');
-    metaContainer.className = 'msg-meta';
-    const timeEl = document.createElement('span');
-    timeEl.className = 'msg-time';
-    timeEl.textContent = t;
-    metaContainer.appendChild(timeEl);
-    
-    wrapper.appendChild(metaContainer);
-    container.appendChild(wrapper);
-    row.appendChild(avatar);
-    row.appendChild(container);
-    chatMessages.appendChild(row);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Helper to create a new bubble
+    let currentContentSpan = null;
+
+    function createNewBubble() {
+        const row = document.createElement('div');
+        row.className = 'message-row received';
+
+        const avatar = document.createElement('img');
+        avatar.className = 'avatar';
+        avatar.src = avatarSrc;
+
+        const container = document.createElement('div');
+        container.className = 'msg-container';
+
+        const nameEl = document.createElement('div');
+        nameEl.className = 'msg-name';
+        nameEl.textContent = u;
+        container.appendChild(nameEl);
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble bubble-received';
+        bubble.style.backgroundColor = appSettings.charBubble;
+        bubble.style.color = appSettings.charText;
+
+        const contentSpan = document.createElement('span');
+        bubble.appendChild(contentSpan);
+
+        wrapper.appendChild(bubble);
+
+        // Meta (Time)
+        const metaContainer = document.createElement('div');
+        metaContainer.className = 'msg-meta';
+        const timeEl = document.createElement('span');
+        timeEl.className = 'msg-time';
+        timeEl.textContent = getTime();
+        metaContainer.appendChild(timeEl);
+
+        wrapper.appendChild(metaContainer);
+        container.appendChild(wrapper);
+        row.appendChild(avatar);
+        row.appendChild(container);
+        chatMessages.appendChild(row);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        currentContentSpan = contentSpan;
+        
+        // Add long press handler
+        if (typeof addLongPressHandler === 'function') addLongPressHandler(bubble);
+    }
+
+    // Create first bubble
+    createNewBubble();
 
     let fullText = '';
-    let thinkingText = '';
     let isThinking = false;
-    let streamBuffer = ''; // Buffer for SSE lines
-    let contentBuffer = ''; // Buffer for content parsing (handling split tags)
+    let streamBuffer = '';
+    let contentBuffer = '';
 
     while (true) {
         const { done, value } = await reader.read();
@@ -3830,76 +4207,81 @@ async function handleGenerationResponse(stream) {
                     const data = JSON.parse(dataStr);
                     const delta = data.choices[0].delta;
                     
-                    // 1. Handle explicit reasoning_content (DeepSeek R1 via some providers)
+                    // 1. Ignore explicit reasoning_content (DeepSeek R1)
                     if (delta.reasoning_content) {
-                        isThinking = true;
-                        thinkingContainer.style.display = 'block';
-                        thinkingText += delta.reasoning_content;
-                        thinkingContent.textContent = thinkingText;
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
                         continue;
                     }
 
-                    // 2. Handle content with potential <think> tags
+                    // 2. Handle content
                     if (delta.content) {
                         contentBuffer += delta.content;
                         
-                        // Process contentBuffer loop to handle multiple tags or split tags
+                        // Process contentBuffer
                         while (true) {
                             if (!isThinking) {
                                 const startIdx = contentBuffer.indexOf('<think>');
-                                if (startIdx !== -1) {
-                                    // Found start tag
+                                const splitIdx = contentBuffer.indexOf('|||');
+                                
+                                // Priority: <think> hides content. ||| splits content.
+                                if (startIdx !== -1 && (splitIdx === -1 || startIdx < splitIdx)) {
+                                    // Found <think> start
                                     fullText += contentBuffer.substring(0, startIdx);
-                                    contentSpan.textContent = fullText;
+                                    currentContentSpan.textContent = fullText;
                                     
-                                    contentBuffer = contentBuffer.substring(startIdx + 7); // Remove <think>
+                                    contentBuffer = contentBuffer.substring(startIdx + 7);
                                     isThinking = true;
-                                    thinkingContainer.style.display = 'block';
+                                } else if (splitIdx !== -1) {
+                                    // Found ||| delimiter
+                                    fullText += contentBuffer.substring(0, splitIdx);
+                                    currentContentSpan.textContent = fullText;
+                                    
+                                    contentBuffer = contentBuffer.substring(splitIdx + 3);
+                                    fullText = ''; // Reset for new bubble
+                                    createNewBubble();
                                 } else {
-                                    // No start tag found.
-                                    // Check for partial tag at the end (e.g. "<th")
-                                    // We keep the partial tag in buffer, flush the rest.
+                                    // Check for partial tags
                                     const lastOpen = contentBuffer.lastIndexOf('<');
-                                    if (lastOpen !== -1 && lastOpen > contentBuffer.length - 7) {
-                                        // Possible partial tag
-                                        fullText += contentBuffer.substring(0, lastOpen);
-                                        contentSpan.textContent = fullText;
-                                        contentBuffer = contentBuffer.substring(lastOpen);
+                                    const possibleThink = lastOpen !== -1 && lastOpen > contentBuffer.length - 7;
+                                    
+                                    const lastPipe = contentBuffer.lastIndexOf('|');
+                                    const possibleSplit = lastPipe !== -1 && lastPipe > contentBuffer.length - 3;
+                                    
+                                    if (possibleThink || possibleSplit) {
+                                        // Flush safe part
+                                        let safeEnd = Math.min(
+                                            possibleThink ? lastOpen : contentBuffer.length,
+                                            possibleSplit ? lastPipe : contentBuffer.length
+                                        );
+                                        
+                                        if (safeEnd > 0) {
+                                            fullText += contentBuffer.substring(0, safeEnd);
+                                            currentContentSpan.textContent = fullText;
+                                            contentBuffer = contentBuffer.substring(safeEnd);
+                                        }
+                                        break; // Wait for more data
                                     } else {
                                         // Safe to flush all
                                         fullText += contentBuffer;
-                                        contentSpan.textContent = fullText;
+                                        currentContentSpan.textContent = fullText;
                                         contentBuffer = '';
+                                        break;
                                     }
-                                    break; // Need more data
                                 }
                             } else {
-                                // We are in thinking mode
+                                // In thinking mode - discard content
                                 const endIdx = contentBuffer.indexOf('</think>');
                                 if (endIdx !== -1) {
-                                    // Found end tag
-                                    thinkingText += contentBuffer.substring(0, endIdx);
-                                    thinkingContent.textContent = thinkingText;
-                                    
-                                    contentBuffer = contentBuffer.substring(endIdx + 8); // Remove </think>
+                                    contentBuffer = contentBuffer.substring(endIdx + 8);
                                     isThinking = false;
                                 } else {
-                                    // No end tag found.
-                                    // Check for partial end tag at the end (e.g. "</thi")
+                                    // Check partial end tag
                                     const lastOpen = contentBuffer.lastIndexOf('<');
                                     if (lastOpen !== -1 && lastOpen > contentBuffer.length - 8) {
-                                        // Possible partial tag
-                                        thinkingText += contentBuffer.substring(0, lastOpen);
-                                        thinkingContent.textContent = thinkingText;
                                         contentBuffer = contentBuffer.substring(lastOpen);
                                     } else {
-                                        // Safe to flush all
-                                        thinkingText += contentBuffer;
-                                        thinkingContent.textContent = thinkingText;
                                         contentBuffer = '';
                                     }
-                                    break; // Need more data
+                                    break;
                                 }
                             }
                         }
@@ -3978,7 +4360,20 @@ async function handleGenerationResponse(stream) {
         closeUserCreatePage,
         showAddActionSheet,
         hideAddActionSheet,
-        closeAddContactModal
+        closeAddContactModal,
+        addGroupNpcSelect,
+        // Settings sub-pages
+        openApiSettings,
+        closeApiSettings,
+        openDataSettings,
+        closeDataSettings,
+        openBeautifySettings,
+        closeBeautifySettings,
+        saveBeautifySettings,
+        saveApiSettings,
+        exportAllData,
+        importAllData,
+        clearAllData
     });
 
 })();
