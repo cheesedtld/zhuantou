@@ -919,7 +919,7 @@ input:checked+.slider:before {
 /* 模拟语音卡片样式 - 仅包含语音条 */
 .voice-card {
     padding: 0;
-    border-radius: 18px;
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
     gap: 0;
@@ -1563,7 +1563,7 @@ input:checked+.slider:before {
 
 #emoji-menu {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 10px;
     padding: 0 15px;
     overflow-y: auto;
@@ -2025,7 +2025,7 @@ input:checked+.slider:before {
 /* Settings Navigation Page */
 .settings-nav-body {
     flex: 1;
-    padding: 16px;
+    padding: 96px 16px 16px 16px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -4018,10 +4018,10 @@ textarea.setting-input {
     font-family: 'Consolas', monospace;
 }
 
-.settings-nav-body {
+/* Fix header overlap (override previous rules) */
+.settings-nav-body,
+.settings-body {
     flex: 1;
     overflow-y: auto;
-    padding: 0 15px;
-    /* Same padding as other screens usually */
-    padding-bottom: 15px;
+    padding: 38px 15px 15px 15px !important;
 }
