@@ -62,10 +62,10 @@
 
     let myStickerList = [];
     const defaultStickerList = [
-        { name: "你自首吧", url: "https://catbox.pengcyril.dpdns.org/s1wpw8.jpeg" },
-        { name: "抱抱", url: "https://catbox.pengcyril.dpdns.org/31onrh.jpeg" },
-        { name: "贴贴", url: "https://catbox.pengcyril.dpdns.org/ljqszc.jpeg" },
-        { name: "我要告状", url: "https://catbox.pengcyril.dpdns.org/icwt52.jpeg" }
+        { name: "你自首吧", url: "https://files.catbox.moe/s1wpw8.jpeg" },
+        { name: "抱抱", url: "https://files.catbox.moe/31onrh.jpeg" },
+        { name: "贴贴", url: "https://files.catbox.moe/ljqszc.jpeg" },
+        { name: "我要告状", url: "https://files.catbox.moe/icwt52.jpeg" }
     ];
 
     let activeDeleteBtn = null;
@@ -1746,7 +1746,7 @@
                         if (legacyMatch) {
                             const name = legacyMatch[1];
                             const suffix = legacyMatch[2];
-                            const prefix = 'https://catbox.pengcyril.dpdns.org/';
+                            const prefix = 'https://files.catbox.moe/';
                             myStickerList.unshift({ name: name, url: prefix + suffix });
                             addedCount++;
                         }
@@ -1769,7 +1769,7 @@
 
             const items = text.split(/[,，\n]+/);
             let count = 0;
-            const prefix = 'https://catbox.pengcyril.dpdns.org/';
+            const prefix = 'https://files.catbox.moe/';
 
             items.forEach(item => {
                 item = item.trim();
@@ -2632,7 +2632,7 @@
             } else {
                 // 否则尝试提取文件名后缀
                 const fileMatch = displayBody.match(/([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)$/);
-                if (fileMatch && !displayBody.startsWith('http')) { src = 'https://catbox.pengcyril.dpdns.org/' + fileMatch[1]; }
+                if (fileMatch && !displayBody.startsWith('http')) { src = 'https://files.catbox.moe/' + fileMatch[1]; }
             }
 
             el.innerHTML = `<img src="${src}">`;
