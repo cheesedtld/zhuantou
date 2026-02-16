@@ -338,6 +338,7 @@
                             stroke-linejoin="round"></path>
                     </svg>
                 </div>
+
             </div>
         </div>
 
@@ -375,14 +376,7 @@
                         <button onclick="refreshModelList()" class="action-btn"
                             style="display: inline-block; padding: 6px 16px; white-space: nowrap; background: linear-gradient(135deg, #ff9a9e, #fecfef); color: white; border: none; border-radius: 8px; font-size: 12px; cursor: pointer;">获取模型列表</button>
                     </div>
-                    <div class="setting-group">
-                        <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 5px;">
-                            <label>系统提示词 (System Prompt)</label>
-                            <textarea id="set-system-prompt" class="setting-input"
-                                style="height: 80px; width: 100%; resize: vertical; box-sizing: border-box; font-family: sans-serif;"
-                                placeholder="你是一个智能助手..."></textarea>
-                        </div>
-                    </div>
+
                     <div class="setting-group">
                         <div class="setting-row">
                             <label>调试模式 (显示AI原始输出)</label>
@@ -436,6 +430,8 @@
                 </div>
             </div>
         </div>
+
+
 
         <!-- 美化设置页面 -->
         <div id="beautify-screen" class="screen">
@@ -643,18 +639,8 @@
                     </div>
                 </div>
 
-                <!-- 媒体管理 -->
-                <div>
-                    <div class="settings-section-title">媒体管理</div>
-                    <div class="setting-group">
-                        <div class="setting-row" onclick="handleAddSticker()" style="cursor: pointer;">
-                            <label style="cursor: pointer;">上传表情包</label>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666" stroke-width="2">
-                                <path d="M12 5v14M5 12h14" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
+                <!-- 媒体管理 (已移除，功能移动至全局设置) -->
+
 
                 <!-- 数据管理 (Moved back) -->
                 <div>
@@ -666,8 +652,8 @@
                                 <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
                             </svg>
                         </div>
-                        <div class="setting-row" onclick="deleteCurrentChat()" style="cursor: pointer;">
-                            <label style="cursor: pointer; color: #e53935;">清空聊天记录</label>
+                        <div class="setting-row" onclick="clearCurrentChatMessages()" style="cursor: pointer;">
+                            <label style="cursor: pointer; color: #e53935;">清空聊天内容</label>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e53935"
                                 stroke-width="2">
                                 <path
@@ -677,9 +663,11 @@
                     </div>
                 </div>
             </div>
-            <div class="settings-footer" style="padding: 10px;">
+            <div class="settings-footer" style="padding: 10px; display: flex; gap: 10px;">
+                <button class="modal-btn" onclick="deleteCurrentChat()"
+                    style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px; background: #d1b8b8; color: #fff; border: none; cursor: pointer;">删除该聊天</button>
                 <button class="modal-btn btn-save" onclick="saveMainChatSettings()"
-                    style="width: 100%; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px;">保存配置</button>
+                    style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px;">保存配置</button>
             </div>
         </div>
 
