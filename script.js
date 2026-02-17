@@ -62,10 +62,10 @@
 
     let myStickerList = [];
     const defaultStickerList = [
-        { name: "你自首吧", url: "https://files.catbox.moe/s1wpw8.jpeg" },
-        { name: "抱抱", url: "https://files.catbox.moe/31onrh.jpeg" },
-        { name: "贴贴", url: "https://files.catbox.moe/ljqszc.jpeg" },
-        { name: "我要告状", url: "https://files.catbox.moe/icwt52.jpeg" }
+        { name: "你自首吧", url: "https://img.phey.click/s1wpw8.jpeg" },
+        { name: "抱抱", url: "https://img.phey.click/31onrh.jpeg" },
+        { name: "贴贴", url: "https://img.phey.click/ljqszc.jpeg" },
+        { name: "我要告状", url: "https://img.phey.click/icwt52.jpeg" }
     ];
 
     let activeDeleteBtn = null;
@@ -188,6 +188,14 @@
                     }
                 });
             }
+        }
+
+        // Add Sticker Library
+        if (myStickerList && myStickerList.length > 0) {
+            context += `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：[${charName}|表情包|时间]表情包名+catbox图床后缀 示例：[${charName}|表情包|${currentTime}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀\n`;
+            myStickerList.forEach(s => {
+                context += `- ${s.name}: ${s.url}\n`;
+            });
         }
 
         return context.trim();
@@ -639,6 +647,30 @@
         currentChatTag = targetTag;
         currentChatTarget = targetName;
 
+        // FIX: Update appSettings.charAvatar based on the target
+        // Default to global setting
+        let newAvatar = appSettings.charAvatar || defaultAppSettings.charAvatar;
+
+        // But try to find specific if we are in a chat
+        if (targetTag.startsWith('chat:')) {
+            // 1. Try to find in NPCs
+            const npc = npcCharacters.find(n => n.name === targetName);
+            if (npc && npc.avatar) {
+                newAvatar = npc.avatar;
+            } else {
+                // 2. Try to find in Users (Private Chat with another user?)
+                const user = userCharacters.find(u => u.name === targetName);
+                if (user && user.avatar) {
+                    newAvatar = user.avatar;
+                }
+            }
+        }
+        // Update the setting used by renderMessageToUI
+        // Note: This relies on renderMessageToUI checking appSettings.charAvatar
+        // We'll also fix renderMessageToUI to be more robust
+        appSettings.charAvatar = newAvatar;
+
+
         // 更新标题
         const headerTitleEl = document.getElementById('header-title');
         if (headerTitleEl) headerTitleEl.textContent = currentChatTarget;
@@ -802,7 +834,27 @@
         if (appSettings.privateChats && Array.isArray(appSettings.privateChats)) {
             appSettings.privateChats.forEach(name => {
                 const key = `chat:${name}`;
-                const memberAvatar = (appSettings.memberAvatars && appSettings.memberAvatars[name]) ? appSettings.memberAvatars[name] : placeholderAvatar;
+
+                // UNIFIED LOGIC: Prioritize NPC/User avatar
+                let memberAvatar = placeholderAvatar;
+
+                // 1. Try Find NPC
+                const npc = npcCharacters.find(n => n.name === name);
+                if (npc && npc.avatar) {
+                    memberAvatar = npc.avatar;
+                } else {
+                    // 2. Try Find User (Private Chat with another user)
+                    const user = userCharacters.find(u => u.name === name);
+                    if (user && user.avatar) {
+                        memberAvatar = user.avatar;
+                    }
+                }
+
+                // 3. Fallback to memberAvatars (legacy/renamed)
+                if (memberAvatar === placeholderAvatar && appSettings.memberAvatars && appSettings.memberAvatars[name]) {
+                    memberAvatar = appSettings.memberAvatars[name];
+                }
+
                 conversations.push({
                     tag: key,
                     name: name,
@@ -1267,9 +1319,22 @@
             if (groupInfo) {
                 groupInfo.members.forEach(m => {
                     const isMe = (m === myName || m === 'User' || m === '我');
-                    let av = (appSettings.memberAvatars && appSettings.memberAvatars[m])
-                        ? appSettings.memberAvatars[m]
-                        : placeholderAvatar;
+                    let av = placeholderAvatar;
+                    if (isMe) {
+                        // Priority 1: Specific User Character
+                        if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
+                            av = userCharacters[appSettings.currentUserId].avatar;
+                        }
+                        // Priority 2: Global User Avatar
+                        else if (appSettings.userAvatar) {
+                            av = appSettings.userAvatar;
+                        }
+                    }
+
+                    // Priority 3: Member Avatar (fallback for user, primary for others)
+                    if ((!av || av === placeholderAvatar) && appSettings.memberAvatars && appSettings.memberAvatars[m]) {
+                        av = appSettings.memberAvatars[m];
+                    }
                     let uploadKey = `member:${m}`;
                     if (isMe) uploadKey = 'user-avatar';
                     members.push({ name: m, isMe: isMe, avatar: av, uploadKey: uploadKey });
@@ -1440,6 +1505,8 @@
     function closeChatSettings() {
         if (chatSettingsScreen) chatSettingsScreen.style.display = 'none';
         updateStatusBar('chat');
+        // FIX: Rerender chat to show updated avatars immediately
+        if (typeof loadInitialChat === 'function') loadInitialChat();
     }
 
     function openChatBeautifySettings() {
@@ -1701,8 +1768,8 @@
         emojiMenu.innerHTML = '';
         const addBtn = document.createElement('div');
         addBtn.className = 'sticker-item';
-        addBtn.onclick = handleAddSticker;
-        addBtn.innerHTML = `<div class="sticker-add-btn"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"></path></svg></div><span class="sticker-name">添加</span>`;
+        addBtn.onclick = handleManageStickers;
+        addBtn.innerHTML = `<div class="sticker-add-btn"><svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L3.16 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"></path></svg></div><span class="sticker-name">管理</span>`;
         emojiMenu.appendChild(addBtn);
 
         myStickerList.forEach((s, index) => {
@@ -1716,49 +1783,159 @@
     }
 
     function handleAddSticker() {
-        openModal('添加表情包', [
-            { placeholder: '粘贴图片链接 (支持批量,逗号分隔)', type: 'textarea', height: '60px' }
-        ], async (values) => {
-            const textInput = values[0];
-
-            let addedCount = 0;
-
-            // Handle Text Input (URLs)
-            if (textInput) {
-                const items = textInput.split(/[,，\n]+/);
-                items.forEach(item => {
-                    item = item.trim();
-                    if (!item) return;
-                    // Support simple URL or Name+URL
-                    const match = item.match(/^(.*?)(https?:\/\/.*)$/);
-                    if (match) {
-                        const name = match[1].trim() || '表情';
-                        const url = match[2].trim();
-                        myStickerList.unshift({ name, url });
-                        addedCount++;
-                    } else if (item.startsWith('http')) {
-                        // Just URL
-                        myStickerList.unshift({ name: '表情', url: item });
-                        addedCount++;
-                    } else {
-                        // Try legacy format: Name + Filename
-                        const legacyMatch = item.match(/^(.+?)([\w\-\.]+\.[a-zA-Z0-9]+)$/);
-                        if (legacyMatch) {
-                            const name = legacyMatch[1];
-                            const suffix = legacyMatch[2];
-                            const prefix = 'https://files.catbox.moe/';
-                            myStickerList.unshift({ name: name, url: prefix + suffix });
-                            addedCount++;
-                        }
-                    }
-                });
-            }
-
-            if (addedCount > 0) { saveStickers(); initStickers(); showToast(`成功添加 ${addedCount} 个表情`); }
-        });
+        // Deprecated/Refactored into Manage Flow, but kept for legacy reference or single add if needed.
+        // Re-using logic in triggerBatchAddSticker mostly.
     }
 
-    function triggerBatchAddSticker() {
+    function handleManageStickers() {
+        // Create a custom modal for management options
+        if (modal) {
+            modal.innerHTML = `
+                <div class="modal-box" style="width: 320px; text-align: center;">
+                    <div class="modal-title">管理表情包</div>
+                    <div style="display: flex; flex-direction: column; gap: 15px; padding: 20px 0;">
+                        <button class="modal-btn" style="width: 100%; padding: 12px; font-size: 16px; background-color: #f0f0f0; color: #333;" onclick="closeModal(); triggerBatchAddSticker()">批量添加</button>
+                        <button class="modal-btn" style="width: 100%; padding: 12px; font-size: 16px; background-color: #ffacac; color: white;" onclick="closeModal(); openBatchDeleteModal()">批量删除</button>
+                    </div>
+                    <div class="modal-actions" style="justify-content: center;">
+                        <button class="modal-btn btn-cancel" onclick="closeModal()" style="width: 100px;">取消</button>
+                    </div>
+                </div>
+            `;
+            modal.classList.add('show');
+        }
+    }
+
+    function openBatchDeleteModal() {
+        if (!myStickerList || myStickerList.length === 0) {
+            showToast('没有可删除的表情包');
+            return;
+        }
+
+        let html = '<div class="sticker-delete-grid">';
+        myStickerList.forEach((s, index) => {
+            html += `
+                <div class="sticker-delete-item">
+                    <input type="checkbox" id="del-st-${index}" value="${index}">
+                    <label for="del-st-${index}" style="width: 100%; height: 100%; display: block; cursor: pointer;">
+                        <div class="img-wrapper"><img src="${s.url}"></div>
+                        <span>${s.name}</span>
+                    </label>
+                </div>
+            `;
+        });
+        html += '</div>';
+
+        // Add some style for the grid
+        const style = `
+            <style>
+                .sticker-delete-grid { 
+                    display: grid; 
+                    grid-template-columns: repeat(3, 1fr); 
+                    gap: 12px; 
+                    max-height: 350px; 
+                    overflow-y: auto; 
+                    padding: 10px; 
+                    background: #f9f9f9;
+                    border-radius: 8px;
+                    border: 1px solid #eee;
+                }
+                .sticker-delete-item { 
+                    text-align: center; 
+                    background: white;
+                    border: 1px solid #eee; 
+                    padding: 8px; 
+                    border-radius: 12px; 
+                    position: relative; 
+                    cursor: pointer; 
+                    display: flex; 
+                    flex-direction: column; 
+                    align-items: center; 
+                    transition: all 0.2s;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+                }
+                .sticker-delete-item:hover {
+                    border-color: #ddd;
+                    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+                }
+                .sticker-delete-item .img-wrapper {
+                    width: 60px;
+                    height: 60px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin-bottom: 5px;
+                }
+                .sticker-delete-item img { 
+                    max-width: 100%; 
+                    max-height: 100%; 
+                    object-fit: contain; 
+                    border-radius: 4px; 
+                }
+                .sticker-delete-item span { 
+                    display: block; 
+                    font-size: 11px; 
+                    overflow: hidden; 
+                    text-overflow: ellipsis; 
+                    white-space: nowrap; 
+                    width: 100%; 
+                    color: #666; 
+                }
+                .sticker-delete-item input { 
+                    position: absolute; 
+                    top: 6px; 
+                    left: 6px; 
+                    z-index: 2; 
+                    transform: scale(1.3); 
+                    accent-color: #ffacac;
+                }
+                /* Custom scrollbar for grid */
+                .sticker-delete-grid::-webkit-scrollbar { width: 4px; }
+                .sticker-delete-grid::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+            </style>
+        `;
+
+        if (modal) {
+            modal.innerHTML = `
+                <div class="modal-box" style="width: 90%; max-width: 450px; padding: 20px;">
+                    <div class="modal-title" style="margin-bottom: 15px;">批量删除表情包</div>
+                    ${style}
+                    <div style="width: 100%;">
+                        ${html}
+                    </div>
+                    <div class="modal-actions" style="margin-top: 20px; justify-content: flex-end; gap: 10px;">
+                        <button class="modal-btn btn-cancel" onclick="closeModal()">取消</button>
+                        <button class="modal-btn" style="background-color: #ffacac; color: white; padding: 8px 20px;" onclick="confirmBatchDelete()">删除选中</button>
+                    </div>
+                </div>
+            `;
+            modal.classList.add('show');
+        }
+    }
+
+    window.confirmBatchDelete = function () {
+        const checkboxes = document.querySelectorAll('.sticker-delete-grid input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            alert('请先选择要删除的表情包');
+            return;
+        }
+
+        if (!confirm(`确定要删除选中的 ${checkboxes.length} 个表情包吗？`)) return;
+
+        // Get indices to delete (in descending order)
+        const indices = Array.from(checkboxes).map(cb => parseInt(cb.value)).sort((a, b) => b - a);
+
+        indices.forEach(index => {
+            myStickerList.splice(index, 1);
+        });
+
+        saveStickers();
+        initStickers();
+        closeModal();
+        showToast(`已删除 ${indices.length} 个表情包`);
+    };
+
+    window.triggerBatchAddSticker = function () {
         openModal('批量添加表情包', [{
             placeholder: '支持两种格式：\n1. 名字+catbox后缀 (如: 开心s1wpw8.jpeg)\n2. 名字+完整URL (如: 开心https://...)\n用逗号或换行分隔多个',
             type: 'textarea',
@@ -1769,7 +1946,7 @@
 
             const items = text.split(/[,，\n]+/);
             let count = 0;
-            const prefix = 'https://files.catbox.moe/';
+            const prefix = 'https://img.phey.click/';
 
             items.forEach(item => {
                 item = item.trim();
@@ -1828,7 +2005,7 @@
         el.classList.add('delete-mode');
         const btn = document.createElement('div');
         btn.className = 'delete-btn';
-        btn.innerHTML = `<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+        btn.innerHTML = `< svg viewBox = "0 0 24 24" ><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg > `;
         btn.onclick = (e) => { e.stopPropagation(); myStickerList.splice(index, 1); saveStickers(); initStickers(); };
         el.appendChild(btn);
     }
@@ -1862,7 +2039,34 @@
     }
 
     function openModal(title, fields, confirmCallback) {
-        modalTitle.textContent = title; modalInputsContainer.innerHTML = '';
+        // Reset modal structure to default input mode if it was changed
+        modal.innerHTML = `
+            <div class="modal-box">
+                <div class="modal-title" id="modal-title"></div>
+                <div id="modal-inputs-container"></div>
+                <div class="modal-actions">
+                    <button class="modal-btn btn-cancel" onclick="closeModal()">取消</button>
+                    <button class="modal-btn btn-grey" id="modal-confirm-btn">发送</button>
+                </div>
+            </div>
+        `;
+
+        // Re-bind elements
+        modalTitle = document.getElementById('modal-title');
+        modalInputsContainer = document.getElementById('modal-inputs-container');
+        modalConfirmBtn = document.getElementById('modal-confirm-btn');
+
+        // Bind confirm button
+        modalConfirmBtn.onclick = () => {
+            const inputs = modalInputsContainer.querySelectorAll('.modal-input');
+            const values = Array.from(inputs).map(input => input.value);
+            if (currentConfirmAction) currentConfirmAction(values);
+            closeModal();
+        };
+
+        modalTitle.textContent = title;
+        modalInputsContainer.innerHTML = '';
+
         fields.forEach(field => {
             let input;
             if (field.type === 'textarea') {
@@ -1871,7 +2075,7 @@
                 input.style.height = field.height || '100px';
                 input.style.resize = 'vertical';
                 input.style.fontFamily = 'inherit';
-            } else if (field.type === 'file') {
+            } else if (field.type === 'file') { // Added file input support
                 input = document.createElement('input');
                 input.type = 'file';
                 input.className = 'modal-input';
@@ -1885,16 +2089,17 @@
             if (field.value) input.value = field.value;
             modalInputsContainer.appendChild(input);
         });
-        currentConfirmAction = confirmCallback; modal.classList.add('show');
+        currentConfirmAction = confirmCallback;
+        modal.classList.add('show');
     }
 
-    async function sendLocation(addr) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}|位置|${t}|!]` : `[${u}|位置|${t}]`; renderMessageToUI({ header: h, body: addr, isUser: true, type: 'location' }); } catch (e) { } }
-    async function sendTransfer(amt, note) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}|TRANS|${t}|!]` : `[${u}|TRANS|${t}]`; renderMessageToUI({ header: h, body: `${amt}|${note || ''}`, isUser: true, type: 'transfer' }); } catch (e) { } }
-    async function sendFile(fn) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}|文件|${t}|!]` : `[${u}|文件|${t}]`; renderMessageToUI({ header: h, body: fn, isUser: true, type: 'file' }); } catch (e) { } }
-    async function sendVoice(dur, txt) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}|语音|${t}|!]` : `[${u}|语音|${t}]`; renderMessageToUI({ header: h, body: `${dur}|${txt || ''}`, isUser: true, type: 'voice' }); } catch (e) { } }
-    async function sendPhoto(base64) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}|图片|${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) { } }
-    async function sendRealAudio(url) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}|语音|${t}]`, body: url, isUser: true, type: 'voice' }); } catch (e) { } }
-    async function sendVideo(url) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}|视频|${t}]`, body: url, isUser: true, type: 'video' }); } catch (e) { } }
+    async function sendLocation(addr) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | 位置 | ${t} | !]` : `[${u} | 位置 | ${t}]`; renderMessageToUI({ header: h, body: addr, isUser: true, type: 'location' }); } catch (e) { } }
+    async function sendTransfer(amt, note) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | TRANS | ${t} | !]` : `[${u} | TRANS | ${t}]`; renderMessageToUI({ header: h, body: `${amt} | ${note || ''}`, isUser: true, type: 'transfer' }); } catch (e) { } }
+    async function sendFile(fn) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 文件 | ${t}| !]` : `[${u}| 文件 | ${t}]`; renderMessageToUI({ header: h, body: fn, isUser: true, type: 'file' }); } catch (e) { } }
+    async function sendVoice(dur, txt) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 语音 | ${t}| !]` : `[${u}| 语音 | ${t}]`; renderMessageToUI({ header: h, body: `${dur}| ${txt || ''} `, isUser: true, type: 'voice' }); } catch (e) { } }
+    async function sendPhoto(base64) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}| 图片 | ${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) { } }
+    async function sendRealAudio(url) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}| 语音 | ${t}]`, body: url, isUser: true, type: 'voice' }); } catch (e) { } }
+    async function sendVideo(url) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}| 视频 | ${t}]`, body: url, isUser: true, type: 'video' }); } catch (e) { } }
 
 
     async function sendSticker(name, url) {
@@ -1907,7 +2112,7 @@
         }
         const t = getTime();
         const u = getUserName();
-        renderMessageToUI({ header: `[${u}|表情包|${t}]`, body: bodyText, isUser: true, type: 'sticker' });
+        renderMessageToUI({ header: `[${u}| 表情包 | ${t}]`, body: bodyText, isUser: true, type: 'sticker' });
     }
 
     // 预览和发送文件相关
@@ -1994,9 +2199,9 @@
             const t = getTime();
             const u = getUserName();
             // 如果被拉黑，在消息头中添加标记 (用于持久化)
-            let header = `[${u}|${t}]`;
+            let header = `[${u}| ${t}]`;
             if (appSettings.blockUser) {
-                header = `[${u}|${t}|!]`; // ! 表示被拉黑/发送失败
+                header = `[${u}| ${t}| !]`; // ! 表示被拉黑/发送失败
             }
             renderMessageToUI({ header: header, body: text, isUser: true });
             messageInput.value = '';
@@ -2016,10 +2221,10 @@
         if (appSettings.timeOffset) {
             const now = new Date();
             const target = new Date(now.getTime() + appSettings.timeOffset);
-            return `${target.getHours().toString().padStart(2, '0')}:${target.getMinutes().toString().padStart(2, '0')}`;
+            return `${target.getHours().toString().padStart(2, '0')}:${target.getMinutes().toString().padStart(2, '0')} `;
         }
         if (appSettings.customTime && /^\d{1,2}:\d{2}$/.test(appSettings.customTime)) return appSettings.customTime;
-        const now = new Date(); return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        const now = new Date(); return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} `;
     }
 
     function triggerLoveEffect() {
@@ -2097,13 +2302,13 @@
                         if (parts.length >= 2) originalNote = parts[1];
                     }
 
-                    const newBody = `${amount}|${originalNote}|received`;
+                    const newBody = `${amount}| ${originalNote}| received`;
                     el.dataset.rawBody = newBody;
                     overlay.classList.remove('visible'); setTimeout(() => overlay.remove(), 300);
 
                     // Add system message
                     const myName = getUserName();
-                    const sysMsg = `[${myName}|转账已接收]`;
+                    const sysMsg = `[${myName}| 转账已接收]`;
                     renderMessageToUI({ body: sysMsg, isUser: true });
 
 
@@ -2125,13 +2330,13 @@
                         if (parts.length >= 2) originalNote = parts[1];
                     }
 
-                    const newBody = `${amount}|${originalNote}|returned`;
+                    const newBody = `${amount}| ${originalNote}| returned`;
                     el.dataset.rawBody = newBody;
                     overlay.classList.remove('visible'); setTimeout(() => overlay.remove(), 300);
 
                     // Add system message
                     const myName = getUserName();
-                    const sysMsg = `[${myName}|转账已退还]`;
+                    const sysMsg = `[${myName}| 转账已退还]`;
                     renderMessageToUI({ body: sysMsg, isUser: true });
 
 
@@ -2243,7 +2448,7 @@
             } else {
                 const n = msg.isUser ? getUserName() : getCharName();
                 const t = getTime();
-                el.dataset.fullHeader = `[${n}|${t}]`;
+                el.dataset.fullHeader = `[${n}| ${t}]`;
             }
 
             row.appendChild(el);
@@ -2271,7 +2476,7 @@
                     // Ensure we have amount|note|status
                     const amount = parts[0] || '¥ 0.00';
                     const originalNote = parts[1] || '转账给您';
-                    lastTransfer.dataset.rawBody = `${amount}|${originalNote}|${status}`;
+                    lastTransfer.dataset.rawBody = `${amount}| ${originalNote}| ${status} `;
 
                 }
             }
@@ -2305,9 +2510,9 @@
             const isVoice = msg.header.includes('语音') || msg.header.includes('VOC');
             const typeText = isVoice ? '语音' : '信息';
 
-            el.textContent = `${displayName}撤回了一条${typeText}`;
+            el.textContent = `${displayName}撤回了一条${typeText} `;
             if (msg.body && msg.body.trim()) {
-                el.textContent += `：${msg.body}`;
+                el.textContent += `：${msg.body} `;
             }
             el.dataset.fullHeader = msg.header;
             el.dataset.rawBody = msg.body;
@@ -2319,7 +2524,7 @@
             return;
         }
 
-        const row = document.createElement('div'); row.className = `message-row ${msg.isUser ? 'sent' : 'received'}`;
+        const row = document.createElement('div'); row.className = `message - row ${msg.isUser ? 'sent' : 'received'} `;
 
         // Check for Love Keywords
         if (msg.body && typeof msg.body === 'string') {
@@ -2357,10 +2562,29 @@
                 avatarSrc = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2IwYjBiMCI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjZjJmMmYyIi8+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OS00IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==';
             }
         } else {
-            avatarSrc = msg.isUser ? appSettings.userAvatar : appSettings.charAvatar;
-            // 尝试查找特定成员头像（仅私聊）
-            if (!msg.isUser && appSettings.memberAvatars && appSettings.memberAvatars[displayName]) {
-                avatarSrc = appSettings.memberAvatars[displayName];
+            // 私聊模式
+            // 优先检查 specific avatars
+            if (msg.isUser) {
+                // User Avatar: Try specific first
+                if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
+                    avatarSrc = userCharacters[appSettings.currentUserId].avatar;
+                }
+                // Fallback to global setting
+                if (!avatarSrc) avatarSrc = appSettings.userAvatar;
+            } else {
+                // Character Avatar: Try to find by name in NPCs (First Priority)
+                const npc = npcCharacters.find(n => n.name === displayName);
+                if (npc && npc.avatar) {
+                    avatarSrc = npc.avatar;
+                }
+
+                // Fallback to memberAvatars (Second Priority - for renamed/group context in private?)
+                if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[displayName]) {
+                    avatarSrc = appSettings.memberAvatars[displayName];
+                }
+
+                // Fallback to global setting (Last Priority)
+                if (!avatarSrc) avatarSrc = appSettings.charAvatar;
             }
         }
         const avatar = document.createElement('img'); avatar.className = 'avatar'; avatar.src = avatarSrc;
@@ -2384,11 +2608,7 @@
         const isLink = msg.type === 'link' || (msg.header && msg.header.includes('|LINK|'));
         const isDeliver = msg.type === 'deliver' || (msg.header && (msg.header.includes('|DELIVER|') || msg.header.includes('|ORDER|')));
 
-        // AI Transfer Handling: Check if message is a transfer confirmation
-        if (displayBody && (displayBody.includes('|转账已接收]') || displayBody.includes('|转账已退还]'))) {
-            if (displayBody.includes('|转账已接收]')) updateLastTransferStatus('received');
-            if (displayBody.includes('|转账已退还]')) updateLastTransferStatus('returned');
-        }
+
 
         const timeMatch = msg.header ? msg.header.match(/\|(\d{2}:\d{2})/) : null;
         const timeStr = timeMatch ? timeMatch[1] : getTime();
@@ -2415,7 +2635,7 @@
                     const parts = msg.header.replace(/^\[|\]$|^【|】$/g, '').split('|');
                     if (parts.length >= 2) {
                         const t = parts.pop();
-                        msg.header = `[${parts.join('|')}|图片|${t}]`;
+                        msg.header = `[${parts.join('|')}| 图片 | ${t}]`;
                     }
                 }
             }
@@ -2443,17 +2663,17 @@
 
             displayBody = replyContent.trim();
 
-            quoteHtml = `<div class="msg-quote">
+            quoteHtml = `< div class="msg-quote" >
         <div class="msg-quote-content">
             <div class="msg-quote-header">
                 <span class="msg-quote-name">${qName}</span>
             </div>
             <div class="msg-quote-text">${qContent}</div>
         </div>
-    </div>`;
+    </div > `;
         } else {
             // 2. Fallback to Old Format
-            const quoteRegex = /「`回复 (.*?)[：:](.*?)`」/;
+            const quoteRegex = /「`回复(.*?)[：:](.*?)`」/;
             const quoteMatch = displayBody.match(quoteRegex);
             if (quoteMatch) {
                 const qName = quoteMatch[1];
@@ -2461,7 +2681,7 @@
                 // Remove quote from body
                 displayBody = displayBody.replace(quoteMatch[0], '').trim();
                 // Build Quote HTML
-                quoteHtml = `<div class="msg-quote"><div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
+                quoteHtml = `< div class="msg-quote" > <div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div > `;
             }
         }
 
@@ -2469,23 +2689,23 @@
             const parts = displayBody.split('|');
             const placeName = parts[0];
             const address = parts[1] || '';
-            el = document.createElement('div'); el.className = `location-card ${msg.isUser ? 'sent' : 'received'}`;
-            el.innerHTML = `<div class="location-info"><div class="location-name">${placeName}</div><div class="location-address" style="font-size:12px;opacity:0.8;margin-top:2px;">${address}</div></div><div class="location-map"><svg class="location-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5" fill="#fff"/></svg></div>`;
+            el = document.createElement('div'); el.className = `location - card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `< div class="location-info" ><div class="location-name">${placeName}</div><div class="location-address" style="font-size:12px;opacity:0.8;margin-top:2px;">${address}</div></div > <div class="location-map"><svg class="location-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5" fill="#fff" /></svg></div>`;
         } else if (isTra) {
             const parts = displayBody.split('|');
             const amount = parts[0] || '¥ 0.00';
             let note = parts[1] || '转账给您';
             const status = parts[2] || 'pending';
 
-            el = document.createElement('div'); el.className = `transfer-card ${msg.isUser ? 'sent' : 'received'}`;
+            el = document.createElement('div'); el.className = `transfer - card ${msg.isUser ? 'sent' : 'received'} `;
             let statusText = '转账';
             if (status === 'received') { statusText = '已收款'; el.classList.add('completed'); }
             else if (status === 'returned') { statusText = '已退回'; el.classList.add('completed'); }
 
-            el.innerHTML = `<div class="transfer-top"><div class="transfer-icon-circle"><svg viewBox="0 0 24 24"><path d="M7 10h14l-4-4"></path><path d="M17 14H3l4 4"></path></svg></div><div class="transfer-content"><div class="transfer-amount">${amount}</div><div class="transfer-note">${note}</div></div></div><div class="transfer-bottom">${statusText}</div>`;
+            el.innerHTML = `< div class="transfer-top" ><div class="transfer-icon-circle"><svg viewBox="0 0 24 24"><path d="M7 10h14l-4-4"></path><path d="M17 14H3l4 4"></path></svg></div><div class="transfer-content"><div class="transfer-amount">${amount}</div><div class="transfer-note">${note}</div></div></div > <div class="transfer-bottom">${statusText}</div>`;
 
             // Store raw body for history persistence
-            el.dataset.rawBody = `${amount}|${parts[1] || '转账给您'}|${status}`;
+            el.dataset.rawBody = `${amount}| ${parts[1] || '转账给您'}| ${status} `;
 
             if (status === 'pending') {
                 el.onclick = (e) => {
@@ -2497,20 +2717,20 @@
             const parts = displayBody.split('|');
             const fileName = parts[0];
             const fileSize = parts[1] || 'Unknown';
-            el = document.createElement('div'); el.className = `file-card ${msg.isUser ? 'sent' : 'received'}`;
-            el.innerHTML = `<div class="file-info"><div class="file-name">${fileName}</div><div class="file-size">${fileSize}</div></div><div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#eee"></path><polyline points="14 2 14 8 20 8" fill="#ddd"></polyline><text x="50%" y="18" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">FILE</text></svg></div>`;
+            el = document.createElement('div'); el.className = `file - card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `< div class="file-info" ><div class="file-name">${fileName}</div><div class="file-size">${fileSize}</div></div > <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#eee"></path><polyline points="14 2 14 8 20 8" fill="#ddd"></polyline><text x="50%" y="18" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">FILE</text></svg></div>`;
         } else if (isLink) {
             const parts = displayBody.split('|');
             const title = parts[0] || 'Product';
             const price = parts[1] || '';
             const imgUrl = parts[2] || '';
 
-            el = document.createElement('div'); el.className = `link-card ${msg.isUser ? 'sent' : 'received'}`;
+            el = document.createElement('div'); el.className = `link - card ${msg.isUser ? 'sent' : 'received'} `;
             el.innerHTML = `
-        <div class="link-content">
+        < div class="link-content" >
             <div class="link-title">${title}</div>
             <div class="link-price">${price}</div>
-        </div>
+        </div >
         <div class="link-image">
             ${imgUrl ? `<img src="${imgUrl}" onerror="this.style.display='none'">` : '<div class="link-placeholder">LINK</div>'}
         </div>
@@ -2521,12 +2741,12 @@
             const summary = parts[1] || '';
             const total = parts[2] || '';
 
-            el = document.createElement('div'); el.className = `deliver-card ${msg.isUser ? 'sent' : 'received'}`;
+            el = document.createElement('div'); el.className = `deliver - card ${msg.isUser ? 'sent' : 'received'} `;
             el.innerHTML = `
-        <div class="deliver-top">
+        < div class="deliver-top" >
             <div class="deliver-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
             <div class="deliver-shop">${shopName}</div>
-        </div>
+        </div >
         <div class="deliver-mid">
             <div class="deliver-summary">${summary}</div>
         </div>
@@ -2536,7 +2756,7 @@
     `;
         } else if (isCallMsg) {
             el = document.createElement('div');
-            el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'}`;
+            el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'} `;
             // 小圆角长方形，无透明度
             el.style.borderRadius = '10px';
             el.style.opacity = '1';
@@ -2554,9 +2774,9 @@
             // 检查是否是真实音频URL (http开头或characters开头)
             if (displayBody.startsWith('http') || displayBody.startsWith('characters/') || displayBody.startsWith('UserUploads/') || displayBody.startsWith('/user/images/')) {
                 el = document.createElement('div');
-                el.className = `real-audio-card ${msg.isUser ? 'sent' : 'received'}`;
+                el.className = `real - audio - card ${msg.isUser ? 'sent' : 'received'} `;
                 // 为了安全和路径正确，如果是相对路径，可能需要补全。但在SillyTavern中相对路径通常是相对于根目录
-                el.innerHTML = `<audio controls src="${displayBody}"></audio>`;
+                el.innerHTML = `< audio controls src = "${displayBody}" ></audio > `;
             } else {
                 // 微信风格模拟语音气泡
                 const parts = displayBody.split('|');
@@ -2570,34 +2790,34 @@
 
                 // 创建容器
                 const container = document.createElement('div');
-                container.className = `voice-card-container ${msg.isUser ? 'sent' : 'received'}`;
+                container.className = `voice - card - container ${msg.isUser ? 'sent' : 'received'} `;
                 container.style.display = 'flex';
                 container.style.flexDirection = 'column';
                 container.style.gap = '0';
 
                 // 创建语音条
                 const voiceCard = document.createElement('div');
-                voiceCard.className = `voice-card ${msg.isUser ? 'sent' : 'received'}`;
+                voiceCard.className = `voice - card ${msg.isUser ? 'sent' : 'received'} `;
                 voiceCard.style.width = width + 'px';
                 voiceCard.style.cursor = 'pointer';
 
                 // 声纹3~4根
                 let waves = '';
                 const barCount = 3 + Math.floor(Math.random() * 2); // 3或4根
-                for (let i = 0; i < barCount; i++) waves += `<div class="wave" style="height:${6 + Math.random() * 14}px"></div>`;
+                for (let i = 0; i < barCount; i++) waves += `< div class="wave" style = "height:${6 + Math.random() * 14}px" ></div > `;
                 let barHtml = '';
                 if (msg.isUser) {
                     // user: 声纹在右，时长在左
-                    barHtml = `<div class="voice-bar" style="flex-direction: row-reverse; justify-content: flex-end;"><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div>`;
+                    barHtml = `< div class="voice-bar" style = "flex-direction: row-reverse; justify-content: flex-end;" ><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div > `;
                 } else {
                     // char: 声纹在左，时长在右，整体靠右
-                    barHtml = `<div class="voice-bar" style="flex-direction: row; justify-content: flex-end;"><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div>`;
+                    barHtml = `< div class="voice-bar" style = "flex-direction: row; justify-content: flex-end;" ><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div > `;
                 }
                 voiceCard.innerHTML = barHtml;
 
                 // 创建文字气泡
                 const textBubble = document.createElement('div');
-                textBubble.className = `voice-text-bubble ${msg.isUser ? 'sent' : 'received'}`;
+                textBubble.className = `voice - text - bubble ${msg.isUser ? 'sent' : 'received'} `;
                 textBubble.textContent = txt;
                 textBubble.style.maxWidth = (phoneW * 0.6) + 'px';
 
@@ -2628,7 +2848,7 @@
                 el = container;
             }
         } else if (isSticker) {
-            el = document.createElement('div'); el.className = `sticker-bubble ${msg.isUser ? 'sent' : 'received'}`;
+            el = document.createElement('div'); el.className = `sticker - bubble ${msg.isUser ? 'sent' : 'received'} `;
             let src = displayBody;
 
             // 优先尝试提取完整 URL
@@ -2638,24 +2858,24 @@
             } else {
                 // 否则尝试提取文件名后缀
                 const fileMatch = displayBody.match(/([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)$/);
-                if (fileMatch && !displayBody.startsWith('http')) { src = 'https://files.catbox.moe/' + fileMatch[1]; }
+                if (fileMatch && !displayBody.startsWith('http')) { src = 'https://img.phey.click/' + fileMatch[1]; }
             }
 
-            el.innerHTML = `<img src="${src}">`;
+            el.innerHTML = `< img src = "${src}" > `;
             el.dataset.stickerBody = displayBody;
         } else if (isVideo) {
-            el = document.createElement('div'); el.className = `photo-card ${msg.isUser ? 'sent' : 'received'}`;
-            el.innerHTML = `<video src="${displayBody}" controls style="width:100%;border-radius:12px;"></video>`;
+            el = document.createElement('div'); el.className = `photo - card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `< video src = "${displayBody}" controls style = "width:100%;border-radius:12px;" ></video > `;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; }
             else { el.style.backgroundColor = appSettings.charBubble; }
         } else if (isPhoto) {
-            el = document.createElement('div'); el.className = `photo-card ${msg.isUser ? 'sent' : 'received'}`;
-            el.innerHTML = `<img src="${displayBody}">`;
+            el = document.createElement('div'); el.className = `photo - card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `< img src = "${displayBody}" > `;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; }
             else { el.style.backgroundColor = appSettings.charBubble; }
         } else {
-            el = document.createElement('div'); el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'}`;
-            const textHtml = displayBody ? `<div class="msg-text">${displayBody.replace(/\n/g, '<br>')}</div>` : '';
+            el = document.createElement('div'); el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'} `;
+            const textHtml = displayBody ? `< div class="msg-text" > ${displayBody.replace(/\n/g, '<br>')}</div > ` : '';
             el.innerHTML = textHtml + quoteHtml;
             el.dataset.rawBody = rawBodyForHistory;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; el.style.color = appSettings.userText; }
@@ -2674,7 +2894,7 @@
             const n = msg.isUser ? getUserName() : getCharName();
             const t = getTime();
             const isPic = isPhoto;
-            el.dataset.fullHeader = isPic ? `[${n}|图片|${t}]` : `[${n}|${t}]`;
+            el.dataset.fullHeader = isPic ? `[${n}| 图片 | ${t}]` : `[${n}| ${t}]`;
         }
 
         // 检查是否被拉黑
@@ -2765,7 +2985,7 @@
         });
 
         try {
-            const key = `faye-phone-history-${currentChatTag}`;
+            const key = `faye - phone - history - ${currentChatTag} `;
             localStorage.setItem(key, JSON.stringify(history));
         } catch (e) {
             console.error("Failed to save chat history to localStorage", e);
@@ -2776,7 +2996,7 @@
         if (!chatMessages || !currentChatTag) return;
         chatMessages.innerHTML = '';
 
-        const key = `faye-phone-history-${currentChatTag}`;
+        const key = `faye - phone - history - ${currentChatTag} `;
         const savedHistory = localStorage.getItem(key);
 
         if (savedHistory) {
@@ -3025,7 +3245,7 @@
         }
 
         // Format: [名字|REP|引用类型|时间]引用内容|
-        const quoteStr = `[${name}|REP|${type}|${time}]${content}|`;
+        const quoteStr = `[${name}| REP | ${type}| ${time}]${content}| `;
 
         const input = document.getElementById('message-input');
         input.value = quoteStr + input.value;
@@ -3040,7 +3260,7 @@
             row.remove();
             // Remove from history (last message)
             if (currentChatTag) {
-                const historyKey = `faye-phone-history-${currentChatTag}`;
+                const historyKey = `faye - phone - history - ${currentChatTag} `;
                 const savedHistory = localStorage.getItem(historyKey);
                 if (savedHistory) {
                     const history = JSON.parse(savedHistory);
@@ -3093,25 +3313,25 @@
 
                     displayBody = replyContent.trim();
 
-                    quoteHtml = `<div class="msg-quote">
-                    <div class="msg-quote-content">
-                        <div style="display:flex;justify-content:space-between;opacity:0.7;font-size:12px;margin-bottom:2px;">
-                            <span>${qName}</span>
-                            <span>${qTime}</span>
-                        </div>
-                        <div style="color:#666;">${qContent}</div>
-                    </div>
-                </div>`;
+                    quoteHtml = `< div class="msg-quote" >
+        <div class="msg-quote-content">
+            <div style="display:flex;justify-content:space-between;opacity:0.7;font-size:12px;margin-bottom:2px;">
+                <span>${qName}</span>
+                <span>${qTime}</span>
+            </div>
+            <div style="color:#666;">${qContent}</div>
+        </div>
+                </div > `;
                 } else {
                     // 2. Fallback to Old Format
-                    const quoteRegex = /「`回复 (.*?)[：:](.*?)`」/;
+                    const quoteRegex = /「`回复(.*?)[：:](.*?)`」/;
                     const quoteMatch = newText.match(quoteRegex);
 
                     if (quoteMatch) {
                         const qName = quoteMatch[1];
                         const qText = quoteMatch[2];
                         displayBody = displayBody.replace(quoteMatch[0], '').trim();
-                        quoteHtml = `<div class="msg-quote"><div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
+                        quoteHtml = `< div class="msg-quote" > <div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div > `;
                     }
                 }
 
@@ -3251,10 +3471,31 @@
 
             if (url) {
                 if (currentSettingsUploadType === 'char-avatar') {
+                    // UNIFIED SYNC: Update the actual character data if we are in a chat with them
+                    if (currentChatTag && currentChatTag.startsWith('chat:')) {
+                        const npc = npcCharacters.find(n => n.name === currentChatTarget);
+                        if (npc) {
+                            npc.avatar = url;
+                            saveNpcsToStorage(); // Persist to storage
+                            // Update UI list if open
+                            const npcList = document.getElementById('npc-list-container');
+                            if (npcList && npcList.offsetParent) renderNpcList();
+                        }
+                    }
+
                     appSettings.charAvatar = url;
                     renderAvatarSettings();
                     saveSettingsToStorage();
                 } else if (currentSettingsUploadType === 'user-avatar') {
+                    // UNIFIED SYNC: Update the actual user data
+                    if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
+                        userCharacters[appSettings.currentUserId].avatar = url;
+                        saveUsersToStorage();
+                        // Update UI list if open
+                        const userList = document.getElementById('user-list-container');
+                        if (userList && userList.offsetParent) renderUserList();
+                    }
+
                     appSettings.userAvatar = url;
                     renderAvatarSettings();
                     saveSettingsToStorage();
@@ -3276,11 +3517,41 @@
                 } else if (currentSettingsUploadType && currentSettingsUploadType.startsWith('member:')) {
                     const memberName = currentSettingsUploadType.split(':')[1];
                     if (memberName) {
+                        // UNIFIED SYNC for Private Chat Settings
+                        // 1. Try to find/update NPC
+                        const npc = npcCharacters.find(n => n.name === memberName);
+                        if (npc) {
+                            npc.avatar = url;
+                            saveNpcsToStorage();
+                            // Update UI list if open
+                            const npcList = document.getElementById('npc-list-container');
+                            if (npcList && npcList.offsetParent) renderNpcList();
+                        }
+
+                        // 2. Try to find/update User
+                        if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId] && userCharacters[appSettings.currentUserId].name === memberName) {
+                            userCharacters[appSettings.currentUserId].avatar = url;
+                            saveUsersToStorage();
+                        } else {
+                            // Also check lookup by name for other users? (Maybe not needed if we only edit 'me' or 'npc')
+                            const user = userCharacters.find(u => u.name === memberName);
+                            if (user) {
+                                user.avatar = url;
+                                saveUsersToStorage();
+                            }
+                        }
+
                         if (!appSettings.memberAvatars) appSettings.memberAvatars = {};
                         appSettings.memberAvatars[memberName] = url;
                         renderAvatarSettings();
                         saveSettingsToStorage();
                     }
+                } else if (currentSettingsUploadType === 'npc-create-avatar') {
+                    const preview = document.getElementById('npc-avatar-preview');
+                    if (preview) preview.src = url;
+                } else if (currentSettingsUploadType === 'user-create-avatar') {
+                    const preview = document.getElementById('user-avatar-preview');
+                    if (preview) preview.src = url;
                 }
             }
         } catch (err) {
@@ -3336,7 +3607,7 @@
             card.className = 'user-card';
             const subNpcCount = (npc.npcs && npc.npcs.length) || 0;
             card.innerHTML = `
-            <img src="${npc.avatar || defaultAvatar}" alt="avatar" class="user-card-avatar">
+        < img src = "${npc.avatar || defaultAvatar}" alt = "avatar" class="user-card-avatar" >
             <div class="user-card-info">
                 <div class="user-card-name">${npc.name || '未命名'}</div>
                 <div class="user-card-meta">
@@ -3349,7 +3620,7 @@
                 <button onclick="editNpc(${index})">编辑</button>
                 <button onclick="deleteNpc(${index})" class="delete">删除</button>
             </div>
-        `;
+    `;
             listContainer.appendChild(card);
         });
     }
@@ -3380,7 +3651,7 @@
             if (nicknameInput) nicknameInput.value = npc.nickname || '';
             if (descInput) descInput.value = npc.persona || npc.desc || '';
             const gender = npc.gender || 'female';
-            const genderRadio = screen.querySelector(`input[name="npc-gender-page"][value="${gender}"]`);
+            const genderRadio = screen.querySelector(`input[name = "npc-gender-page"][value = "${gender}"]`);
             if (genderRadio) {
                 genderRadio.checked = true;
                 const label = genderRadio.closest('.uc-gender-option');
@@ -3497,11 +3768,10 @@
     function handleNpcAvatarChange(event) {
         const file = event.target.files[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                document.getElementById('npc-avatar-preview').src = e.target.result;
-            }
-            reader.readAsDataURL(file);
+            currentSettingsUploadType = 'npc-create-avatar';
+            openCropper(file);
+            // Reset input so same file can be selected again
+            event.target.value = '';
         }
     }
 
@@ -3556,18 +3826,18 @@
             card.className = 'wb-card';
             const entryCount = (wb.entries || []).length;
             card.innerHTML = `
-                <div class="wb-card-info" onclick="openWorldbookEdit(${index})">
+        < div class="wb-card-info" onclick = "openWorldbookEdit(${index})" >
                     <div class="wb-card-icon">📖</div>
                     <div class="wb-card-text">
                         <div class="wb-card-name">${wb.name || '未命名'}</div>
                         <div class="wb-card-sub">${entryCount} 个条目</div>
                     </div>
-                </div>
-                <div class="wb-card-actions">
-                    <button class="wb-card-edit" onclick="openWorldbookEdit(${index})">编辑</button>
-                    <button class="wb-card-delete" onclick="deleteWorldbook(${index})">删除</button>
-                </div>
-            `;
+                </div >
+        <div class="wb-card-actions">
+            <button class="wb-card-edit" onclick="openWorldbookEdit(${index})">编辑</button>
+            <button class="wb-card-delete" onclick="deleteWorldbook(${index})">删除</button>
+        </div>
+    `;
             container.appendChild(card);
         });
     }
@@ -3617,10 +3887,10 @@
         const isKeyword = entry && entry.trigger === 'keyword';
 
         card.innerHTML = `
-            <div class="wb-entry-header">
+        < div class="wb-entry-header" >
                 <span class="wb-entry-label">条目 ${container.children.length + 1}</span>
                 <button class="wb-entry-delete" onclick="this.closest('.wb-entry-card').remove()">×</button>
-            </div>
+            </div >
             <div class="wb-entry-field">
                 <label>位置</label>
                 <select class="wb-entry-position uc-select">
@@ -3652,7 +3922,7 @@
                 <label>内容</label>
                 <textarea class="wb-entry-content uc-textarea" placeholder="条目内容...">${entry && entry.content ? entry.content : ''}</textarea>
             </div>
-        `;
+    `;
 
         // Bind trigger toggle
         card.querySelectorAll('.wb-trigger-option').forEach(opt => {
@@ -3778,7 +4048,7 @@
             const genderEmoji = '';
             const npcCount = (user.npcs && user.npcs.length) || 0;
             userCard.innerHTML = `
-            <img src="${user.avatar || defaultAvatar}" alt="avatar" class="user-card-avatar">
+        < img src = "${user.avatar || defaultAvatar}" alt = "avatar" class="user-card-avatar" >
             <div class="user-card-info">
                 <div class="user-card-name">${genderEmoji} ${user.name}</div>
                 <div class="user-card-meta">
@@ -3790,7 +4060,7 @@
                 <button onclick="editUser(${index})">编辑</button>
                 <button onclick="deleteUser(${index})" class="delete">删除</button>
             </div>
-        `;
+    `;
             listContainer.appendChild(userCard);
         });
     }
@@ -3818,7 +4088,7 @@
             if (nameInput) nameInput.value = user.name || '';
             if (descInput) descInput.value = user.persona || user.desc || '';
             const gender = user.gender || 'female';
-            const genderRadio = document.querySelector(`input[name="user-gender"][value="${gender}"]`);
+            const genderRadio = document.querySelector(`input[name = "user-gender"][value = "${gender}"]`);
             if (genderRadio) {
                 genderRadio.checked = true;
                 const label = genderRadio.closest('.uc-gender-option');
@@ -3949,11 +4219,10 @@
     function handleUserAvatarChange(event) {
         const file = event.target.files[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                document.getElementById('user-avatar-preview').src = e.target.result;
-            }
-            reader.readAsDataURL(file);
+            currentSettingsUploadType = 'user-create-avatar';
+            openCropper(file);
+            // Reset input so same file can be selected again
+            event.target.value = '';
         }
     }
 
@@ -3970,7 +4239,7 @@
         const isFemale = !npc || npc.gender === 'female';
         const isMale = npc && npc.gender === 'male';
         card.innerHTML = `
-        <button class="npc-remove-btn" onclick="this.closest('.uc-npc-card').remove()">×</button>
+        < button class="npc-remove-btn" onclick = "this.closest('.uc-npc-card').remove()" >×</button >
         <div class="npc-row">
             <div class="npc-field"><label>姓名</label><input type="text" class="npc-name-input" placeholder="NPC名字" value="${npc ? npc.name : ''}"></div>
             <div class="npc-field"><label>昵称</label><input type="text" class="npc-nickname-input" placeholder="可选" value="${npc ? (npc.nickname || '') : ''}"></div>
@@ -4260,7 +4529,7 @@
             callSeconds++;
             const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
             const s = (callSeconds % 60).toString().padStart(2, '0');
-            if (timerEl) timerEl.textContent = `${m}:${s}`;
+            if (timerEl) timerEl.textContent = `${m}:${s} `;
         }, 1000);
     }
 
@@ -4315,22 +4584,22 @@
                 callSeconds++;
                 const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
                 const s = (callSeconds % 60).toString().padStart(2, '0');
-                if (timerEl) timerEl.textContent = `${m}:${s}`;
+                if (timerEl) timerEl.textContent = `${m}:${s} `;
             }, 1000);
 
             // Trigger AI Greeting (Incoming Call Context)
             showCallTyping();
 
-            const prompt = `System: ${getUserName()} is calling you. Output [拒接通话] format to reject, or [通话] format to accept.
+            const prompt = `System: ${getUserName()} is calling you.Output[拒接通话] format to reject, or[通话] format to accept.
 [系统指令] ${getUserName()} 正在给你打电话。
-请决定是接听还是拒接。
-如果要拒接，请输出包含 [拒接通话] 的内容。
-如果要接听，请输出包含 [通话] 的内容，并开始对话。
-回复格式要求：
-1. 必须是语音通话的口吻，简短、口语化。
-2. 禁止输出心声或动作描写（除非是声音描写）。
-3. 声音描写（如笑声、叹气）请用括号包裹。
-你的回复将直接显示在通话字幕中。`;
+    请决定是接听还是拒接。
+    如果要拒接，请输出包含[拒接通话] 的内容。
+    如果要接听，请输出包含[通话] 的内容，并开始对话。
+    回复格式要求：
+    1. 必须是语音通话的口吻，简短、口语化。
+    2. 禁止输出心声或动作描写（除非是声音描写）。
+    3. 声音描写（如笑声、叹气）请用括号包裹。
+    你的回复将直接显示在通话字幕中。`;
 
             // [修复] 使用 runSunboxGenerate 替代 generate
             // AI generation is disabled in standalone mode.
@@ -4352,14 +4621,14 @@
             showCallTyping();
 
             const prompt = `[系统指令] ${getUserName()} 正在给你打电话。
-请决定是接听还是拒接。
-如果要拒接，请输出包含 [拒接通话] 的内容。
-如果要接听，请输出包含 [通话] 的内容，并开始对话。
-回复格式要求：
-1. 必须是语音通话的口吻，简短、口语化。
-2. 禁止输出心声或动作描写（除非是声音描写）。
-3. 声音描写（如笑声、叹气）请用括号包裹。
-你的回复将直接显示在通话字幕中。`;
+    请决定是接听还是拒接。
+    如果要拒接，请输出包含[拒接通话] 的内容。
+    如果要接听，请输出包含[通话] 的内容，并开始对话。
+    回复格式要求：
+    1. 必须是语音通话的口吻，简短、口语化。
+    2. 禁止输出心声或动作描写（除非是声音描写）。
+    3. 声音描写（如笑声、叹气）请用括号包裹。
+    你的回复将直接显示在通话字幕中。`;
 
             // AI generation is disabled in standalone mode.
             // For standalone, we can simulate an auto-connect or auto-reject.
@@ -4397,7 +4666,7 @@
                 callSeconds++;
                 const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
                 const s = (callSeconds % 60).toString().padStart(2, '0');
-                if (timerEl) timerEl.textContent = `${m}:${s}`;
+                if (timerEl) timerEl.textContent = `${m}:${s} `;
             }, 1000);
         }
 
@@ -4409,7 +4678,7 @@
         if (!container) return;
 
         const bubble = document.createElement('div');
-        bubble.className = `call-bubble ${isUser ? 'sent' : 'received'}`;
+        bubble.className = `call - bubble ${isUser ? 'sent' : 'received'} `;
         bubble.innerHTML = text; // Use innerHTML to support HTML content like typing indicator
 
         container.appendChild(bubble);
@@ -4455,7 +4724,7 @@
         } else if (callSeconds > 0) {
             const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
             const s = (callSeconds % 60).toString().padStart(2, '0');
-            bodyText = `通话结束，时长：${m}:${s}`;
+            bodyText = `通话结束，时长：${m}:${s} `;
         } else {
             bodyText = "通话取消";
         }
@@ -4464,7 +4733,7 @@
         const u = getUserName();
 
         // Save to history
-        renderMessageToUI({ header: `[${u}|通话|${t}]`, body: bodyText, isUser: true });
+        renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: bodyText, isUser: true });
 
         updateStatusBar('chat');
     }
@@ -4504,7 +4773,7 @@
         const u = getUserName();
         // Only log to history if text is not empty
         if (text) {
-            renderMessageToUI({ header: `[${u}|通话|${t}]`, body: text, isUser: true });
+            renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: text, isUser: true });
         }
 
         // [修复] 使用 runSunboxGenerate 替代 generate
@@ -4554,7 +4823,7 @@
         const t = typeof getTime === 'function' ? getTime() : new Date().toLocaleTimeString();
         const u = getUserName();
         if (typeof renderMessageToUI === 'function') {
-            renderMessageToUI({ header: `[${u}|${t}]`, body: `已拒绝通话`, isUser: true });
+            renderMessageToUI({ header: `[${u}| ${t}]`, body: `已拒绝通话`, isUser: true });
         }
 
         // AI generation is disabled in standalone mode.
@@ -4579,7 +4848,7 @@
 
         try {
             const headers = { 'Content-Type': 'application/json' };
-            if (key) headers['Authorization'] = `Bearer ${key}`;
+            if (key) headers['Authorization'] = `Bearer ${key} `;
 
             const res = await fetch(`${endpoint}/models`, { method: 'GET', headers });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -4690,7 +4959,7 @@
 5. 转账: [${charName}|TRANS|${currentTime}]金额|备注
 6. 文件: [${charName}|文件|${currentTime}]文件名
 7. 视频: [${charName}|视频|${currentTime}]视频描述
-8. 表情包: [${charName}|表情包|${currentTime}]表情包名+文件名.后缀  示例：[${charName}|表情包|${currentTime}]抱抱31onrh.jpeg
+8. 表情包: [${charName}|表情包|${currentTime}]表情包名+catbox图床后缀  示例：[${charName}|表情包|${currentTime}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀）
 9. 通话: [${charName}|通话|${currentTime}]通话内容
 10. 链接: [${charName}|LINK|${currentTime}]标题|价格|图片URL
 11. 外卖/订单: [${charName}|DELIVER|${currentTime}]店名|商品摘要|总价
@@ -5206,7 +5475,11 @@ Apply the following substitutions based on current language (CN/EN).
         exportCurrentChat,
         summarizeChatMemory,
         saveMainChatSettings,
-        clearCurrentChatMessages
+        clearCurrentChatMessages,
+        handleManageStickers,
+        triggerBatchAddSticker,
+        openBatchDeleteModal,
+        confirmBatchDelete
     });
 
 })();
