@@ -919,8 +919,9 @@ input:checked+.slider:before {
 /* 模拟语音卡片样式 - 仅包含语音条 */
 .voice-card {
     padding: 0;
-    border-radius: 10px;
+    border-radius: 18px;
     display: flex;
+    opacity: 0.8;
     flex-direction: column;
     gap: 0;
     min-width: 18px;
@@ -946,8 +947,8 @@ input:checked+.slider:before {
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 30px;
-    padding: 7px 10px;
+    height: 20px;
+    padding: 7px 14px;
     margin: 0;
     background: inherit;
     color: inherit;
@@ -1413,7 +1414,7 @@ input:checked+.slider:before {
 /* Input Bar */
 #input-bar {
     display: flex;
-    padding: 2px 5px 10px 5px;
+    padding: 2px 5px 28px 5px;
     border-top: none;
     /* No white line */
     background-color: #fff;
@@ -1422,7 +1423,7 @@ input:checked+.slider:before {
     flex-shrink: 0;
     z-index: 10;
     /* 减小输入框与上边缘间隙 */
-    padding-bottom: 10px;
+    padding-bottom: 28px;
     transition: background-color 0.3s;
 }
 
@@ -1498,8 +1499,12 @@ input:checked+.slider:before {
     transition: stroke 0.2s;
 }
 
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
 .toolbar-btn.active svg {
-    transform: rotate(45deg);
+    transform: none;
 }
 
 #plus-button {
