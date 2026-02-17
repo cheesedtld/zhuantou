@@ -4028,5 +4028,5 @@ textarea.setting-input {
 .settings-body {
     flex: 1;
     overflow-y: auto;
-    padding: 38px 15px 15px 15px !important;
+    padding: 28px 15px 15px 15px !important;
 }
