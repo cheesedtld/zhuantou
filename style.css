@@ -1414,7 +1414,7 @@ input:checked+.slider:before {
 /* Input Bar */
 #input-bar {
     display: flex;
-    padding: 2px 5px 28px 5px;
+    padding: 2px 5px 12px 5px;
     border-top: none;
     /* No white line */
     background-color: #fff;
@@ -1423,7 +1423,7 @@ input:checked+.slider:before {
     flex-shrink: 0;
     z-index: 10;
     /* 减小输入框与上边缘间隙 */
-    padding-bottom: 28px;
+    padding-bottom: 12px;
     transition: background-color 0.3s;
 }
 
@@ -1440,7 +1440,7 @@ input:checked+.slider:before {
     flex: 1;
     border: none;
     border-radius: 15px;
-    padding: 8px 10px;
+    padding: 12px 10px;
     font-size: 15px;
     resize: none;
     max-height: 80px;
