@@ -192,7 +192,7 @@
 
         // Add Sticker Library
         if (myStickerList && myStickerList.length > 0) {
-            context += `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：[${charName}|表情包|时间]表情包名+catbox图床后缀 示例：[${charName}|表情包|${currentTime}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀\n`;
+            context += `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：[${charName}|表情包|时间]表情包名+catbox图床后缀 示例：[${charName}|表情包|${getTime()}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀\n`;
             myStickerList.forEach(s => {
                 context += `- ${s.name}: ${s.url}\n`;
             });
@@ -867,8 +867,16 @@
         }
 
         // Function to get a simplified message preview
-        const getPreviewText = (body) => {
-            if (!body) return '';
+        const getPreviewText = (msg) => {
+            if (!msg) return '';
+            if (msg.type === 'sticker') return '[表情包]';
+            if (msg.type === 'photo') return '[图片]';
+            if (msg.type === 'voice') return '[语音]';
+            if (msg.type === 'video') return '[视频]';
+            if (msg.type === 'file') return '[文件]';
+            if (msg.type === 'location') return '[位置]';
+
+            const body = msg.body || '';
             if (body.includes('[') && body.includes(']')) {
                 if (body.includes('|图片|')) return '[图片]';
                 if (body.includes('|语音|')) return '[语音]';
@@ -884,14 +892,14 @@
 
         // Render List
         conversations.forEach(chat => {
-            const historyKey = `faye-phone-history-${chat.tag}`;
+            const historyKey = `faye - phone - history - ${chat.tag} `;
             const savedHistory = localStorage.getItem(historyKey);
             if (savedHistory) {
                 try {
                     const history = JSON.parse(savedHistory);
                     if (history.length > 0) {
                         const lastMessage = history[history.length - 1];
-                        chat.lastMsg = getPreviewText(lastMessage.body);
+                        chat.lastMsg = getPreviewText(lastMessage);
                         const timeMatch = lastMessage.header ? lastMessage.header.match(/\|(\d{2}:\d{2})/) : null;
                         chat.lastTime = timeMatch ? timeMatch[1] : '';
                     }
@@ -1709,7 +1717,7 @@
 
         // 2. 从 localStorage 删除聊天记录
         try {
-            const historyKey = `faye-phone-history-${currentChatTag}`;
+            const historyKey = `faye - phone - history - ${currentChatTag} `;
             localStorage.removeItem(historyKey);
         } catch (e) {
             console.error("Failed to remove chat history from localStorage", e);
@@ -1729,7 +1737,7 @@
 
         // Only remove chat history from localStorage
         try {
-            const historyKey = `faye-phone-history-${currentChatTag}`;
+            const historyKey = `faye - phone - history - ${currentChatTag} `;
             localStorage.removeItem(historyKey);
         } catch (e) {
             console.error("Failed to remove chat history from localStorage", e);
@@ -2105,7 +2113,8 @@
     async function sendSticker(name, url) {
         let bodyText;
         if (url.startsWith('http') || url.startsWith('data:')) {
-            bodyText = url;
+            // Include name for AI context, separated by pipe
+            bodyText = `${name}|${url}`;
         } else {
             const filename = url.split('/').pop();
             bodyText = name + filename;
@@ -2524,7 +2533,7 @@
             return;
         }
 
-        const row = document.createElement('div'); row.className = `message - row ${msg.isUser ? 'sent' : 'received'} `;
+        const row = document.createElement('div'); row.className = `message-row ${msg.isUser ? 'sent' : 'received'} `;
 
         // Check for Love Keywords
         if (msg.body && typeof msg.body === 'string') {
@@ -2548,7 +2557,7 @@
         let displayName = msg.isUser ? getUserName() : getCharName();
         if (msg.header) {
             const parts = msg.header.replace(/^[\[【]|[\]】]$/g, '').split('|');
-            if (parts.length > 0 && parts[0]) displayName = parts[0];
+            if (parts.length > 0 && parts[0]) displayName = parts[0].trim();
         }
         const isGroupChat = currentChatTag && currentChatTag.startsWith('group:');
         if (isGroupChat) {
@@ -2689,20 +2698,20 @@
             const parts = displayBody.split('|');
             const placeName = parts[0];
             const address = parts[1] || '';
-            el = document.createElement('div'); el.className = `location - card ${msg.isUser ? 'sent' : 'received'} `;
-            el.innerHTML = `< div class="location-info" ><div class="location-name">${placeName}</div><div class="location-address" style="font-size:12px;opacity:0.8;margin-top:2px;">${address}</div></div > <div class="location-map"><svg class="location-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5" fill="#fff" /></svg></div>`;
+            el = document.createElement('div'); el.className = `location-card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `<div class="location-info"><div class="location-name">${placeName}</div><div class="location-address" style="font-size:12px;opacity:0.8;margin-top:2px;">${address}</div></div><div class="location-map"><svg class="location-pin" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5" fill="#fff" /></svg></div>`;
         } else if (isTra) {
             const parts = displayBody.split('|');
             const amount = parts[0] || '¥ 0.00';
             let note = parts[1] || '转账给您';
             const status = parts[2] || 'pending';
 
-            el = document.createElement('div'); el.className = `transfer - card ${msg.isUser ? 'sent' : 'received'} `;
+            el = document.createElement('div'); el.className = `transfer-card ${msg.isUser ? 'sent' : 'received'} `;
             let statusText = '转账';
             if (status === 'received') { statusText = '已收款'; el.classList.add('completed'); }
             else if (status === 'returned') { statusText = '已退回'; el.classList.add('completed'); }
 
-            el.innerHTML = `< div class="transfer-top" ><div class="transfer-icon-circle"><svg viewBox="0 0 24 24"><path d="M7 10h14l-4-4"></path><path d="M17 14H3l4 4"></path></svg></div><div class="transfer-content"><div class="transfer-amount">${amount}</div><div class="transfer-note">${note}</div></div></div > <div class="transfer-bottom">${statusText}</div>`;
+            el.innerHTML = `<div class="transfer-top"><div class="transfer-icon-circle"><svg viewBox="0 0 24 24"><path d="M7 10h14l-4-4"></path><path d="M17 14H3l4 4"></path></svg></div><div class="transfer-content"><div class="transfer-amount">${amount}</div><div class="transfer-note">${note}</div></div></div><div class="transfer-bottom">${statusText}</div>`;
 
             // Store raw body for history persistence
             el.dataset.rawBody = `${amount}| ${parts[1] || '转账给您'}| ${status} `;
@@ -2717,17 +2726,17 @@
             const parts = displayBody.split('|');
             const fileName = parts[0];
             const fileSize = parts[1] || 'Unknown';
-            el = document.createElement('div'); el.className = `file - card ${msg.isUser ? 'sent' : 'received'} `;
-            el.innerHTML = `< div class="file-info" ><div class="file-name">${fileName}</div><div class="file-size">${fileSize}</div></div > <div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#eee"></path><polyline points="14 2 14 8 20 8" fill="#ddd"></polyline><text x="50%" y="18" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">FILE</text></svg></div>`;
+            el = document.createElement('div'); el.className = `file-card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `<div class="file-info"><div class="file-name">${fileName}</div><div class="file-size">${fileSize}</div></div><div class="file-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#eee"></path><polyline points="14 2 14 8 20 8" fill="#ddd"></polyline><text x="50%" y="18" font-size="6" fill="#888" text-anchor="middle" font-family="Arial">FILE</text></svg></div>`;
         } else if (isLink) {
             const parts = displayBody.split('|');
             const title = parts[0] || 'Product';
             const price = parts[1] || '';
             const imgUrl = parts[2] || '';
 
-            el = document.createElement('div'); el.className = `link - card ${msg.isUser ? 'sent' : 'received'} `;
+            el = document.createElement('div'); el.className = `link-card ${msg.isUser ? 'sent' : 'received'} `;
             el.innerHTML = `
-        < div class="link-content" >
+        <div class="link-content">
             <div class="link-title">${title}</div>
             <div class="link-price">${price}</div>
         </div >
@@ -2741,9 +2750,9 @@
             const summary = parts[1] || '';
             const total = parts[2] || '';
 
-            el = document.createElement('div'); el.className = `deliver - card ${msg.isUser ? 'sent' : 'received'} `;
+            el = document.createElement('div'); el.className = `deliver-card ${msg.isUser ? 'sent' : 'received'} `;
             el.innerHTML = `
-        < div class="deliver-top" >
+        <div class="deliver-top">
             <div class="deliver-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
             <div class="deliver-shop">${shopName}</div>
         </div >
@@ -2774,9 +2783,9 @@
             // 检查是否是真实音频URL (http开头或characters开头)
             if (displayBody.startsWith('http') || displayBody.startsWith('characters/') || displayBody.startsWith('UserUploads/') || displayBody.startsWith('/user/images/')) {
                 el = document.createElement('div');
-                el.className = `real - audio - card ${msg.isUser ? 'sent' : 'received'} `;
+                el.className = `real-audio-card ${msg.isUser ? 'sent' : 'received'} `;
                 // 为了安全和路径正确，如果是相对路径，可能需要补全。但在SillyTavern中相对路径通常是相对于根目录
-                el.innerHTML = `< audio controls src = "${displayBody}" ></audio > `;
+                el.innerHTML = `<audio controls src="${displayBody}"></audio>`;
             } else {
                 // 微信风格模拟语音气泡
                 const parts = displayBody.split('|');
@@ -2790,34 +2799,34 @@
 
                 // 创建容器
                 const container = document.createElement('div');
-                container.className = `voice - card - container ${msg.isUser ? 'sent' : 'received'} `;
+                container.className = `voice-card-container ${msg.isUser ? 'sent' : 'received'} `;
                 container.style.display = 'flex';
                 container.style.flexDirection = 'column';
                 container.style.gap = '0';
 
                 // 创建语音条
                 const voiceCard = document.createElement('div');
-                voiceCard.className = `voice - card ${msg.isUser ? 'sent' : 'received'} `;
+                voiceCard.className = `voice-card ${msg.isUser ? 'sent' : 'received'} `;
                 voiceCard.style.width = width + 'px';
                 voiceCard.style.cursor = 'pointer';
 
                 // 声纹3~4根
                 let waves = '';
                 const barCount = 3 + Math.floor(Math.random() * 2); // 3或4根
-                for (let i = 0; i < barCount; i++) waves += `< div class="wave" style = "height:${6 + Math.random() * 14}px" ></div > `;
+                for (let i = 0; i < barCount; i++) waves += `<div class="wave" style="height:${6 + Math.random() * 14}px"></div>`;
                 let barHtml = '';
                 if (msg.isUser) {
                     // user: 声纹在右，时长在左
-                    barHtml = `< div class="voice-bar" style = "flex-direction: row-reverse; justify-content: flex-end;" ><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div > `;
+                    barHtml = `<div class="voice-bar" style="flex-direction: row-reverse; justify-content: flex-end;"><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div>`;
                 } else {
                     // char: 声纹在左，时长在右，整体靠右
-                    barHtml = `< div class="voice-bar" style = "flex-direction: row; justify-content: flex-end;" ><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div > `;
+                    barHtml = `<div class="voice-bar" style="flex-direction: row; justify-content: flex-end;"><div class="voice-waves">${waves}</div><div class="voice-duration">${dur}"</div></div>`;
                 }
                 voiceCard.innerHTML = barHtml;
 
                 // 创建文字气泡
                 const textBubble = document.createElement('div');
-                textBubble.className = `voice - text - bubble ${msg.isUser ? 'sent' : 'received'} `;
+                textBubble.className = `voice-text-bubble ${msg.isUser ? 'sent' : 'received'} `;
                 textBubble.textContent = txt;
                 textBubble.style.maxWidth = (phoneW * 0.6) + 'px';
 
@@ -2848,8 +2857,19 @@
                 el = container;
             }
         } else if (isSticker) {
-            el = document.createElement('div'); el.className = `sticker - bubble ${msg.isUser ? 'sent' : 'received'} `;
+            el = document.createElement('div'); el.className = `sticker-bubble ${msg.isUser ? 'sent' : 'received'} `;
             let src = displayBody;
+
+            // Handle Name|URL format
+            if (src.includes('|') && !src.startsWith('http')) {
+                const parts = src.split('|');
+                // Assume the part starting with http or data is the URL
+                // Or simply take the last part if we follow Name|URL convention
+                // But let's be safe: find the part that looks like a URL
+                const potentialUrl = parts.find(p => p.startsWith('http') || p.startsWith('data:'));
+                if (potentialUrl) src = potentialUrl;
+                else src = parts[1] || parts[0]; // Fallback
+            }
 
             // 优先尝试提取完整 URL
             const urlMatch = displayBody.match(/(https?:\/\/[^\s]+)/);
@@ -2861,21 +2881,21 @@
                 if (fileMatch && !displayBody.startsWith('http')) { src = 'https://img.phey.click/' + fileMatch[1]; }
             }
 
-            el.innerHTML = `< img src = "${src}" > `;
+            el.innerHTML = `<img src="${src}">`;
             el.dataset.stickerBody = displayBody;
         } else if (isVideo) {
-            el = document.createElement('div'); el.className = `photo - card ${msg.isUser ? 'sent' : 'received'} `;
-            el.innerHTML = `< video src = "${displayBody}" controls style = "width:100%;border-radius:12px;" ></video > `;
+            el = document.createElement('div'); el.className = `photo-card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `<video src="${displayBody}" controls style="width:100%;border-radius:12px;"></video>`;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; }
             else { el.style.backgroundColor = appSettings.charBubble; }
         } else if (isPhoto) {
-            el = document.createElement('div'); el.className = `photo - card ${msg.isUser ? 'sent' : 'received'} `;
-            el.innerHTML = `< img src = "${displayBody}" > `;
+            el = document.createElement('div'); el.className = `photo-card ${msg.isUser ? 'sent' : 'received'} `;
+            el.innerHTML = `<img src="${displayBody}">`;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; }
             else { el.style.backgroundColor = appSettings.charBubble; }
         } else {
             el = document.createElement('div'); el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'} `;
-            const textHtml = displayBody ? `< div class="msg-text" > ${displayBody.replace(/\n/g, '<br>')}</div > ` : '';
+            const textHtml = displayBody ? `<div class="msg-text">${displayBody.replace(/\n/g, '<br>')}</div>` : '';
             el.innerHTML = textHtml + quoteHtml;
             el.dataset.rawBody = rawBodyForHistory;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; el.style.color = appSettings.userText; }
@@ -3598,7 +3618,7 @@
         const defaultAvatar = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
         if (npcCharacters.length === 0) {
-            listContainer.innerHTML = '<div class="user-list-empty"><div class="empty-icon">🎭</div><div>还没有角色哦~<br>点击右上角 + 创建一个吧</div></div>';
+            listContainer.innerHTML = '<div class="user-list-empty"><div>还没有角色哦~<br>点击右上角 + 创建一个吧</div></div>';
             return;
         }
 
@@ -3607,13 +3627,13 @@
             card.className = 'user-card';
             const subNpcCount = (npc.npcs && npc.npcs.length) || 0;
             card.innerHTML = `
-        < img src = "${npc.avatar || defaultAvatar}" alt = "avatar" class="user-card-avatar" >
+        <img src="${npc.avatar || defaultAvatar}" alt="avatar" class="user-card-avatar">
             <div class="user-card-info">
                 <div class="user-card-name">${npc.name || '未命名'}</div>
                 <div class="user-card-meta">
                     <span>${npc.gender === 'male' ? '男' : '女'}</span>
                     ${subNpcCount > 0 ? '<span>' + subNpcCount + ' 个关联NPC</span>' : ''}
-                    ${npc.worldbook ? '<span>📖 有世界书</span>' : ''}
+                    ${npc.worldbook ? '<span>有世界书</span>' : ''}
                 </div>
             </div>
             <div class="user-card-actions">
@@ -3826,13 +3846,13 @@
             card.className = 'wb-card';
             const entryCount = (wb.entries || []).length;
             card.innerHTML = `
-        < div class="wb-card-info" onclick = "openWorldbookEdit(${index})" >
+        <div class="wb-card-info" onclick="openWorldbookEdit(${index})">
                     <div class="wb-card-icon">📖</div>
                     <div class="wb-card-text">
                         <div class="wb-card-name">${wb.name || '未命名'}</div>
                         <div class="wb-card-sub">${entryCount} 个条目</div>
                     </div>
-                </div >
+                </div>
         <div class="wb-card-actions">
             <button class="wb-card-edit" onclick="openWorldbookEdit(${index})">编辑</button>
             <button class="wb-card-delete" onclick="deleteWorldbook(${index})">删除</button>
@@ -3887,10 +3907,10 @@
         const isKeyword = entry && entry.trigger === 'keyword';
 
         card.innerHTML = `
-        < div class="wb-entry-header" >
+        <div class="wb-entry-header">
                 <span class="wb-entry-label">条目 ${container.children.length + 1}</span>
                 <button class="wb-entry-delete" onclick="this.closest('.wb-entry-card').remove()">×</button>
-            </div >
+            </div>
             <div class="wb-entry-field">
                 <label>位置</label>
                 <select class="wb-entry-position uc-select">
@@ -4048,7 +4068,7 @@
             const genderEmoji = '';
             const npcCount = (user.npcs && user.npcs.length) || 0;
             userCard.innerHTML = `
-        < img src = "${user.avatar || defaultAvatar}" alt = "avatar" class="user-card-avatar" >
+        <img src="${user.avatar || defaultAvatar}" alt="avatar" class="user-card-avatar">
             <div class="user-card-info">
                 <div class="user-card-name">${genderEmoji} ${user.name}</div>
                 <div class="user-card-meta">
@@ -4239,7 +4259,7 @@
         const isFemale = !npc || npc.gender === 'female';
         const isMale = npc && npc.gender === 'male';
         card.innerHTML = `
-        < button class="npc-remove-btn" onclick = "this.closest('.uc-npc-card').remove()" >×</button >
+        <button class="npc-remove-btn" onclick="this.closest('.uc-npc-card').remove()">×</button>
         <div class="npc-row">
             <div class="npc-field"><label>姓名</label><input type="text" class="npc-name-input" placeholder="NPC名字" value="${npc ? npc.name : ''}"></div>
             <div class="npc-field"><label>昵称</label><input type="text" class="npc-nickname-input" placeholder="可选" value="${npc ? (npc.nickname || '') : ''}"></div>
@@ -4678,7 +4698,7 @@
         if (!container) return;
 
         const bubble = document.createElement('div');
-        bubble.className = `call - bubble ${isUser ? 'sent' : 'received'} `;
+        bubble.className = `call-bubble ${isUser ? 'sent' : 'received'} `;
         bubble.innerHTML = text; // Use innerHTML to support HTML content like typing indicator
 
         container.appendChild(bubble);
@@ -5099,7 +5119,7 @@ Apply the following substitutions based on current language (CN/EN).
             // Using 'conversations' array might be better but it only has lastMsg.
             // Let's use localStorage history for current chat.
             if (currentChatTag) {
-                const historyKey = `faye-phone-history-${currentChatTag}`;
+                const historyKey = `faye - phone - history - ${currentChatTag} `;
                 const savedHistory = localStorage.getItem(historyKey);
                 if (savedHistory) {
                     const history = JSON.parse(savedHistory);
@@ -5115,7 +5135,15 @@ Apply the following substitutions based on current language (CN/EN).
                             // For now, replace with placeholder text unless it's the very last message
                             content = '[发送了一张图片]';
                         } else if (msg.type === 'sticker') {
-                            content = `[发送了表情包: ${msg.body}]`;
+                            let stickerName = msg.body;
+                            // Check for Name|URL format
+                            if (msg.body && msg.body.includes('|')) {
+                                const parts = msg.body.split('|');
+                                // If format is Name|URL, the first part is usually the name
+                                // Unless the name itself contains pipe (unlikely)
+                                stickerName = parts[0];
+                            }
+                            content = `[发送了表情包: ${stickerName}]`;
                         }
 
                         messages.push({ role, content });
@@ -5269,7 +5297,8 @@ Apply the following substitutions based on current language (CN/EN).
 
         // ====== Phase 3: Split by headers and render messages one by one ======
         // Header regex: [Name|Time] or [Name|Type|Time]
-        const headerRegex = /\[([^\]|]+(?:\|[^\]|]+)*)\|(\d{2}:\d{2})\]/g;
+        // Header regex: [Name|Time] or [Name|Type|Time] - Flexible for whitespace
+        const headerRegex = /\[([^\]]*?)\|\s*(\d{2}:\d{2})\s*\]/g;
 
         // Find all headers and their positions
         const segments = [];
@@ -5296,6 +5325,18 @@ Apply the following substitutions based on current language (CN/EN).
             segments.push({ header: match[0], headerEnd: match.index + match[0].length });
             lastIndex = match.index + match[0].length;
         }
+
+        // Special Check for AI sending stickers in strict format
+        // e.g. [CharName|表情包|12:00] https://...
+        // The regex above catches the header. We need to ensure the body is treated as a sticker if the header says '表情包'.
+        // This is handled in renderMessageToUI via 'isSticker' check on the header.
+
+        // However, if the AI outputs JUST a sticker line without standard brackets or with slight variations, we might miss it.
+        // But for now, we rely on the system prompt instruction: [Name|表情包|Time] URL
+        // The existing headerRegex will catch [Name|表情包|Time]
+        // And renderMessageToUI will see '表情包' in header and use sticker-bubble.
+
+        // Fill in bodies (content between headers)
 
         // Fill in bodies (content between headers)
         for (let i = 0; i < segments.length; i++) {
