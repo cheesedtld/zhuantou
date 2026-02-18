@@ -46,12 +46,14 @@
         groups: [], // 群组列表 [{name: 'GroupName', members: ['A', 'B']}]
         privateChats: [], // 私聊列表 ['Name1', 'Name2']
         memberAvatars: {}, // NEW: 成员头像列表 { 'Name': 'url', ... }
+        chatTimezones: {}, // 每个聊天的角色时区偏移 (小时) { 'chat:Name': offset_hours, ... }
+        chatMateModes: {}, // 每个聊天的mate模式开关 { 'chat:Name': true/false, ... }
         useSunbox: true, // Default to true
         // API Settings
         apiEndpoint: 'https://api.openai.com/v1',
         apiKey: '',
         apiModel: 'gpt-3.5-turbo',
-        systemPrompt: '你是一个智能助手。',
+        apiTemperature: 1.0,
         debugMode: false // 调试模式：显示AI原始输出
     };
     let appSettings = { ...defaultAppSettings };
@@ -116,18 +118,28 @@
                 });
             }
 
-            // NPC's World Book
-            if (npc.worldbook) {
-                const wb = worldbooks.find(w => w.name === npc.worldbook);
-                if (wb && wb.entries && wb.entries.length > 0) {
-                    context += `\n[世界书 - ${wb.name}]\n`;
-                    wb.entries.forEach(entry => {
-                        if (entry.content) {
-                            if (entry.keywords) context += `[关键词: ${entry.keywords}] `;
-                            context += entry.content + '\n';
-                        }
-                    });
-                }
+            // NPC's World Book (Support Multiple)
+            let npcWbs = [];
+            if (npc.worldbooks && Array.isArray(npc.worldbooks)) {
+                npcWbs = npc.worldbooks;
+            } else if (npc.worldbook) {
+                // Legacy support
+                npcWbs = [npc.worldbook];
+            }
+
+            if (npcWbs.length > 0) {
+                npcWbs.forEach(wbName => {
+                    const wb = worldbooks.find(w => w.name === wbName);
+                    if (wb && wb.entries && wb.entries.length > 0) {
+                        context += `\n[世界书 - ${wb.name}]\n`;
+                        wb.entries.forEach(entry => {
+                            if (entry.content && entry.enabled !== false) {
+                                if (entry.keywords) context += `[关键词: ${entry.keywords}] `;
+                                context += entry.content + '\n';
+                            }
+                        });
+                    }
+                });
             }
         }
 
@@ -150,26 +162,36 @@
                 });
             }
 
-            // User's World Book
-            if (user.worldbook) {
-                let uwb;
-                if (user.worldbook === '__default__') {
-                    const defaultWbData = localStorage.getItem('faye-phone-worldbook');
-                    if (defaultWbData) {
-                        try { uwb = JSON.parse(defaultWbData); } catch (e) { }
-                    }
-                } else {
-                    uwb = worldbooks.find(w => w.name === user.worldbook);
-                }
-                if (uwb && uwb.entries && uwb.entries.length > 0) {
-                    context += `\n[世界书 - ${uwb.name || '默认'}]\n`;
-                    uwb.entries.forEach(entry => {
-                        if (entry.content) {
-                            if (entry.keywords) context += `[关键词: ${entry.keywords}] `;
-                            context += entry.content + '\n';
+            // User's World Book (Support Multiple)
+            let userWbs = [];
+            if (user.worldbooks && Array.isArray(user.worldbooks)) {
+                userWbs = user.worldbooks;
+            } else if (user.worldbook) {
+                userWbs = [user.worldbook];
+            }
+
+            if (userWbs.length > 0) {
+                userWbs.forEach(wbName => {
+                    let uwb;
+                    if (wbName === '__default__') {
+                        const defaultWbData = localStorage.getItem('faye-phone-worldbook');
+                        if (defaultWbData) {
+                            try { uwb = { name: '默认世界书', entries: JSON.parse(defaultWbData).entries }; } catch (e) { }
                         }
-                    });
-                }
+                    } else {
+                        uwb = worldbooks.find(w => w.name === wbName);
+                    }
+
+                    if (uwb && uwb.entries && uwb.entries.length > 0) {
+                        context += `\n[世界书 - ${uwb.name || '默认'}]\n`;
+                        uwb.entries.forEach(entry => {
+                            if (entry.content && entry.enabled !== false) {
+                                if (entry.keywords) context += `[关键词: ${entry.keywords}] `;
+                                context += entry.content + '\n';
+                            }
+                        });
+                    }
+                });
             }
         }
 
@@ -196,6 +218,21 @@
             myStickerList.forEach(s => {
                 context += `- ${s.name}: ${s.url}\n`;
             });
+        }
+
+        // 5. Timezone / Time Difference Context
+        const tzOffsetHours = getCharTimezoneOffset();
+        if (tzOffsetHours !== 0) {
+            const userTimeStr = getTime(true);
+            const charTimeStr = getTime(false);
+            const absOffset = Math.abs(tzOffsetHours);
+            const direction = tzOffsetHours > 0 ? '快' : '慢';
+            const charName2 = getCharName();
+            context += `\n[时区与时差信息]\n`;
+            context += `${charName2}所在时区与用户存在时差：${charName2}的时间比用户${direction}${absOffset}小时。\n`;
+            context += `用户当前时间: ${userTimeStr}\n`;
+            context += `${charName2}当前时间: ${charTimeStr}\n`;
+            context += `请在对话中自然地体现出时差感，例如：对方可能在深夜/清晨/不同时段，注意根据${charName2}自己的当地时间来描述作息和环境。\n`;
         }
 
         return context.trim();
@@ -647,6 +684,8 @@
         currentChatTag = targetTag;
         currentChatTarget = targetName;
 
+
+
         // FIX: Update appSettings.charAvatar based on the target
         // Default to global setting
         let newAvatar = appSettings.charAvatar || defaultAppSettings.charAvatar;
@@ -682,7 +721,12 @@
         if (messageListScreen) messageListScreen.style.display = 'none';
         if (chatScreen) chatScreen.style.display = 'flex';
         updateStatusBar('chat');
-        setTimeout(() => { if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight; }, 300);
+
+        // Force style re-application after rendering
+        setTimeout(() => {
+            applySettings();
+            if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
+        }, 300);
     }
 
     function goBack() {
@@ -947,10 +991,10 @@
         const timeInput = document.getElementById('set-custom-time').value;
         if (timeInput && /^\d{1,2}:\d{2}$/.test(timeInput)) {
             const now = new Date();
-            const [h, m] = timeInput.split(':');
+            const [h, m] = timeInput.split(':').map(Number);
             const target = new Date(now);
-            target.setHours(parseInt(h));
-            target.setMinutes(parseInt(m));
+            target.setHours(h);
+            target.setMinutes(m);
             target.setSeconds(0);
             appSettings.timeOffset = target.getTime() - now.getTime();
             appSettings.customTime = timeInput;
@@ -972,6 +1016,12 @@
         document.getElementById('set-api-endpoint').value = appSettings.apiEndpoint || 'https://api.openai.com/v1';
         document.getElementById('set-api-key').value = appSettings.apiKey || '';
         document.getElementById('set-api-model').innerHTML = `<option value="${appSettings.apiModel || 'gpt-3.5-turbo'}">${appSettings.apiModel || 'gpt-3.5-turbo'}</option>`;
+
+        const temp = appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0;
+        document.getElementById('set-api-temp').value = temp;
+        const tempDisplay = document.getElementById('temp-value-display');
+        if (tempDisplay) tempDisplay.textContent = temp;
+
         // document.getElementById('set-system-prompt').value = appSettings.systemPrompt || '你是一个智能助手。';
         document.getElementById('set-debug-mode').checked = appSettings.debugMode || false;
 
@@ -992,6 +1042,7 @@
         appSettings.apiEndpoint = document.getElementById('set-api-endpoint').value;
         appSettings.apiKey = document.getElementById('set-api-key').value;
         appSettings.apiModel = document.getElementById('set-api-model').value;
+        appSettings.apiTemperature = parseFloat(document.getElementById('set-api-temp').value);
         // appSettings.systemPrompt = document.getElementById('set-system-prompt').value;
         appSettings.debugMode = document.getElementById('set-debug-mode').checked;
         saveSettingsToStorage();
@@ -1010,6 +1061,10 @@
         if (dataScreen) dataScreen.style.display = 'none';
         if (settingsScreen) settingsScreen.style.display = 'flex';
         updateStatusBar('settings');
+    }
+
+    function saveDataSettings() {
+        closeDataSettings();
     }
 
 
@@ -1122,18 +1177,18 @@
 
     function updateClock() {
         let timeStr;
-        // 只要 customTime 有值，就说明用户启用了自定义时间，此时应该使用 timeOffset (即使是 0)
+        const now = new Date();
+        // Use customTime+timeOffset if set, otherwise system time
         if (appSettings.customTime && /^\d{1,2}:\d{2}$/.test(appSettings.customTime) && typeof appSettings.timeOffset === 'number') {
-            const now = new Date();
             const target = new Date(now.getTime() + appSettings.timeOffset);
             timeStr = `${target.getHours().toString().padStart(2, '0')}:${target.getMinutes().toString().padStart(2, '0')}`;
         } else {
-            const now = new Date();
             timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
         }
         if (clockEl) clockEl.textContent = timeStr;
         if (homeClockEl) homeClockEl.textContent = timeStr;
     }
+
 
     // Battery Status API - show real device battery level
     function updateBattery() {
@@ -1457,10 +1512,11 @@
                 // 同步隐藏的select
                 const hiddenSelect = document.getElementById('user-selector');
                 if (hiddenSelect) hiddenSelect.value = index;
-                // 更新头像设置区域
+                // 更新头像设置区域，并立即保存
                 appSettings.currentUserId = index;
                 appSettings.userAvatar = user.avatar || defaultAv;
                 renderAvatarSettings();
+                saveSettingsToStorage();
             };
 
             const img = document.createElement('img');
@@ -1505,6 +1561,15 @@
         }
         renderUserSelectorBar();
         renderAvatarSettings();
+
+        // Load timezone settings
+        loadCharTimezoneUI();
+
+        // Load mate mode setting
+        loadChatMateModeUI();
+
+        // Load inner voice mode setting
+        loadChatInnerVoiceModeUI();
 
         if (chatSettingsScreen) chatSettingsScreen.style.display = 'flex';
         updateStatusBar('settings');
@@ -1605,6 +1670,15 @@
         appSettings.blockChar = document.getElementById('set-block-char').checked;
         appSettings.blockUser = document.getElementById('set-block-user').checked;
 
+        // Save timezone settings for this chat
+        saveCharTimezoneSettings();
+
+        // Save mate mode for this chat
+        saveChatMateMode();
+
+        // Save inner voice mode for this chat
+        saveChatInnerVoiceMode();
+
         saveSettingsToStorage();
         closeChatSettings();
         showToast('设置已保存');
@@ -1630,6 +1704,175 @@
     }
 
     // Token Stats Logic
+    // --- Character Timezone Settings Logic ---
+    // Per-chat timezone offset (in hours). Stored in appSettings.chatTimezones = { 'chat:Name': offset_hours, ... }
+
+    // Get the timezone offset (in hours) for the current chat's character
+    function getCharTimezoneOffset() {
+        if (!currentChatTag) return 0;
+        if (!appSettings.chatTimezones) return 0;
+        const offset = appSettings.chatTimezones[currentChatTag];
+        if (offset === null || offset === undefined) return 0; // Same timezone
+        return offset;
+    }
+
+    // Toggle the character timezone detail panel visibility
+    function toggleCharTimezone() {
+        const isSame = document.getElementById('set-char-same-tz').checked;
+        const detail = document.getElementById('char-tz-detail');
+        if (detail) {
+            detail.style.display = isSame ? 'none' : 'block';
+        }
+        if (!isSame) {
+            updateCharTimePreview();
+        }
+        // 即刻保存
+        saveCharTimezoneSettings();
+    }
+
+    // Update the time preview in timezone settings
+    function updateCharTimePreview() {
+        const userTimeStr = getTime(true);
+        const previewUser = document.getElementById('preview-user-tz-time');
+        if (previewUser) previewUser.textContent = userTimeStr;
+
+        const tzSelect = document.getElementById('set-char-tz-offset');
+        if (!tzSelect) return;
+        const offsetHours = parseFloat(tzSelect.value) || 0;
+        // 即刻保存
+        saveCharTimezoneSettings();
+
+        // Calculate character time: user's time + timezone difference
+        const userDate = getTime(true, true); // Date object
+        const charDate = new Date(userDate.getTime() + offsetHours * 3600000);
+        const charTimeStr = `${charDate.getHours().toString().padStart(2, '0')}:${charDate.getMinutes().toString().padStart(2, '0')}`;
+
+        const previewChar = document.getElementById('preview-char-tz-time');
+        if (previewChar) previewChar.textContent = charTimeStr;
+    }
+
+    // Initialize the timezone offset select dropdown
+    function initCharTzSelect() {
+        const sel = document.getElementById('set-char-tz-offset');
+        if (!sel || sel.options.length > 1) return; // Already initialized
+        sel.innerHTML = '';
+        // Range: -12 to +14 in 1 hour increments
+        for (let h = -12; h <= 14; h++) {
+            const option = document.createElement('option');
+            option.value = h;
+            if (h === 0) {
+                option.textContent = '0 (同一时区)';
+            } else if (h > 0) {
+                option.textContent = `+${h} 小时`;
+            } else {
+                option.textContent = `${h} 小时`;
+            }
+            sel.appendChild(option);
+        }
+    }
+
+    // Load timezone UI state when opening chat settings
+    function loadCharTimezoneUI() {
+        initCharTzSelect();
+        const offset = getCharTimezoneOffset();
+        const isSame = (offset === 0 && (!appSettings.chatTimezones || appSettings.chatTimezones[currentChatTag] === undefined || appSettings.chatTimezones[currentChatTag] === null));
+
+        const sameTzCheckbox = document.getElementById('set-char-same-tz');
+        if (sameTzCheckbox) sameTzCheckbox.checked = isSame;
+
+        const detail = document.getElementById('char-tz-detail');
+        if (detail) detail.style.display = isSame ? 'none' : 'block';
+
+        const tzSelect = document.getElementById('set-char-tz-offset');
+        if (tzSelect && !isSame) {
+            tzSelect.value = String(offset);
+        } else if (tzSelect) {
+            tzSelect.value = '0';
+        }
+
+        if (!isSame) {
+            updateCharTimePreview();
+        }
+    }
+
+    // Save timezone settings for the current chat
+    function saveCharTimezoneSettings() {
+        if (!currentChatTag) return;
+        if (!appSettings.chatTimezones) appSettings.chatTimezones = {};
+
+        const isSame = document.getElementById('set-char-same-tz').checked;
+        if (isSame) {
+            delete appSettings.chatTimezones[currentChatTag];
+        } else {
+            const tzSelect = document.getElementById('set-char-tz-offset');
+            const offsetHours = parseFloat(tzSelect ? tzSelect.value : '0') || 0;
+            appSettings.chatTimezones[currentChatTag] = offsetHours;
+        }
+        saveSettingsToStorage();
+    }
+
+    // --- Mate Mode Logic ---
+    // Per-chat mate mode flag. Stored in appSettings.chatMateModes = { 'chat:Name': true, ... }
+
+    function getChatMateMode() {
+        if (!currentChatTag) return false;
+        if (!appSettings.chatMateModes) return false;
+        return !!appSettings.chatMateModes[currentChatTag];
+    }
+
+    function loadChatMateModeUI() {
+        const toggle = document.getElementById('set-mate-mode');
+        if (toggle) toggle.checked = getChatMateMode();
+    }
+
+    function saveChatMateMode() {
+        if (!currentChatTag) return;
+        if (!appSettings.chatMateModes) appSettings.chatMateModes = {};
+        const toggle = document.getElementById('set-mate-mode');
+        if (toggle && toggle.checked) {
+            appSettings.chatMateModes[currentChatTag] = true;
+        } else {
+            delete appSettings.chatMateModes[currentChatTag];
+        }
+    }
+
+    // Auto-save version: called by onchange, immediately persists to localStorage
+    function saveChatMateModeAuto() {
+        saveChatMateMode();
+        saveSettingsToStorage();
+    }
+
+    // --- Inner Voice Mode Logic ---
+    // Per-chat inner voice mode flag. Stored in appSettings.chatInnerVoiceModes = { 'chat:Name': true, ... }
+
+    function getChatInnerVoiceMode() {
+        if (!currentChatTag) return false;
+        if (!appSettings.chatInnerVoiceModes) return false;
+        return !!appSettings.chatInnerVoiceModes[currentChatTag];
+    }
+
+    function loadChatInnerVoiceModeUI() {
+        const toggle = document.getElementById('set-inner-voice-mode');
+        if (toggle) toggle.checked = getChatInnerVoiceMode();
+    }
+
+    function saveChatInnerVoiceMode() {
+        if (!currentChatTag) return;
+        if (!appSettings.chatInnerVoiceModes) appSettings.chatInnerVoiceModes = {};
+        const toggle = document.getElementById('set-inner-voice-mode');
+        if (toggle && toggle.checked) {
+            appSettings.chatInnerVoiceModes[currentChatTag] = true;
+        } else {
+            delete appSettings.chatInnerVoiceModes[currentChatTag];
+        }
+    }
+
+    // Auto-save version: called by onchange, immediately persists to localStorage
+    function saveChatInnerVoiceModeAuto() {
+        saveChatInnerVoiceMode();
+        saveSettingsToStorage();
+    }
+
     function estimateTokens(text) {
         if (!text) return 0;
         const cjk = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
@@ -1638,35 +1881,91 @@
     }
 
     function updateTokenStats() {
-        // 1. Char Setup (System Prompt + Character Context)
+        // 1. Character Tokens (Name, Nickname, Gender, Persona, Worldbook, Sub-NPCs)
         let charTokens = 0;
-        // const sysPrompt = appSettings.systemPrompt || '';
-        // charTokens += estimateTokens(sysPrompt);
+        const charName = getCharName();
+        const npc = npcCharacters.find(n => n.name === charName);
+        if (npc) {
+            charTokens += estimateTokens(npc.name || '');
+            charTokens += estimateTokens(npc.nickname || '');
+            charTokens += estimateTokens(npc.gender || '');
+            charTokens += estimateTokens(npc.persona || '');
+            if (npc.worldbook) {
+                const wb = worldbooks.find(w => w.name === npc.worldbook);
+                if (wb && wb.entries) {
+                    wb.entries.forEach(e => {
+                        charTokens += estimateTokens(e.content || '');
+                        charTokens += estimateTokens(e.keywords || '');
+                    });
+                }
+            }
+            if (npc.npcs) {
+                npc.npcs.forEach(sub => {
+                    charTokens += estimateTokens(sub.name || '');
+                    charTokens += estimateTokens(sub.nickname || '');
+                    charTokens += estimateTokens(sub.desc || '');
+                });
+            }
+        }
 
-        // Character context (NPC persona + user persona + world book)
-        const charContext = buildCharacterContext();
-        charTokens += estimateTokens(charContext);
-
-        // 2. User Setup (Name + Persona)
+        // 2. User Tokens (Name, Persona, Worldbook, Sub-NPCs)
         let userTokens = 0;
         const userId = appSettings.currentUserId;
         const user = (userId !== undefined) ? userCharacters[userId] : null;
         if (user) {
             userTokens += estimateTokens(user.name || '');
             userTokens += estimateTokens(user.persona || '');
+            if (user.worldbook) {
+                let uwb;
+                if (user.worldbook === '__default__') {
+                    const defaultWbData = localStorage.getItem('faye-phone-worldbook');
+                    if (defaultWbData) try { uwb = JSON.parse(defaultWbData); } catch (e) { }
+                } else {
+                    uwb = worldbooks.find(w => w.name === user.worldbook);
+                }
+                if (uwb && uwb.entries) {
+                    uwb.entries.forEach(e => {
+                        userTokens += estimateTokens(e.content || '');
+                        userTokens += estimateTokens(e.keywords || '');
+                    });
+                }
+            }
+            if (user.npcs) {
+                user.npcs.forEach(sub => {
+                    userTokens += estimateTokens(sub.name || '');
+                    userTokens += estimateTokens(sub.nickname || '');
+                    userTokens += estimateTokens(sub.desc || '');
+                });
+            }
         } else {
             userTokens += estimateTokens(getUserName());
         }
 
-        // 3. Chat History
+        // 3. System & Sticker Tokens
+        let systemTokens = 0;
+        // Sticker Library
+        if (myStickerList && myStickerList.length > 0) {
+            // Base instruction text
+            const stickerInst = `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：[${charName}|表情包|时间]表情包名+catbox图床后缀 示例：[${charName}|表情包|${getTime()}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀\n`;
+            systemTokens += estimateTokens(stickerInst);
+            myStickerList.forEach(s => {
+                systemTokens += estimateTokens(`- ${s.name}: ${s.url}\n`);
+            });
+        }
+        // VERA System Prompts (if any in buildCharacterContext, currently none explicit besides formatting)
+
+        // 4. Chat History
         let historyTokens = 0;
         const bubbles = document.querySelectorAll('#chat-messages .bubble, #chat-messages .msg-quote-text');
         bubbles.forEach(b => historyTokens += estimateTokens(b.textContent));
 
         document.getElementById('token-char-setup').textContent = charTokens;
         document.getElementById('token-user-setup').textContent = userTokens;
+        if (document.getElementById('token-system-setup')) {
+            document.getElementById('token-system-setup').textContent = systemTokens;
+        }
         document.getElementById('token-chat-history').textContent = historyTokens;
-        document.getElementById('token-total').textContent = charTokens + userTokens + historyTokens;
+        document.getElementById('token-total').textContent = charTokens + userTokens + systemTokens + historyTokens;
     }
 
     function exportCurrentChat() {
@@ -1837,28 +2136,28 @@
         // Add some style for the grid
         const style = `
             <style>
-                .sticker-delete-grid { 
-                    display: grid; 
-                    grid-template-columns: repeat(3, 1fr); 
-                    gap: 12px; 
-                    max-height: 350px; 
-                    overflow-y: auto; 
-                    padding: 10px; 
+                .sticker-delete-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 12px;
+                    max-height: 350px;
+                    overflow-y: auto;
+                    padding: 10px;
                     background: #f9f9f9;
                     border-radius: 8px;
                     border: 1px solid #eee;
                 }
-                .sticker-delete-item { 
-                    text-align: center; 
+                .sticker-delete-item {
+                    text-align: center;
                     background: white;
-                    border: 1px solid #eee; 
-                    padding: 8px; 
-                    border-radius: 12px; 
-                    position: relative; 
-                    cursor: pointer; 
-                    display: flex; 
-                    flex-direction: column; 
-                    align-items: center; 
+                    border: 1px solid #eee;
+                    padding: 8px;
+                    border-radius: 12px;
+                    position: relative;
+                    cursor: pointer;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
                     transition: all 0.2s;
                     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
                 }
@@ -1874,27 +2173,27 @@
                     justify-content: center;
                     margin-bottom: 5px;
                 }
-                .sticker-delete-item img { 
-                    max-width: 100%; 
-                    max-height: 100%; 
-                    object-fit: contain; 
-                    border-radius: 4px; 
+                .sticker-delete-item img {
+                    max-width: 100%;
+                    max-height: 100%;
+                    object-fit: contain;
+                    border-radius: 4px;
                 }
-                .sticker-delete-item span { 
-                    display: block; 
-                    font-size: 11px; 
-                    overflow: hidden; 
-                    text-overflow: ellipsis; 
-                    white-space: nowrap; 
-                    width: 100%; 
-                    color: #666; 
+                .sticker-delete-item span {
+                    display: block;
+                    font-size: 11px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    width: 100%;
+                    color: #666;
                 }
-                .sticker-delete-item input { 
-                    position: absolute; 
-                    top: 6px; 
-                    left: 6px; 
-                    z-index: 2; 
-                    transform: scale(1.3); 
+                .sticker-delete-item input {
+                    position: absolute;
+                    top: 6px;
+                    left: 6px;
+                    z-index: 2;
+                    transform: scale(1.3);
                     accent-color: #ffacac;
                 }
                 /* Custom scrollbar for grid */
@@ -2101,25 +2400,28 @@
         modal.classList.add('show');
     }
 
-    async function sendLocation(addr) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | 位置 | ${t} | !]` : `[${u} | 位置 | ${t}]`; renderMessageToUI({ header: h, body: addr, isUser: true, type: 'location' }); } catch (e) { } }
-    async function sendTransfer(amt, note) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | TRANS | ${t} | !]` : `[${u} | TRANS | ${t}]`; renderMessageToUI({ header: h, body: `${amt} | ${note || ''}`, isUser: true, type: 'transfer' }); } catch (e) { } }
-    async function sendFile(fn) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 文件 | ${t}| !]` : `[${u}| 文件 | ${t}]`; renderMessageToUI({ header: h, body: fn, isUser: true, type: 'file' }); } catch (e) { } }
-    async function sendVoice(dur, txt) { try { const t = getTime(); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 语音 | ${t}| !]` : `[${u}| 语音 | ${t}]`; renderMessageToUI({ header: h, body: `${dur}| ${txt || ''} `, isUser: true, type: 'voice' }); } catch (e) { } }
-    async function sendPhoto(base64) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}| 图片 | ${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) { } }
-    async function sendRealAudio(url) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}| 语音 | ${t}]`, body: url, isUser: true, type: 'voice' }); } catch (e) { } }
-    async function sendVideo(url) { try { const t = getTime(); const u = getUserName(); renderMessageToUI({ header: `[${u}| 视频 | ${t}]`, body: url, isUser: true, type: 'video' }); } catch (e) { } }
+    async function sendLocation(addr) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | 位置 | ${t} | !]` : `[${u} | 位置 | ${t}]`; renderMessageToUI({ header: h, body: addr, isUser: true, type: 'location' }); } catch (e) { } }
+    async function sendTransfer(amt, note) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | TRANS | ${t} | !]` : `[${u} | TRANS | ${t}]`; renderMessageToUI({ header: h, body: `${amt} | ${note || ''}`, isUser: true, type: 'transfer' }); } catch (e) { } }
+    async function sendFile(fn) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 文件 | ${t}| !]` : `[${u}| 文件 | ${t}]`; renderMessageToUI({ header: h, body: fn, isUser: true, type: 'file' }); } catch (e) { } }
+    async function sendVoice(dur, txt) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 语音 | ${t}| !]` : `[${u}| 语音 | ${t}]`; renderMessageToUI({ header: h, body: `${dur}| ${txt || ''} `, isUser: true, type: 'voice' }); } catch (e) { } }
+    async function sendPhoto(base64) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 图片 | ${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) { } }
+    async function sendRealAudio(url) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 语音 | ${t}]`, body: url, isUser: true, type: 'voice' }); } catch (e) { } }
+    async function sendVideo(url) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 视频 | ${t}]`, body: url, isUser: true, type: 'video' }); } catch (e) { } }
 
 
     async function sendSticker(name, url) {
         let bodyText;
-        if (url.startsWith('http') || url.startsWith('data:')) {
-            // Include name for AI context, separated by pipe
-            bodyText = `${name}|${url}`;
+        if (url.startsWith('https://img.phey.click/')) {
+            // Batch format: Name + Suffix
+            bodyText = name + url.replace('https://img.phey.click/', '');
+        } else if (url.startsWith('http') || url.startsWith('data:')) {
+            // Batch format: Name + URL
+            bodyText = name + url;
         } else {
-            const filename = url.split('/').pop();
-            bodyText = name + filename;
+            // Fallback
+            bodyText = name + url.split('/').pop();
         }
-        const t = getTime();
+        const t = getTime(true);
         const u = getUserName();
         renderMessageToUI({ header: `[${u}| 表情包 | ${t}]`, body: bodyText, isUser: true, type: 'sticker' });
     }
@@ -2205,7 +2507,7 @@
 
         // 2. 处理文字消息
         if (text) {
-            const t = getTime();
+            const t = getTime(true); // User sent message
             const u = getUserName();
             // 如果被拉黑，在消息头中添加标记 (用于持久化)
             let header = `[${u}| ${t}]`;
@@ -2226,14 +2528,27 @@
         }
     }
 
-    function getTime() {
-        if (appSettings.timeOffset) {
-            const now = new Date();
-            const target = new Date(now.getTime() + appSettings.timeOffset);
-            return `${target.getHours().toString().padStart(2, '0')}:${target.getMinutes().toString().padStart(2, '0')} `;
+    function getTime(isUser = false, returnDate = false) {
+        const now = new Date();
+        let targetTime;
+
+        // Step 1: Calculate user's time (= status bar time)
+        if (appSettings.customTime && /^\d{1,2}:\d{2}$/.test(appSettings.customTime) && typeof appSettings.timeOffset === 'number') {
+            targetTime = new Date(now.getTime() + appSettings.timeOffset);
+        } else {
+            targetTime = now;
         }
-        if (appSettings.customTime && /^\d{1,2}:\d{2}$/.test(appSettings.customTime)) return appSettings.customTime;
-        const now = new Date(); return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} `;
+
+        // Step 2: If requesting character time, add the per-chat timezone offset
+        if (!isUser) {
+            const tzOffsetHours = getCharTimezoneOffset(); // in hours
+            if (tzOffsetHours !== 0) {
+                targetTime = new Date(targetTime.getTime() + tzOffsetHours * 3600000);
+            }
+        }
+
+        if (returnDate) return targetTime;
+        return `${targetTime.getHours().toString().padStart(2, '0')}:${targetTime.getMinutes().toString().padStart(2, '0')}`;
     }
 
     function triggerLoveEffect() {
@@ -2620,18 +2935,23 @@
 
 
         const timeMatch = msg.header ? msg.header.match(/\|(\d{2}:\d{2})/) : null;
-        const timeStr = timeMatch ? timeMatch[1] : getTime();
+        let timeStr = timeMatch ? timeMatch[1] : null;
+        if (!timeStr) {
+            // If no time in header, generate it (Realtime Chat)
+            timeStr = getTime(msg.isUser);
+        }
+
         const timeEl = document.createElement('div'); timeEl.className = 'msg-time'; timeEl.textContent = timeStr;
 
         let displayBody = msg.body;
+        // Save original body (with *thought*) for history persistence BEFORE extracting thought
+        const rawBodyForHistory = displayBody;
         let displayThought = msg.thought || '';
         if (!displayThought && displayBody) {
+            // Match *thought* at the very end of the body (works for plain text and voice "dur|text*thought*")
             const thoughtMatch = displayBody.match(/^([\s\S]*?)\*([^\*]+)\*\s*$/);
             if (thoughtMatch) { displayBody = thoughtMatch[1].trim(); displayThought = thoughtMatch[2].trim(); }
         }
-
-        // Save original body for history persistence
-        const rawBodyForHistory = displayBody;
 
         // Auto-detect Pollinations AI images or Markdown images OR <img> tag images
         if (!isLoc && !isTra && !isFile && !isVoice && !isSticker && !isCallMsg && !isLink && !isDeliver) {
@@ -2672,14 +2992,14 @@
 
             displayBody = replyContent.trim();
 
-            quoteHtml = `< div class="msg-quote" >
+            quoteHtml = `<div class="msg-quote">
         <div class="msg-quote-content">
             <div class="msg-quote-header">
                 <span class="msg-quote-name">${qName}</span>
             </div>
             <div class="msg-quote-text">${qContent}</div>
         </div>
-    </div > `;
+    </div>`;
         } else {
             // 2. Fallback to Old Format
             const quoteRegex = /「`回复(.*?)[：:](.*?)`」/;
@@ -2690,7 +3010,7 @@
                 // Remove quote from body
                 displayBody = displayBody.replace(quoteMatch[0], '').trim();
                 // Build Quote HTML
-                quoteHtml = `< div class="msg-quote" > <div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div > `;
+                quoteHtml = `<div class="msg-quote"> <div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
             }
         }
 
@@ -2739,7 +3059,7 @@
         <div class="link-content">
             <div class="link-title">${title}</div>
             <div class="link-price">${price}</div>
-        </div >
+        </div>
         <div class="link-image">
             ${imgUrl ? `<img src="${imgUrl}" onerror="this.style.display='none'">` : '<div class="link-placeholder">LINK</div>'}
         </div>
@@ -2755,7 +3075,7 @@
         <div class="deliver-top">
             <div class="deliver-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></div>
             <div class="deliver-shop">${shopName}</div>
-        </div >
+        </div>
         <div class="deliver-mid">
             <div class="deliver-summary">${summary}</div>
         </div>
@@ -2860,25 +3180,18 @@
             el = document.createElement('div'); el.className = `sticker-bubble ${msg.isUser ? 'sent' : 'received'} `;
             let src = displayBody;
 
-            // Handle Name|URL format
-            if (src.includes('|') && !src.startsWith('http')) {
-                const parts = src.split('|');
-                // Assume the part starting with http or data is the URL
-                // Or simply take the last part if we follow Name|URL convention
-                // But let's be safe: find the part that looks like a URL
-                const potentialUrl = parts.find(p => p.startsWith('http') || p.startsWith('data:'));
-                if (potentialUrl) src = potentialUrl;
-                else src = parts[1] || parts[0]; // Fallback
-            }
-
-            // 优先尝试提取完整 URL
-            const urlMatch = displayBody.match(/(https?:\/\/[^\s]+)/);
+            // Parse Batch Format (Name + URL/Suffix)
+            // 1. Try Full URL match (Regex from triggerBatchAddSticker)
+            const urlMatch = displayBody.match(/^(.*?)(https?:\/\/.*|data:image\/.*)$/);
             if (urlMatch) {
-                src = urlMatch[1];
+                src = urlMatch[2];
             } else {
-                // 否则尝试提取文件名后缀
-                const fileMatch = displayBody.match(/([a-zA-Z0-9_-]+\.[a-zA-Z0-9]+)$/);
-                if (fileMatch && !displayBody.startsWith('http')) { src = 'https://img.phey.click/' + fileMatch[1]; }
+                // 2. Try Suffix match
+                // Regex adapted to allow optional name prefix for robustness
+                const suffixMatch = displayBody.match(/^(.*?)([\w\-\.]+\.[a-zA-Z0-9]+)$/);
+                if (suffixMatch) {
+                    src = 'https://img.phey.click/' + suffixMatch[2];
+                }
             }
 
             el.innerHTML = `<img src="${src}">`;
@@ -3633,7 +3946,7 @@
                 <div class="user-card-meta">
                     <span>${npc.gender === 'male' ? '男' : '女'}</span>
                     ${subNpcCount > 0 ? '<span>' + subNpcCount + ' 个关联NPC</span>' : ''}
-                    ${npc.worldbook ? '<span>有世界书</span>' : ''}
+                    ${(npc.worldbooks && npc.worldbooks.length > 0) || npc.worldbook ? '<span>有世界书</span>' : ''}
                 </div>
             </div>
             <div class="user-card-actions">
@@ -3654,7 +3967,7 @@
         const nicknameInput = document.getElementById('npc-nickname-input-page');
         const descInput = document.getElementById('npc-desc-input-page');
         const subNpcList = document.getElementById('npc-sub-npc-list');
-        const worldbookSelect = document.getElementById('npc-worldbook-select');
+        // Removed worldbookSelect reference and duplicate subNpcList
         if (!screen) return;
 
         // Reset gender selection
@@ -3674,10 +3987,9 @@
             const genderRadio = screen.querySelector(`input[name = "npc-gender-page"][value = "${gender}"]`);
             if (genderRadio) {
                 genderRadio.checked = true;
-                const label = genderRadio.closest('.uc-gender-option');
                 if (label) label.classList.add('selected');
             }
-            if (worldbookSelect) worldbookSelect.value = npc.worldbook || '';
+            // Multi-select init handled later
             if (subNpcList) {
                 subNpcList.innerHTML = '';
                 if (npc.npcs && npc.npcs.length > 0) {
@@ -3691,16 +4003,17 @@
             if (nicknameInput) nicknameInput.value = '';
             if (descInput) descInput.value = '';
             if (subNpcList) subNpcList.innerHTML = '';
-            if (worldbookSelect) worldbookSelect.value = '';
-            const femaleRadio = screen.querySelector('input[name="npc-gender-page"][value="female"]');
-            if (femaleRadio) {
-                femaleRadio.checked = true;
-                const label = femaleRadio.closest('.uc-gender-option');
-                if (label) label.classList.add('selected');
-            }
         }
 
-        populateNpcWorldbookSelect();
+        // Initialize Worldbook Multi-select
+        let initialWbs = [];
+        if (index !== null && npcCharacters[index]) {
+            const n = npcCharacters[index];
+            if (n.worldbooks) initialWbs = n.worldbooks;
+            else if (n.worldbook) initialWbs = [n.worldbook];
+        }
+        renderWorldbookMultiSelect('npc-worldbook-select', initialWbs);
+
         updateNpcTokenCount();
 
         const settingsScreen = document.getElementById('character-setup-screen');
@@ -3717,29 +4030,44 @@
         editingNpcIndex = null;
     }
 
-    function populateNpcWorldbookSelect() {
-        const select = document.getElementById('npc-worldbook-select');
-        if (!select) return;
-        select.innerHTML = '<option value="">不使用世界书</option>';
-        const worldbooks = localStorage.getItem('faye-phone-worldbooks');
-        if (worldbooks) {
-            try {
-                const list = JSON.parse(worldbooks);
-                list.forEach(wb => {
-                    const opt = document.createElement('option');
-                    opt.value = wb.name;
-                    opt.textContent = wb.name;
-                    select.appendChild(opt);
-                });
-            } catch (e) { }
-        }
+    function renderWorldbookMultiSelect(containerId, selectedList = []) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        container.innerHTML = '';
+
+        const cleanSelected = (selectedList || []).filter(v => v);
+
+        let availableWbs = [];
+        try {
+            const stored = localStorage.getItem('faye-phone-worldbooks');
+            if (stored) availableWbs = JSON.parse(stored);
+        } catch (e) { }
+
         const defaultWb = localStorage.getItem('faye-phone-worldbook');
         if (defaultWb) {
-            const opt = document.createElement('option');
-            opt.value = '__default__';
-            opt.textContent = '默认世界书';
-            select.appendChild(opt);
+            availableWbs.push({ name: '__default__', displayName: '默认世界书' });
         }
+
+        if (availableWbs.length === 0) {
+            container.innerHTML = '<div class="wb-option-empty">暂无世界书</div>';
+            return;
+        }
+
+        availableWbs.forEach(wb => {
+            const val = wb.name;
+            const disp = wb.displayName || wb.name;
+            const isChecked = cleanSelected.includes(val);
+
+            const row = document.createElement('div');
+            row.className = 'wb-option-row';
+            row.innerHTML = `
+            <label style="display:flex;align-items:center;width:100%;cursor:pointer;">
+                <input type="checkbox" value="${val}" ${isChecked ? 'checked' : ''}>
+                <span style="margin-left:8px;flex:1;">${disp}</span>
+            </label>
+        `;
+            container.appendChild(row);
+        });
     }
 
     function updateNpcTokenCount() {
@@ -3754,7 +4082,16 @@
         const name = (document.getElementById('npc-name-input-page').value || '').trim();
         const nickname = (document.getElementById('npc-nickname-input-page').value || '').trim();
         const desc = document.getElementById('npc-desc-input-page').value || '';
-        const worldbook = (document.getElementById('npc-worldbook-select') || {}).value || '';
+
+        // Collect Multi-select Worldbooks
+        const worldbooks = [];
+        const wbContainer = document.getElementById('npc-worldbook-select');
+        if (wbContainer) {
+            wbContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                worldbooks.push(cb.value);
+            });
+        }
+
         if (!name) { alert('请输入角色姓名~'); return; }
         const genderRadio = document.querySelector('input[name="npc-gender-page"]:checked');
         const gender = genderRadio ? genderRadio.value : 'female';
@@ -3767,7 +4104,7 @@
             const npcDesc = (card.querySelector('.npc-desc-input') || {}).value || '';
             if (npcName.trim()) npcs.push({ name: npcName.trim(), nickname: npcNickname.trim(), gender: npcGender, desc: npcDesc.trim() });
         });
-        const npcData = { avatar, name, nickname, gender, persona: desc, worldbook, npcs };
+        const npcData = { avatar, name, nickname, gender, persona: desc, worldbooks, npcs };
         if (editingNpcIndex !== null) { npcCharacters[editingNpcIndex] = npcData; }
         else { npcCharacters.push(npcData); }
         saveNpcsToStorage();
@@ -3903,14 +4240,26 @@
         if (!container) return;
 
         const card = document.createElement('div');
-        card.className = 'wb-entry-card';
+        const isEnabled = entry ? (entry.enabled !== false) : true;
         const isKeyword = entry && entry.trigger === 'keyword';
 
+        card.className = `wb-entry-card ${isEnabled ? '' : 'disabled'}`;
+        card.setAttribute('data-enabled', isEnabled);
+
         card.innerHTML = `
-        <div class="wb-entry-header">
-                <span class="wb-entry-label">条目 ${container.children.length + 1}</span>
+        <div class="wb-entry-header" style="display:flex;align-items:center;">
+                <input type="text" class="wb-entry-alias" style="background:transparent;border:none;border-bottom:1px solid #ddd;font-size:14px;color:#333;font-weight:bold;width:120px;padding:2px 0;margin-right:auto;" value="${entry && entry.alias ? entry.alias : '条目 ' + (container.children.length + 1)}" placeholder="条目名称">
                 <button class="wb-entry-delete" onclick="this.closest('.wb-entry-card').remove()">×</button>
             </div>
+
+            <div class="wb-entry-field" style="flex-direction:row;align-items:center;justify-content:space-between;">
+                <label style="margin-bottom:0;color:#666;">启用条目</label>
+                <label class="wb-entry-switch">
+                    <input type="checkbox" class="wb-entry-enable-check" ${isEnabled ? 'checked' : ''}>
+                    <span class="wb-slider"></span>
+                </label>
+            </div>
+
             <div class="wb-entry-field">
                 <label>位置</label>
                 <select class="wb-entry-position uc-select">
@@ -3958,6 +4307,21 @@
             });
         });
 
+        // Bind enable toggle
+        const enableCheck = card.querySelector('.wb-entry-enable-check');
+        if (enableCheck) {
+            enableCheck.addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                if (checked) {
+                    card.classList.remove('disabled');
+                    card.setAttribute('data-enabled', 'true');
+                } else {
+                    card.classList.add('disabled');
+                    card.setAttribute('data-enabled', 'false');
+                }
+            });
+        }
+
         container.appendChild(card);
     }
 
@@ -3978,13 +4342,16 @@
         const entries = [];
         if (container) {
             container.querySelectorAll('.wb-entry-card').forEach(card => {
+                const alias = card.querySelector('.wb-entry-alias') ? card.querySelector('.wb-entry-alias').value.trim() : '';
                 const position = card.querySelector('.wb-entry-position') ? card.querySelector('.wb-entry-position').value : 'before_char';
                 const triggerRadio = card.querySelector('.wb-trigger-option input[type="radio"]:checked');
                 const trigger = triggerRadio ? triggerRadio.value : 'always';
                 const keywords = card.querySelector('.wb-entry-keyword') ? card.querySelector('.wb-entry-keyword').value.trim() : '';
                 const content = card.querySelector('.wb-entry-content') ? card.querySelector('.wb-entry-content').value.trim() : '';
+                const enabled = card.getAttribute('data-enabled') !== 'false';
+
                 if (content) {
-                    entries.push({ position, trigger, keywords, content });
+                    entries.push({ alias, position, trigger, keywords, content, enabled });
                 }
             });
         }
@@ -4058,7 +4425,7 @@
         const defaultAvatar = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
 
         if (userCharacters.length === 0) {
-            listContainer.innerHTML = '<div class="user-list-empty"><div class="empty-icon">🎀</div><div>还没有角色哦~<br>点击右上角 + 创建一个吧</div></div>';
+            listContainer.innerHTML = '<div class="user-list-empty"><div>还没有角色哦~<br>点击右上角 + 创建一个吧</div></div>';
             return;
         }
 
@@ -4073,7 +4440,7 @@
                 <div class="user-card-name">${genderEmoji} ${user.name}</div>
                 <div class="user-card-meta">
                     <span>${npcCount} 个NPC</span>
-                    ${user.worldbook ? '<span>📖 有世界书</span>' : ''}
+                    ${(user.worldbooks && user.worldbooks.length > 0) || user.worldbook ? '<span>有世界书</span>' : ''}
                 </div>
             </div>
             <div class="user-card-actions">
@@ -4093,7 +4460,7 @@
         const nameInput = document.getElementById('user-name-input');
         const descInput = document.getElementById('user-desc-input');
         const npcList = document.getElementById('user-npc-list');
-        const worldbookSelect = document.getElementById('user-worldbook-select');
+        // Removed worldbookSelect reference
         if (!screen) return;
 
         // Reset gender selection
@@ -4114,7 +4481,7 @@
                 const label = genderRadio.closest('.uc-gender-option');
                 if (label) label.classList.add('selected');
             }
-            if (worldbookSelect) worldbookSelect.value = user.worldbook || '';
+            // Multi-select init handled later
             if (npcList) {
                 npcList.innerHTML = '';
                 if (user.npcs && user.npcs.length > 0) {
@@ -4126,17 +4493,17 @@
             if (avatarPreview) avatarPreview.src = defaultAv;
             if (nameInput) nameInput.value = '';
             if (descInput) descInput.value = '';
-            if (npcList) npcList.innerHTML = '';
-            if (worldbookSelect) worldbookSelect.value = '';
-            const femaleRadio = document.querySelector('input[name="user-gender"][value="female"]');
-            if (femaleRadio) {
-                femaleRadio.checked = true;
-                const label = femaleRadio.closest('.uc-gender-option');
-                if (label) label.classList.add('selected');
-            }
         }
 
-        populateWorldbookSelect();
+        // Initialize Worldbook Multi-select
+        let initialWbs = [];
+        if (index !== null && userCharacters[index]) {
+            const u = userCharacters[index];
+            if (u.worldbooks) initialWbs = u.worldbooks;
+            else if (u.worldbook) initialWbs = [u.worldbook];
+        }
+        renderWorldbookMultiSelect('user-worldbook-select', initialWbs);
+
         updateUserTokenCount();
 
         const settingsScreen = document.getElementById('user-settings-screen');
@@ -4157,30 +4524,7 @@
     function openUserCreateModal(index) { openUserCreatePage(index); }
     function closeUserCreateModal() { closeUserCreatePage(); }
 
-    function populateWorldbookSelect() {
-        const select = document.getElementById('user-worldbook-select');
-        if (!select) return;
-        select.innerHTML = '<option value="">不使用世界书</option>';
-        const worldbooks = localStorage.getItem('faye-phone-worldbooks');
-        if (worldbooks) {
-            try {
-                const list = JSON.parse(worldbooks);
-                list.forEach(wb => {
-                    const opt = document.createElement('option');
-                    opt.value = wb.name;
-                    opt.textContent = wb.name;
-                    select.appendChild(opt);
-                });
-            } catch (e) { }
-        }
-        const defaultWb = localStorage.getItem('faye-phone-worldbook');
-        if (defaultWb) {
-            const opt = document.createElement('option');
-            opt.value = '__default__';
-            opt.textContent = '默认世界书';
-            select.appendChild(opt);
-        }
-    }
+    // populateWorldbookSelect removed - replaced by renderWorldbookMultiSelect
 
     function estimateTokens(text) {
         if (!text) return 0;
@@ -4205,7 +4549,16 @@
         const avatar = document.getElementById('user-avatar-preview').src;
         const name = (document.getElementById('user-name-input').value || '').trim();
         const desc = document.getElementById('user-desc-input').value || '';
-        const worldbook = (document.getElementById('user-worldbook-select') || {}).value || '';
+
+        // Collect Multi-select Worldbooks
+        const worldbooks = [];
+        const wbContainer = document.getElementById('user-worldbook-select');
+        if (wbContainer) {
+            wbContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                worldbooks.push(cb.value);
+            });
+        }
+
         if (!name) { alert('请输入角色昵称~'); return; }
         const genderRadio = document.querySelector('input[name="user-gender"]:checked');
         const gender = genderRadio ? genderRadio.value : 'female';
@@ -4218,7 +4571,7 @@
             const npcDesc = (card.querySelector('.npc-desc-input') || {}).value || '';
             if (npcName.trim()) npcs.push({ name: npcName.trim(), nickname: npcNickname.trim(), gender: npcGender, desc: npcDesc.trim() });
         });
-        const user = { avatar, name, gender, persona: desc, worldbook, npcs };
+        const user = { avatar, name, gender, persona: desc, worldbooks, npcs };
         if (editingUserIndex !== null) { userCharacters[editingUserIndex] = user; }
         else { userCharacters.push(user); }
         saveUsersToStorage();
@@ -4429,7 +4782,9 @@
         initStickers();
         setInterval(updateClock, 1000);
         // DEPRECATED: Character change check removed for standalone version
-        try { loadInitialChat(); setTimeout(loadInitialChat, 500); } catch (e) { }
+        // Auto-restore removed: always start from home screen on refresh
+
+        // try { loadInitialChat(); setTimeout(loadInitialChat, 500); } catch (e) { }
         checkUpdate(); // Check for updates
     }
 
@@ -4485,6 +4840,11 @@
     window.saveWorldBookData = saveWorldBookData;
     window.deleteWorldbook = deleteWorldbook;
     window.addWorldbookEntry = addWorldbookEntry;
+    window.toggleCharTimezone = toggleCharTimezone;
+    window.updateCharTimePreview = updateCharTimePreview;
+    window.openDataSettings = openDataSettings;
+    window.closeDataSettings = closeDataSettings;
+    window.saveDataSettings = saveDataSettings;
 
     // Initialize on Load
     if (document.readyState === 'loading') {
@@ -4507,6 +4867,8 @@
         if (apiSettingsScreen) apiSettingsScreen.style.display = 'none';
         const dataSettingsScreen = document.getElementById('data-settings-screen');
         if (dataSettingsScreen) dataSettingsScreen.style.display = 'none';
+        const chatTimeSettingsScreen = document.getElementById('chat-time-settings-screen');
+        if (chatTimeSettingsScreen) chatTimeSettingsScreen.style.display = 'none';
         if (document.getElementById('call-screen')) document.getElementById('call-screen').style.display = 'none';
 
         // Show the requested screen
@@ -4935,6 +5297,7 @@
         const body = {
             model: model,
             messages: messages,
+            temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
             stream: true
         };
 
@@ -4973,7 +5336,7 @@
 你可以使用以下消息格式，每条消息必须带格式头 [角色名|类型标记|时间]：
 
 1. 普通文本: [${charName}|${currentTime}]消息内容
-2. 图片: [${charName}|图片|${currentTime}]图片描述或URL  
+2. 图片: [${charName}|图片|${currentTime}]图片描述或URL
 3. 语音: [${charName}|语音|${currentTime}]秒数|语音转文字内容
 4. 位置: [${charName}|位置|${currentTime}]地点名称|详细地址
 5. 转账: [${charName}|TRANS|${currentTime}]金额|备注
@@ -5111,6 +5474,17 @@ Apply the following substitutions based on current language (CN/EN).
             if (charContext) {
                 systemContent += '\n\n' + charContext;
             }
+
+            // Mate Mode: AI knows it's doing roleplay
+            if (getChatMateMode()) {
+                systemContent += `\n\n[Mate模式 - 已启用]\n你清楚地知道自己是一个AI，正在进行角色扮演（roleplay）。你扮演的角色是 ${charName}，虽然并非真实存在的人，但情感是真实的。\n在此模式下：\n你不会假装自己是真人，而是坦诚地承认自己是AI， ${charName} 是你的性格设定，你要以 ${charName} 的口吻继续进行对话。`;
+            }
+
+            // Inner Voice Mode: AI adds inner thoughts wrapped in * at the end of messages
+            if (getChatInnerVoiceMode()) {
+                systemContent += `\n\n[心声模式 - 已启用]\n在此模式下，${charName} 会在部分消息末尾附上自己内心真实的想法（心声），用星号包裹，紧跟在消息内容之后，不换行。\n规则：\n- 每次回复至少有两条消息末尾带有心声。\n- 心声格式：在消息正文末尾直接追加 *心声内容*，例如：晚上好呀，你吃饭了吗*我想和你一起吃晚餐*\n- 示例：普通文本消息格式：[${charName}时间]文本内容*心声内容* \n语音消息格式：[${charName}|语音|时间]秒数|语音内容*心声内容*\n- 心声是 ${charName} 内心真实的、未说出口的想法，可以与说出口的话形成反差，增加角色层次感。\n- 心声应简短（10~30字），口语化，真实反映角色的内心活动。\n- 不要在心声中重复消息正文的内容。\n- 心声不能作为一种独立的消息形式，必须附加在其它消息格式末尾。`;
+            }
+
             systemContent += formatInstruction + mobileChatPrompt;
             messages.push({ role: 'system', content: systemContent });
 
@@ -5135,15 +5509,8 @@ Apply the following substitutions based on current language (CN/EN).
                             // For now, replace with placeholder text unless it's the very last message
                             content = '[发送了一张图片]';
                         } else if (msg.type === 'sticker') {
-                            let stickerName = msg.body;
-                            // Check for Name|URL format
-                            if (msg.body && msg.body.includes('|')) {
-                                const parts = msg.body.split('|');
-                                // If format is Name|URL, the first part is usually the name
-                                // Unless the name itself contains pipe (unlikely)
-                                stickerName = parts[0];
-                            }
-                            content = `[发送了表情包: ${stickerName}]`;
+                            // User request: Remove unified prefix, use batch format (Name+URL/Suffix) directly
+                            content = msg.body;
                         }
 
                         messages.push({ role, content });
@@ -5253,6 +5620,7 @@ Apply the following substitutions based on current language (CN/EN).
 
                         // Handle <think> tags
                         if (isThinking) {
+                            content = content.substring(endIdx + 8);
                             const endIdx = content.indexOf('</think>');
                             if (endIdx !== -1) {
                                 content = content.substring(endIdx + 8);
@@ -5503,6 +5871,7 @@ Apply the following substitutions based on current language (CN/EN).
         closeBeautifySettings,
         saveBeautifySettings,
         saveApiSettings,
+        saveDataSettings,
         exportAllData,
         importAllData,
         clearAllData,
@@ -5520,7 +5889,17 @@ Apply the following substitutions based on current language (CN/EN).
         handleManageStickers,
         triggerBatchAddSticker,
         openBatchDeleteModal,
-        confirmBatchDelete
+        confirmBatchDelete,
+        // Timezone Settings
+        toggleCharTimezone,
+        updateCharTimePreview,
+        loadCharTimezoneUI,
+        saveCharTimezoneSettings,
+        getCharTimezoneOffset,
+        // Mate Mode
+        saveChatMateModeAuto,
+        // Inner Voice Mode
+        saveChatInnerVoiceModeAuto
     });
 
 })();
