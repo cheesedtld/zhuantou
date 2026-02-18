@@ -371,6 +371,16 @@
                                 <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
                             </select>
                         </div>
+                        <div class="setting-row">
+                            <label>AI 温度 (Temperature)</label>
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <input type="range" id="set-api-temp" class="setting-range" min="0" max="2" step="0.1"
+                                    value="1.0" style="flex: 1;"
+                                    oninput="document.getElementById('temp-value-display').textContent = this.value">
+                                <span id="temp-value-display"
+                                    style="width: 30px; text-align: right; font-size: 13px; color: #666;">1.0</span>
+                            </div>
+                        </div>
                     </div>
                     <div style="padding: 10px 0; text-align: right;">
                         <button onclick="refreshModelList()" class="action-btn"
@@ -504,7 +514,7 @@
             <div class="modal-box"
                 style="background: #fff0f5; border: 3px solid #ffb6c1; border-radius: 25px; box-shadow: 0 10px 30px rgba(255,182,193,0.4);">
                 <div class="modal-title"
-                    style="color: #ff69b4; font-family: 'Ma Shan Zheng', cursive; font-size: 22px;">🦋 更新啦 </div>
+                    style="color: #ff69b4; font-family: 'Ma Shan Zheng', cursive; font-size: 22px;">更新啦 </div>
                 <style>
                     #update-content::-webkit-scrollbar {
                         display: none;
@@ -618,6 +628,44 @@
                     </svg>
                 </div>
 
+                <!-- 时区设置 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">时区设置</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <label>同一时区</label>
+                            <label class="switch">
+                                <input type="checkbox" id="set-char-same-tz" checked onchange="toggleCharTimezone()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="char-tz-detail" style="display: none;">
+                            <div class="setting-row">
+                                <label>时差</label>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <select id="set-char-tz-offset" class="setting-input-sm"
+                                        style="width: 120px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 4px 6px; font-size: 13px;"
+                                        onchange="updateCharTimePreview()">
+                                    </select>
+                                </div>
+                            </div>
+                            <div
+                                style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span style="font-size: 12px; color: #999;">我的时间：</span>
+                                    <span id="preview-user-tz-time"
+                                        style="font-size: 13px; color: #333; font-weight: 500;">--:--</span>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span style="font-size: 12px; color: #999;">对方时间：</span>
+                                    <span id="preview-char-tz-time"
+                                        style="font-size: 13px; color: #e88a9a; font-weight: 600;">--:--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 拉黑设置 -->
                 <div style="margin-top: 10px;">
                     <div class="settings-section-title">隐私与安全</div>
@@ -633,6 +681,36 @@
                             <label>消息被对方拒收</label>
                             <label class="switch">
                                 <input type="checkbox" id="set-block-user" onchange="saveChatBlockSettings()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 角色扮演设置 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">角色扮演</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">Mate 模式</label>
+                                <span
+                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，角色知道自己是AI角色扮演，而非真实存在</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-mate-mode" onchange="saveChatMateModeAuto()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">心声模式</label>
+                                <span
+                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI每次回复至少两条消息末尾会附上角色内心独白</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-inner-voice-mode"
+                                    onchange="saveChatInnerVoiceModeAuto()">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -660,14 +738,16 @@
                                     d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
                             </svg>
                         </div>
+                        <div class="setting-row" onclick="deleteCurrentChat()" style="cursor: pointer;">
+                            <label style="cursor: pointer; color: #e53935;">删除该聊天</label>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e53935"
+                                stroke-width="2">
+                                <path
+                                    d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="settings-footer" style="padding: 10px; display: flex; gap: 10px;">
-                <button class="modal-btn" onclick="deleteCurrentChat()"
-                    style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px; background: #d1b8b8; color: #fff; border: none; cursor: pointer;">删除该聊天</button>
-                <button class="modal-btn btn-save" onclick="saveMainChatSettings()"
-                    style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px;">保存配置</button>
             </div>
         </div>
 
@@ -760,16 +840,20 @@
                     <div class="settings-section-title">Token 统计 (估算)</div>
                     <div class="setting-group">
                         <div class="setting-row">
-                            <label>角色设定</label>
+                            <label>角色设定 (Char)</label>
                             <span id="token-char-setup" style="font-size: 13px; color: #888;">0</span>
                         </div>
                         <div class="setting-row">
-                            <label>User 设定</label>
+                            <label>用户设定 (User)</label>
                             <span id="token-user-setup" style="font-size: 13px; color: #888;">0</span>
                         </div>
                         <div class="setting-row">
-                            <label>聊天记录</label>
+                            <label>聊天记录 (Chat)</label>
                             <span id="token-chat-history" style="font-size: 13px; color: #888;">0</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>系统总计 (Sys)</label>
+                            <span id="token-system-setup" style="font-size: 13px; color: #888;">0</span>
                         </div>
                         <div class="setting-row" style="border-top: 1px solid #f0f0f0;">
                             <label style="font-weight: bold;">总计 (Total)</label>
@@ -1059,7 +1143,7 @@
                         </svg></div>
                     <span class="header-title" id="npc-create-title">创建角色</span>
                     <div class="header-btn header-btn-right" onclick="saveNpc()">
-                        <span style="font-size: 14px; color: #007aff; font-weight: bold;">保存</span>
+                        <span style="font-size: 14px; color: #e398b1; font-weight: bold;">保存</span>
                     </div>
                 </div>
             </div>
@@ -1112,9 +1196,9 @@
                 <div class="uc-card">
                     <div class="uc-field">
                         <label>世界书</label>
-                        <select id="npc-worldbook-select" class="uc-select">
-                            <option value="">不使用世界书</option>
-                        </select>
+                        <div id="npc-worldbook-select" class="wb-select-container">
+                            <div class="wb-option-empty">暂无世界书</div>
+                        </div>
                         <div class="uc-hint">选择一个世界书来设定故事背景</div>
                     </div>
                 </div>
@@ -1159,7 +1243,7 @@
                         </svg></div>
                     <span class="header-title" id="worldbook-edit-title">新建世界书</span>
                     <div class="header-btn header-btn-right" onclick="saveWorldBookData()">
-                        <span style="font-size: 14px; color: #007aff; font-weight: bold;">保存</span>
+                        <span style="font-size: 14px; color: #e398b1; font-weight: bold;">保存</span>
                     </div>
                 </div>
             </div>
@@ -1210,7 +1294,7 @@
                         </svg></div>
                     <span class="header-title" id="user-create-title">创建角色</span>
                     <div class="header-btn header-btn-right" onclick="saveUser()">
-                        <span style="font-size: 14px; color: #fb00ff; font-weight: bold;">保存</span>
+                        <span style="font-size: 14px; color: #e398b1; font-weight: bold;">保存</span>
                     </div>
                 </div>
             </div>
@@ -1256,9 +1340,9 @@
                 <div class="uc-card">
                     <div class="uc-field">
                         <label>世界书</label>
-                        <select id="user-worldbook-select" class="uc-select">
-                            <option value="">不使用世界书</option>
-                        </select>
+                        <div id="user-worldbook-select" class="wb-select-container">
+                            <div class="wb-option-empty">暂无世界书</div>
+                        </div>
                         <div class="uc-hint">选择一个世界书来设定故事背景</div>
                     </div>
                 </div>
