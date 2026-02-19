@@ -26,12 +26,8 @@
 
 <body>
     <div id="phone-container">
-        <div id="home-indicator"></div>
         <div class="status-bar text-dark" id="status-bar">
             <div class="sb-left" id="clock">12:00</div>
-            <div class="dynamic-island">
-                <div class="island-camera"></div>
-            </div>
             <div class="sb-right">
                 <svg width="22" height="11" viewBox="0 0 22 11" fill="currentColor">
                     <path d="M4 5 l1.5 2.5 h-3 z" />
@@ -72,14 +68,7 @@
                     </div>
                     <span class="app-name">Discord</span>
                 </div>
-                <div class="app-item">
-                    <div class="app-icon-box app-icon-style">
-                        <div class="app-icon-image"
-                            style="-webkit-mask-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><text x=\'50%25\' y=\'50%25\' dy=\'.35em\' font-family=\'Arial\' font-weight=\'900\' font-size=\'14\' text-anchor=\'middle\'>ST</text></svg>'); mask-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><text x=\'50%25\' y=\'50%25\' dy=\'.35em\' font-family=\'Arial\' font-weight=\'900\' font-size=\'14\' text-anchor=\'middle\'>ST</text></svg>');">
-                        </div>
-                    </div>
-                    <span class="app-name">SillyTavern</span>
-                </div>
+
                 <div class="app-item" onclick="openUserSettings()">
                     <div class="app-icon-box app-icon-style">
                         <div class="app-icon-image"
@@ -170,7 +159,7 @@
                     <div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24">
                             <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
                         </svg></div>
-                    <span class="header-title" id="header-title">{{char}}</span>
+                    <span class="header-title" id="header-title"></span>
                     <div class="header-btn header-btn-right" onclick="openChatSettings()"><svg viewBox="0 0 24 24">
                             <circle cx="6" cy="12" r="1.6" fill="#181818"></circle>
                             <circle cx="12" cy="12" r="1.6" fill="#181818"></circle>
@@ -929,30 +918,22 @@
                             <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
                                 <label style="font-size:14px;">消息保留条数</label>
                                 <span
-                                    style="font-size:11px; color:#aaa; line-height:1.4;">总结时保留最近N条消息不被总结，其余旧消息将被AI提取为记忆摘要</span>
+                                    style="font-size:11px; color:#aaa; line-height:1.4;">总结后保留最近N-5条消息不被总结，最近N条消息不被删除</span>
                             </div>
                             <input type="number" id="memory-keep-count" value="10" min="5" max="100"
                                 style="width: 60px; text-align: center; border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 14px;">
                         </div>
-                        <div class="setting-row">
-                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">自动注入记忆</label>
-                                <span
-                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI对话时会自动将记忆总结作为上下文注入</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="memory-auto-inject" checked onchange="saveMemorySettings()">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
                     </div>
+
                 </div>
+
 
                 <!-- 记忆操作 -->
                 <div>
                     <div class="settings-section-title">记忆操作</div>
                     <div class="setting-group">
-                        <div class="setting-row" style="display: flex; gap: 10px; padding: 12px; align-items: stretch;">
+                        <div class="setting-row" id="memory-action-buttons-container"
+                            style="display: flex; gap: 10px; padding: 12px; align-items: stretch;">
                             <button id="btn-summarize-memory" onclick="summarizeChatMemory()" class="modal-btn"
                                 style="flex: 1; border-radius: 8px; background-color: #e8f5e9; color: #2e7d32; padding: 10px; font-size: 13px;">
                                 AI自动总结
@@ -970,9 +951,9 @@
                     <div class="settings-section-title"
                         style="display: flex; justify-content: space-between; align-items: center;">
                         <span>记忆总结列表</span>
-                        <div onclick="clearAllMemories()"
-                            style="cursor: pointer; padding: 4px; display: flex; align-items: center;" title="清空所有">
-                            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #aaa;">
+                        <div onclick="toggleMemoryBatchMode()"
+                            style="cursor: pointer; padding: 8px; display: flex; align-items: center;" title="批量管理">
+                            <svg viewBox="0 0 24 24" style="width: 20px; height: 20px; fill: #888;">
                                 <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z">
                                 </path>
                             </svg>
@@ -1004,10 +985,6 @@
                     </div>
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-size:12px; color:#aaa;" id="memory-edit-token-count">0 tokens</span>
-                        <label
-                            style="display:flex; align-items:center; gap:6px; font-size:13px; color:#333; cursor:pointer;">
-                            <input type="checkbox" id="memory-edit-enabled" checked style="width:16px; height:16px;"> 启用
-                        </label>
                     </div>
                 </div>
                 <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top:15px;">
@@ -1020,89 +997,85 @@
 
         <div id="call-screen" class="screen"
             style="background: linear-gradient(180deg, #2b2b2b 0%, #1a1a1a 100%); color: #fff; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px 40px 20px; z-index: 100; box-sizing: border-box; display: none;">
-            <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; width: 100%;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div id="call-name" style="font-size: 26px; font-weight: 600; letter-spacing: 1px;">{{char}}</div>
-                </div>
-                <div id="call-timer"
-                    style="font-size: 16px; opacity: 0.6; font-variant-numeric: tabular-nums; position: relative; top: -2px;">
-                    00:00</div>
-            </div>
-
+            <!-- Top: Name + Timer + Status + Avatar (fixed position) -->
             <div
-                style="display: flex; flex-direction: column; align-items: center; gap: 20px; flex: 1; justify-content: center; width: 100%;">
-                <div style="position: relative;">
+                style="display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; flex-shrink: 0;">
+                <div id="call-name" style="font-size: 26px; font-weight: 600; letter-spacing: 1px;"></div>
+                <div id="call-timer" style="font-size: 16px; opacity: 0.6; font-variant-numeric: tabular-nums;">
+                    00:00</div>
+                <div id="call-char-text" style="font-size: 12px; opacity: 0.8;"></div>
+                <div style="position: relative; margin-top: 10px;">
                     <img id="call-avatar" src=""
-                        style="width: 120px; height: 120px; border-radius: 20px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
+                        style="width: 100px; height: 100px; border-radius: 20px; object-fit: cover; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1);">
                     <div class="ripple-ring"></div>
                 </div>
-
-                <!-- Middle Message Area -->
-                <div id="call-chat-container"
-                    style="width: 100%; padding: 0 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; height: 200px; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none;">
-                    <!-- Call bubbles will be injected here -->
-                </div>
-                <style>
-                    #call-chat-container::-webkit-scrollbar {
-                        display: none;
-                    }
-
-                    .call-bubble {
-                        max-width: 80%;
-                        padding: 8px 12px;
-                        border-radius: 16px;
-                        font-size: 14px;
-                        line-height: 1.4;
-                        word-break: break-word;
-                        animation: fadeIn 0.3s ease;
-                    }
-
-                    .call-bubble.sent {
-                        align-self: flex-end;
-                        background: #666666;
-                        color: #fff;
-                        border-bottom-right-radius: 4px;
-                    }
-
-                    .call-bubble.received {
-                        align-self: flex-start;
-                        background: #333333;
-                        color: #fff;
-                        border-bottom-left-radius: 4px;
-                    }
-
-                    @keyframes fadeIn {
-                        from {
-                            opacity: 0;
-                            transform: translateY(5px);
-                        }
-
-                        to {
-                            opacity: 1;
-                            transform: translateY(0);
-                        }
-                    }
-
-                    @keyframes jump-exclamation {
-
-                        0%,
-                        100% {
-                            transform: translateY(0);
-                        }
-
-                        50% {
-                            transform: translateY(-5px);
-                        }
-                    }
-
-                    .jumping-exclamation {
-                        display: inline-block;
-                        font-weight: bold;
-                        font-size: 18px;
-                        animation: jump-exclamation 0.6s infinite;
-                    }
-                </style>
             </div>
+
+            <!-- Middle: Chat bubbles (scrollable, takes remaining space) -->
+            <div id="call-chat-container"
+                style="width: 100%; padding: 10px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; margin-top: 15px;">
+                <!-- Call bubbles will be injected here -->
+            </div>
+            <style>
+                #call-chat-container::-webkit-scrollbar {
+                    display: none;
+                }
+
+                .call-bubble {
+                    max-width: 80%;
+                    padding: 8px 12px;
+                    border-radius: 16px;
+                    font-size: 14px;
+                    line-height: 1.4;
+                    word-break: break-word;
+                    animation: fadeIn 0.3s ease;
+                }
+
+                .call-bubble.sent {
+                    align-self: flex-end;
+                    background: #666666;
+                    color: #fff;
+                    border-bottom-right-radius: 4px;
+                }
+
+                .call-bubble.received {
+                    align-self: flex-start;
+                    background: #333333;
+                    color: #fff;
+                    border-bottom-left-radius: 4px;
+                }
+
+                @keyframes fadeIn {
+                    from {
+                        opacity: 0;
+                        transform: translateY(5px);
+                    }
+
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+
+                @keyframes jump-exclamation {
+
+                    0%,
+                    100% {
+                        transform: translateY(0);
+                    }
+
+                    50% {
+                        transform: translateY(-5px);
+                    }
+                }
+
+                .jumping-exclamation {
+                    display: inline-block;
+                    font-weight: bold;
+                    font-size: 18px;
+                    animation: jump-exclamation 0.6s infinite;
+                }
+            </style>
 
             <div style="width: 100%; display: flex; flex-direction: column; gap: 30px;">
                 <div
@@ -1213,7 +1186,7 @@
         <div id="incoming-call-screen" class="screen"
             style="display:none; background: linear-gradient(180deg, #2b2b2b 0%, #1a1a1a 100%); color: #fff; flex-direction: column; align-items: center; justify-content: space-between; padding: 60px 20px 80px 20px; z-index: 110;">
             <div style="display: flex; flex-direction: column; align-items: center; gap: 15px;">
-                <div id="incoming-call-name" style="font-size: 26px; font-weight: 600;">{{char}}</div>
+                <div id="incoming-call-name" style="font-size: 26px; font-weight: 600;"></div>
                 <div style="font-size: 16px; opacity: 0.6;">邀请你进行语音通话...</div>
             </div>
 
