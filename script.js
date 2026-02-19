@@ -2810,41 +2810,34 @@
         }
 
 
-        // NEW: 处理撤回消息
+        // 兼容旧版：处理历史记录中的撤回消息头部格式
         if (msg.header && (msg.header.includes('|撤回|') || msg.header.includes('|RECALL'))) {
-            const row = document.createElement('div');
-            row.className = 'message-row system';
-            row.style.justifyContent = 'center';
-            row.style.margin = '10px 0';
-
-            const el = document.createElement('div');
-            el.className = 'recall-notice';
-            el.style.fontSize = '12px';
-            el.style.color = '#999';
-            el.style.backgroundColor = 'rgba(0,0,0,0.05)';
-            el.style.padding = '4px 12px';
-            el.style.borderRadius = '10px';
-
             let displayName = msg.isUser ? getUserName() : getCharName();
             if (msg.header) {
                 const parts = msg.header.replace(/^\[|\]$|^【|】$/g, '').split('|');
                 if (parts.length > 0 && parts[0]) displayName = parts[0];
             }
-
-            const isVoice = msg.header.includes('语音') || msg.header.includes('VOC');
-            const typeText = isVoice ? '语音' : '信息';
-
-            el.textContent = `${displayName}撤回了一条${typeText} `;
+            let recallText = `${displayName}撤回了一条消息`;
             if (msg.body && msg.body.trim()) {
-                el.textContent += `：${msg.body} `;
+                recallText += `：${msg.body.trim()}`;
             }
-            el.dataset.fullHeader = msg.header;
-            el.dataset.rawBody = msg.body;
-
-            row.appendChild(el);
-            chatMessages.appendChild(row);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            if (!isHistoryLoad) { saveCurrentChatHistory(); scrollToBottom(); }
+            const sysRow = document.createElement('div');
+            sysRow.className = 'message-row system';
+            sysRow.style.justifyContent = 'center';
+            sysRow.style.margin = '10px 0';
+            const sysEl = document.createElement('div');
+            sysEl.className = 'recall-notice';
+            sysEl.style.fontSize = '12px';
+            sysEl.style.color = '#999';
+            sysEl.style.backgroundColor = 'rgba(0,0,0,0.05)';
+            sysEl.style.padding = '4px 12px';
+            sysEl.style.borderRadius = '10px';
+            sysEl.textContent = recallText;
+            sysEl.dataset.fullHeader = msg.header;
+            sysEl.dataset.rawBody = msg.body || '';
+            sysRow.appendChild(sysEl);
+            chatMessages.appendChild(sysRow);
+            if (!isHistoryLoad) { saveCurrentChatHistory(); chatMessages.scrollTop = chatMessages.scrollHeight; }
             return;
         }
 
@@ -2944,6 +2937,42 @@
         const timeEl = document.createElement('div'); timeEl.className = 'msg-time'; timeEl.textContent = timeStr;
 
         let displayBody = msg.body;
+
+        // 检测 <recall> 标签：AI撤回消息，渲染为灰色小字
+        let isRecallMsg = false;
+        if (displayBody && displayBody.includes('<recall>')) {
+            isRecallMsg = true;
+            displayBody = displayBody.replace(/<recall>/g, '').trim();
+        }
+        if (isRecallMsg) {
+            let recallName = msg.isUser ? getUserName() : getCharName();
+            if (msg.header) {
+                const parts = msg.header.replace(/^\[|\]$|^【|】$/g, '').split('|');
+                if (parts.length > 0 && parts[0]) recallName = parts[0];
+            }
+            let recallText = `${recallName}撤回了一条消息`;
+            if (displayBody) recallText += `：${displayBody}`;
+
+            const sysRow = document.createElement('div');
+            sysRow.className = 'message-row system';
+            sysRow.style.justifyContent = 'center';
+            sysRow.style.margin = '10px 0';
+            const sysEl = document.createElement('div');
+            sysEl.className = 'recall-notice';
+            sysEl.style.fontSize = '12px';
+            sysEl.style.color = '#999';
+            sysEl.style.backgroundColor = 'rgba(0,0,0,0.05)';
+            sysEl.style.padding = '4px 12px';
+            sysEl.style.borderRadius = '10px';
+            sysEl.textContent = recallText;
+            sysEl.dataset.fullHeader = msg.header || '';
+            sysEl.dataset.rawBody = (msg.body || '').replace(/<recall>/g, '');
+            sysRow.appendChild(sysEl);
+            chatMessages.appendChild(sysRow);
+            if (!isHistoryLoad) { saveCurrentChatHistory(); chatMessages.scrollTop = chatMessages.scrollHeight; }
+            return;
+        }
+
         // Save original body (with *thought*) for history persistence BEFORE extracting thought
         const rawBodyForHistory = displayBody;
         let displayThought = msg.thought || '';
@@ -3163,6 +3192,9 @@
                     textBubble.style.backgroundColor = appSettings.charBubble;
                     textBubble.style.color = appSettings.charText;
                 }
+
+                // 保存原始body用于历史记录持久化（dur|text格式）
+                container.dataset.rawBody = rawBodyForHistory;
 
                 // 添加到容器
                 container.appendChild(voiceCard);
@@ -3414,6 +3446,178 @@
     }
     function clearDeleteButton() { if (activeDeleteBtn) { activeDeleteBtn.remove(); activeDeleteBtn = null; } document.querySelectorAll('.delete-mode').forEach(el => el.classList.remove('delete-mode')); }
     function executeDelete(el) { const r = el.closest('.message-row'); r.style.transform = 'scale(0)'; setTimeout(async () => { r.remove(); clearDeleteButton(); saveCurrentChatHistory(); }, 200); }
+
+    // ========== 多选模式 ==========
+    let isMultiSelectMode = false;
+
+    function enterMultiSelectMode(triggerEl) {
+        isMultiSelectMode = true;
+        const chatScreen = document.getElementById('chat-screen');
+        chatScreen.classList.add('multi-select-mode');
+
+        // Hide input bar
+        const inputBar = document.getElementById('input-bar');
+        if (inputBar) inputBar.style.display = 'none';
+
+        // Add checkbox to each message row (skip system rows)
+        const rows = chatMessages.querySelectorAll('.message-row.sent, .message-row.received');
+        rows.forEach(row => {
+            if (row.querySelector('.multi-select-checkbox')) return;
+            const cb = document.createElement('div');
+            cb.className = 'multi-select-checkbox';
+            cb.innerHTML = '<div class="ms-check-inner"></div>';
+            cb.addEventListener('click', (e) => {
+                e.stopPropagation();
+                row.classList.toggle('ms-selected');
+                updateMultiSelectCount();
+            });
+            row.insertBefore(cb, row.firstChild);
+        });
+
+        // Pre-select the trigger message
+        if (triggerEl) {
+            const triggerRow = triggerEl.closest('.message-row');
+            if (triggerRow) {
+                triggerRow.classList.add('ms-selected');
+            }
+        }
+
+        // Create bottom toolbar
+        const toolbar = document.createElement('div');
+        toolbar.id = 'multi-select-toolbar';
+        toolbar.innerHTML = `
+            <div class="ms-toolbar-left">
+                <span class="ms-count">已选择 <span id="ms-selected-count">0</span> 条</span>
+            </div>
+            <div class="ms-toolbar-right">
+                <button class="ms-btn ms-btn-delete" onclick="deleteSelectedMessages()">删除</button>
+                <button class="ms-btn ms-btn-cancel" onclick="exitMultiSelectMode()">取消</button>
+            </div>
+        `;
+        chatScreen.appendChild(toolbar);
+        updateMultiSelectCount();
+    }
+
+    function updateMultiSelectCount() {
+        const count = chatMessages.querySelectorAll('.message-row.ms-selected').length;
+        const countEl = document.getElementById('ms-selected-count');
+        if (countEl) countEl.textContent = count;
+        // Disable delete button if nothing selected
+        const delBtn = document.querySelector('.ms-btn-delete');
+        if (delBtn) {
+            delBtn.disabled = count === 0;
+            delBtn.style.opacity = count === 0 ? '0.4' : '1';
+        }
+    }
+
+    function exitMultiSelectMode() {
+        isMultiSelectMode = false;
+        const chatScreen = document.getElementById('chat-screen');
+        chatScreen.classList.remove('multi-select-mode');
+
+        // Show input bar
+        const inputBar = document.getElementById('input-bar');
+        if (inputBar) inputBar.style.display = '';
+
+        // Remove checkboxes and selection
+        chatMessages.querySelectorAll('.multi-select-checkbox').forEach(cb => cb.remove());
+        chatMessages.querySelectorAll('.ms-selected').forEach(row => row.classList.remove('ms-selected'));
+
+        // Remove toolbar
+        const toolbar = document.getElementById('multi-select-toolbar');
+        if (toolbar) toolbar.remove();
+    }
+
+    function deleteSelectedMessages() {
+        const selected = chatMessages.querySelectorAll('.message-row.ms-selected');
+        if (selected.length === 0) return;
+
+        // Animate and remove
+        selected.forEach(row => {
+            row.style.transition = 'transform 0.2s, opacity 0.2s';
+            row.style.transform = 'scale(0.8)';
+            row.style.opacity = '0';
+        });
+
+        setTimeout(() => {
+            selected.forEach(row => row.remove());
+            saveCurrentChatHistory();
+            exitMultiSelectMode();
+        }, 220);
+    }
+
+    // ========== 撤回消息 ==========
+    function executeRecall(el) {
+        const row = el.closest('.message-row');
+        if (!row) return;
+
+        // Get sender name
+        const nameEl = row.querySelector('.msg-name');
+        const displayName = nameEl ? nameEl.textContent : getUserName();
+
+        // Detect message type for recall notice
+        const header = el.dataset.fullHeader || '';
+        const isVoice = header.includes('语音') || header.includes('VOC');
+        const isPhoto = header.includes('图片');
+        const isSticker = header.includes('表情包');
+        const isFile = header.includes('文件');
+        const isVideo = header.includes('视频');
+        const isLocation = header.includes('位置');
+        let typeText;
+        if (isVoice) typeText = '语音';
+        else if (isPhoto) typeText = '图片';
+        else if (isSticker) typeText = '表情包';
+        else if (isFile) typeText = '文件';
+        else if (isVideo) typeText = '视频';
+        else if (isLocation) typeText = '位置';
+        else typeText = '消息';
+
+        // Get time from the original header
+        const timeMatch = header.match(/\|(\d{2}:\d{2})/);
+        const timeStr = timeMatch ? timeMatch[1] : getTime(true);
+
+        // Build recall header
+        const recallHeader = `[${displayName}|撤回|${timeStr}]`;
+
+        // Get the raw body for text messages
+        const rawBody = el.dataset.rawBody || el.textContent || '';
+
+        // Build recall text
+        let recallText = `${displayName}撤回了一条${typeText}`;
+        // For text messages, show the recalled content
+        if (typeText === '消息' && rawBody.trim()) {
+            recallText += `：${rawBody.trim()}`;
+        }
+
+        // Build recall notice element
+        const newRow = document.createElement('div');
+        newRow.className = 'message-row system';
+        newRow.style.justifyContent = 'center';
+        newRow.style.margin = '10px 0';
+
+        const notice = document.createElement('div');
+        notice.className = 'recall-notice';
+        notice.style.fontSize = '12px';
+        notice.style.color = '#999';
+        notice.style.backgroundColor = 'rgba(0,0,0,0.05)';
+        notice.style.padding = '4px 12px';
+        notice.style.borderRadius = '10px';
+        notice.textContent = recallText;
+        notice.dataset.fullHeader = recallHeader;
+        notice.dataset.rawBody = rawBody;
+
+        newRow.appendChild(notice);
+
+        // Animate out old row, animate in new row
+        row.style.transition = 'transform 0.25s, opacity 0.25s';
+        row.style.transform = 'scale(0.8)';
+        row.style.opacity = '0';
+
+        setTimeout(() => {
+            row.replaceWith(newRow);
+            saveCurrentChatHistory();
+        }, 260);
+    }
     // Global variable for active menu
     let activeMsgMenu = null;
 
@@ -3428,6 +3632,7 @@
     function addLongPressHandler(el) {
         let timer;
         const start = (e) => {
+            if (isMultiSelectMode) return; // Skip long press in multi-select mode
             if (e.target.closest('.delete-btn') || e.target.closest('.msg-action-menu')) return;
             el.classList.add('pressing');
             timer = setTimeout(() => {
@@ -3439,6 +3644,18 @@
             clearTimeout(timer);
             if (!activeMsgMenu) el.classList.remove('pressing');
         };
+
+        // Handle click for multi-select mode
+        el.addEventListener('click', (e) => {
+            if (!isMultiSelectMode) return;
+            if (e.target.closest('.multi-select-checkbox')) return; // Checkbox handles itself
+            e.stopPropagation();
+            const row = el.closest('.message-row');
+            if (row) {
+                row.classList.toggle('ms-selected');
+                updateMultiSelectCount();
+            }
+        });
 
         el.addEventListener('mousedown', start);
         el.addEventListener('touchstart', start, { passive: true });
@@ -3482,12 +3699,28 @@
             menu.appendChild(btnRegen);
         }
 
-        // Delete (Always last)
+        // Multi-select
+        const btnMulti = document.createElement('div');
+        btnMulti.className = 'msg-action-item';
+        btnMulti.innerHTML = '<img src="https://api.iconify.design/mdi:checkbox-multiple-marked-outline.svg" class="msg-action-icon">';
+        btnMulti.onclick = (e) => { e.stopPropagation(); closeMsgMenu(); enterMultiSelectMode(el); };
+        menu.appendChild(btnMulti);
+
+        // Delete
         const btnDelete = document.createElement('div');
         btnDelete.className = 'msg-action-item';
         btnDelete.innerHTML = '<img src="https://api.iconify.design/carbon:delete.svg" class="msg-action-icon">';
         btnDelete.onclick = (e) => { e.stopPropagation(); executeDelete(el); closeMsgMenu(); };
         menu.appendChild(btnDelete);
+
+        // Recall (Only for User messages, always rightmost)
+        if (isUser) {
+            const btnRecall = document.createElement('div');
+            btnRecall.className = 'msg-action-item';
+            btnRecall.innerHTML = '<img src="https://api.iconify.design/mdi:undo-variant.svg" class="msg-action-icon">';
+            btnRecall.onclick = (e) => { e.stopPropagation(); executeRecall(el); closeMsgMenu(); };
+            menu.appendChild(btnRecall);
+        }
 
         document.getElementById('chat-screen').appendChild(menu);
         activeMsgMenu = menu;
@@ -5346,7 +5579,7 @@
 9. 通话: [${charName}|通话|${currentTime}]通话内容
 10. 链接: [${charName}|LINK|${currentTime}]标题|价格|图片URL
 11. 外卖/订单: [${charName}|DELIVER|${currentTime}]店名|商品摘要|总价
-12. 撤回: [${charName}|撤回|${currentTime}]撤回的消息内容
+12. 撤回: 在消息内容末尾添加<recall>标签即可，例如：[${charName}|${currentTime}]刚才那条消息发错了<recall> 系统会自动将这条消息渲染为灰色撤回提示
 13. 接收转账: [${charName}|${currentTime}][${charName}|转账已接收] (接收转账)
 14. 退回转账: [${charName}|${currentTime}][${charName}|转账已退还] (退回转账)
 
@@ -5466,11 +5699,7 @@ Apply the following substitutions based on current language (CN/EN).
 `;
 
             let systemContent = veraPrompt + '\n\n';
-            // if (appSettings.systemPrompt) {
-            //     systemContent += appSettings.systemPrompt;
-            // } else {
-            //     systemContent += '你是一个智能助手。';
-            // }
+
             if (charContext) {
                 systemContent += '\n\n' + charContext;
             }
@@ -5488,10 +5717,7 @@ Apply the following substitutions based on current language (CN/EN).
             systemContent += formatInstruction + mobileChatPrompt;
             messages.push({ role: 'system', content: systemContent });
 
-            // Chat History (Last 20 messages)
-            // We need to reconstruct history from DOM or memory.
-            // Using 'conversations' array might be better but it only has lastMsg.
-            // Let's use localStorage history for current chat.
+
             if (currentChatTag) {
                 const historyKey = `faye - phone - history - ${currentChatTag} `;
                 const savedHistory = localStorage.getItem(historyKey);
@@ -5899,7 +6125,12 @@ Apply the following substitutions based on current language (CN/EN).
         // Mate Mode
         saveChatMateModeAuto,
         // Inner Voice Mode
-        saveChatInnerVoiceModeAuto
+        saveChatInnerVoiceModeAuto,
+        // Multi-select & Recall
+        enterMultiSelectMode,
+        exitMultiSelectMode,
+        deleteSelectedMessages,
+        executeRecall
     });
 
 })();
