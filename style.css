@@ -98,14 +98,6 @@ body {
     gap: 6px;
 }
 
-.dynamic-island {
-    display: none;
-}
-
-.island-camera {
-    display: none;
-}
-
 /* --- 屏幕管理 --- */
 .screen {
     flex: 1;
