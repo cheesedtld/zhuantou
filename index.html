@@ -112,6 +112,14 @@
                         </svg></div>
                     <span class="app-name">设置</span>
                 </div>
+                <div class="app-item" onclick="openRegexScreen()">
+                    <div class="app-icon-box app-icon-style">
+                        <div class="app-icon-image"
+                            style="-webkit-mask-image: url('https://api.iconify.design/tabler:regex.svg'); mask-image: url('https://api.iconify.design/tabler:regex.svg');">
+                        </div>
+                    </div>
+                    <span class="app-name">正则</span>
+                </div>
             </div>
         </div>
         <div id="message-list-screen" class="screen">
@@ -172,6 +180,15 @@
             </div>
             <div id="chat-messages"></div>
             <div id="love-effect-layer" class="love-effect-container"></div>
+
+            <!-- 引用消息预览条 -->
+            <div id="quote-preview-bar">
+                <div class="quote-preview-content">
+                    <div class="quote-preview-name" id="quote-preview-name"></div>
+                    <div class="quote-preview-text" id="quote-preview-text"></div>
+                </div>
+                <div class="quote-preview-close" onclick="cancelQuote()">×</div>
+            </div>
 
             <!-- 媒体预览条 -->
             <div id="media-preview-bar">
@@ -454,18 +471,6 @@
                 </div>
             </div>
             <div class="settings-body">
-                <!-- 个性化 -->
-                <div>
-                    <div class="settings-section-title">个性化</div>
-                    <div class="setting-group">
-                        <div class="setting-row"><label>主屏幕壁纸</label>
-                            <div><button class="file-upload-label"
-                                    onclick="triggerSettingsUpload('home-bg')">上传图片</button> <img id="preview-home-bg"
-                                    class="preview-img" src=""></div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- 图标与文字 -->
                 <div>
                     <div class="settings-section-title">图标与文字</div>
@@ -476,6 +481,31 @@
                                 class="color-picker"></div>
                         <div class="setting-row"><label>字体颜色</label> <input type="color" id="set-home-text-color"
                                 class="color-picker"></div>
+                    </div>
+                </div>
+
+                <!-- 主屏幕壁纸 -->
+                <div>
+                    <div class="settings-section-title">主屏幕壁纸</div>
+                    <div class="setting-group">
+                        <div class="setting-row"
+                            style="display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-weight: bold;">当前壁纸预览</label>
+                                <div>
+                                    <button class="file-upload-label"
+                                        onclick="triggerSettingsUpload('home-bg')">本地上传</button>
+                                    <button class="file-upload-label"
+                                        style="margin-left: 5px; background-color: #f0f0f0; color: #333;"
+                                        onclick="openUrlUploadModal('home-bg')">url上传</button>
+                                </div>
+                            </div>
+                            <div
+                                style="background: #f7f7f7; border-radius: 12px; border: 1px solid #eee; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                                <img id="preview-home-bg" src=""
+                                    style="width: 140px; height: 280px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 2px solid #fff;">
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -514,7 +544,8 @@
             <div class="modal-box"
                 style="background: #fff0f5; border: 3px solid #ffb6c1; border-radius: 25px; box-shadow: 0 10px 30px rgba(255,182,193,0.4);">
                 <div class="modal-title"
-                    style="color: #ff69b4; font-family: 'Ma Shan Zheng', cursive; font-size: 22px;">更新啦 </div>
+                    style="color: #ff69b4; font-family: 'Ma Shan Zheng', cursive; font-size: 22px;">更新啦
+                </div>
                 <style>
                     #update-content::-webkit-scrollbar {
                         display: none;
@@ -591,6 +622,19 @@
                     <div class="settings-section-title">头像设置</div>
                     <div class="setting-group no-border" style="background: transparent; box-shadow: none;">
                         <div id="avatar-settings-container" class="avatar-grid"></div>
+                    </div>
+                </div>
+
+                <!-- 备注设置 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">备注</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <label>备注名</label>
+                            <input type="text" id="set-chat-remark" class="uc-input" placeholder="设置备注名..."
+                                style="width: 140px; text-align: right; border: none; background: transparent; font-size: 14px; color: #333;"
+                                oninput="saveChatRemarkAuto()">
+                        </div>
                     </div>
                 </div>
 
@@ -809,10 +853,21 @@
                 <div>
                     <div class="settings-section-title">背景设置</div>
                     <div class="setting-group">
-                        <div class="setting-row"><label>聊天背景</label>
-                            <div><button class="file-upload-label"
-                                    onclick="triggerSettingsUpload('chat-bg')">上传图片</button>
-                                <img id="preview-chat-bg" class="preview-img" src="">
+                        <div class="setting-row"
+                            style="display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 15px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <label style="font-weight: bold;">聊天背景预览</label>
+                                <div><button class="file-upload-label"
+                                        onclick="triggerSettingsUpload('chat-bg')">本地上传</button>
+                                    <button class="file-upload-label"
+                                        style="margin-left: 5px; background-color: #f0f0f0; color: #333;"
+                                        onclick="openUrlUploadModal('chat-bg')">url上传</button>
+                                </div>
+                            </div>
+                            <div
+                                style="background: #f7f7f7; border-radius: 12px; border: 1px solid #eee; display: flex; justify-content: center; align-items: center; padding: 20px;">
+                                <img id="preview-chat-bg" src=""
+                                    style="width: 140px; height: 280px; object-fit: cover; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border: 2px solid #fff;">
                             </div>
                         </div>
                     </div>
@@ -852,6 +907,10 @@
                             <span id="token-chat-history" style="font-size: 13px; color: #888;">0</span>
                         </div>
                         <div class="setting-row">
+                            <label>记忆总结 (Memory)</label>
+                            <span id="token-memory-summary" style="font-size: 13px; color: #888;">0</span>
+                        </div>
+                        <div class="setting-row">
                             <label>系统总计 (Sys)</label>
                             <span id="token-system-setup" style="font-size: 13px; color: #888;">0</span>
                         </div>
@@ -862,17 +921,99 @@
                     </div>
                 </div>
 
+                <!-- 记忆总结设置 -->
+                <div>
+                    <div class="settings-section-title">总结设置</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">消息保留条数</label>
+                                <span
+                                    style="font-size:11px; color:#aaa; line-height:1.4;">总结时保留最近N条消息不被总结，其余旧消息将被AI提取为记忆摘要</span>
+                            </div>
+                            <input type="number" id="memory-keep-count" value="10" min="5" max="100"
+                                style="width: 60px; text-align: center; border: 1px solid #ddd; border-radius: 6px; padding: 4px 8px; font-size: 14px;">
+                        </div>
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">自动注入记忆</label>
+                                <span
+                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI对话时会自动将记忆总结作为上下文注入</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="memory-auto-inject" checked onchange="saveMemorySettings()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 记忆操作 -->
                 <div>
                     <div class="settings-section-title">记忆操作</div>
                     <div class="setting-group">
-                        <div class="setting-row" style="justify-content: center; padding: 12px;">
+                        <div class="setting-row" style="display: flex; gap: 10px; padding: 12px; align-items: stretch;">
                             <button id="btn-summarize-memory" onclick="summarizeChatMemory()" class="modal-btn"
-                                style="width: 100%; border-radius: 8px; background-color: #e8f5e9; color: #2e7d32;">
-                                总结记忆 (开发中)
+                                style="flex: 1; border-radius: 8px; background-color: #e8f5e9; color: #2e7d32; padding: 10px; font-size: 13px;">
+                                AI自动总结
+                            </button>
+                            <button onclick="addMemoryManual()" class="modal-btn"
+                                style="flex: 1; border-radius: 8px; background-color: #e3f2fd; color: #1565c0; padding: 10px; font-size: 13px;">
+                                手动添加
                             </button>
                         </div>
                     </div>
+                </div>
+
+                <!-- 记忆列表 -->
+                <div>
+                    <div class="settings-section-title"
+                        style="display: flex; justify-content: space-between; align-items: center;">
+                        <span>记忆总结列表</span>
+                        <div onclick="clearAllMemories()"
+                            style="cursor: pointer; padding: 4px; display: flex; align-items: center;" title="清空所有">
+                            <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: #aaa;">
+                                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z">
+                                </path>
+                            </svg>
+                        </div>
+                    </div>
+                    <div id="memory-list-container" class="setting-group">
+                        <div class="setting-row"
+                            style="justify-content: center; color: #aaa; font-size: 13px; padding: 20px;">
+                            暂无记忆总结
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 记忆编辑弹窗 -->
+        <div id="memory-edit-modal" class="modal-overlay">
+            <div class="modal-box" style="max-width: 360px;">
+                <div class="modal-title" id="memory-edit-modal-title">编辑记忆</div>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <div>
+                        <label style="font-size:13px; color:#666; margin-bottom:4px; display:block;">记忆标题</label>
+                        <input type="text" id="memory-edit-title" class="uc-input" placeholder="如：第一次约会">
+                    </div>
+                    <div>
+                        <label style="font-size:13px; color:#666; margin-bottom:4px; display:block;">记忆内容</label>
+                        <textarea id="memory-edit-content" class="uc-textarea" placeholder="描述这段记忆的关键信息..."
+                            style="min-height: 120px; resize: vertical;"></textarea>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:12px; color:#aaa;" id="memory-edit-token-count">0 tokens</span>
+                        <label
+                            style="display:flex; align-items:center; gap:6px; font-size:13px; color:#333; cursor:pointer;">
+                            <input type="checkbox" id="memory-edit-enabled" checked style="width:16px; height:16px;"> 启用
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top:15px;">
+                    <button class="modal-btn" onclick="closeMemoryEditModal()"
+                        style="background:#f5f5f5; color:#333;">取消</button>
+                    <button class="modal-btn btn-confirm" onclick="saveMemoryEntry()">保存</button>
                 </div>
             </div>
         </div>
@@ -1154,7 +1295,9 @@
                         src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E"
                         onclick="document.getElementById('npc-avatar-input').click()">
                     <input type="file" id="npc-avatar-input" accept="image/*" style="display:none">
-                    <div class="uc-avatar-hint">点击更换头像</div>
+                    <div class="uc-avatar-hint">点击更换头像 <span
+                            style="color: #e398b1; cursor: pointer; margin-left: 5px; font-weight: bold;"
+                            onclick="event.stopPropagation(); openUrlUploadModal('npc-avatar')">url上传</span></div>
                 </div>
 
                 <!-- 基本信息 -->
@@ -1305,7 +1448,9 @@
                         src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E"
                         onclick="document.getElementById('user-avatar-input').click()">
                     <input type="file" id="user-avatar-input" accept="image/*" style="display:none">
-                    <div class="uc-avatar-hint">点击更换头像</div>
+                    <div class="uc-avatar-hint">点击更换头像 <span
+                            style="color: #e398b1; cursor: pointer; margin-left: 5px; font-weight: bold;"
+                            onclick="event.stopPropagation(); openUrlUploadModal('user-avatar')">url上传</span></div>
                 </div>
 
                 <!-- 基本信息 -->
@@ -1385,6 +1530,79 @@
     </div>
 
     <script src="script.js"></script>
+
+    <!-- URL Upload Modal -->
+    <div id="url-upload-modal" class="modal-overlay" style="display:none; z-index: 500;">
+        <div class="modal-box"
+            style="width: 85%; max-width: 320px; padding: 20px; background-color: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.2);">
+            <h3 style="margin-top:0; margin-bottom: 15px; font-size: 18px;">url上传</h3>
+            <p style="font-size: 13px; color: #666; margin-bottom: 10px; line-height: 1.5;">
+                输入 Catbox 后缀 (如 31onrh.jpeg) 或完整 URL 链接。
+                <br>
+            </p>
+            <input type="text" id="url-upload-input" class="uc-input" placeholder="输入后缀或链接..."
+                style="margin-bottom: 15px;">
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px;">
+                <button class="modal-btn" onclick="closeUrlUploadModal()"
+                    style="background:#f5f5f5; color:#333;">取消</button>
+                <button class="modal-btn btn-confirm" onclick="confirmUrlUpload()">确定</button>
+            </div>
+        </div>
+    </div>
+    <!-- Regex Settings Screen -->
+    <div id="regex-screen" class="screen">
+        <div class="app-header">
+            <div class="header-content">
+                <div class="header-btn" onclick="closeRegexScreen()"><svg viewBox="0 0 24 24">
+                        <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
+                    </svg></div>
+                <span class="header-title">正则脚本</span>
+                <div class="header-btn header-btn-right" onclick="addNewRegexRule()"><svg viewBox="0 0 24 24">
+                        <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path>
+                    </svg></div>
+            </div>
+        </div>
+        <div class="settings-body" id="regex-list-container">
+            <!-- Regex rules will be rendered here by JS -->
+        </div>
+    </div>
+
+    <!-- Regex Edit Modal -->
+    <div id="regex-edit-modal" class="modal-overlay">
+        <div class="modal-box" style="max-width: 340px;">
+            <div class="modal-title" id="regex-edit-modal-title">编辑正则</div>
+            <div style="display:flex; flex-direction:column; gap:12px;">
+                <div>
+                    <label style="font-size:13px; color:#666; margin-bottom:4px; display:block;">规则名称</label>
+                    <input type="text" id="regex-edit-name" class="uc-input" placeholder="如：去除星号">
+                </div>
+                <div>
+                    <label style="font-size:13px; color:#666; margin-bottom:4px; display:block;">正则表达式</label>
+                    <input type="text" id="regex-edit-pattern" class="uc-input" placeholder="如：\*([^*]+)\*">
+                </div>
+                <div>
+                    <label style="font-size:13px; color:#666; margin-bottom:4px; display:block;">替换内容</label>
+                    <input type="text" id="regex-edit-replace" class="uc-input" placeholder="如：$1 (留空则删除匹配)">
+                </div>
+                <div style="display:flex; gap:20px; align-items:center; padding:4px 0;">
+                    <label
+                        style="display:flex; align-items:center; gap:6px; font-size:13px; color:#333; cursor:pointer;">
+                        <input type="checkbox" id="regex-edit-user" style="width:16px; height:16px;"> user输入
+                    </label>
+                    <label
+                        style="display:flex; align-items:center; gap:6px; font-size:13px; color:#333; cursor:pointer;">
+                        <input type="checkbox" id="regex-edit-ai" checked style="width:16px; height:16px;"> AI输出
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions" style="justify-content: flex-end; gap: 10px; margin-top:15px;">
+                <button class="modal-btn" onclick="closeRegexEditModal()"
+                    style="background:#f5f5f5; color:#333;">取消</button>
+                <button class="modal-btn btn-confirm" onclick="saveRegexRule()">保存</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 
 </html>
