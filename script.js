@@ -64,10 +64,10 @@
 
     let myStickerList = [];
     const defaultStickerList = [
-        { name: "你自首吧", url: "https://img.phey.click/s1wpw8.jpeg" },
         { name: "抱抱", url: "https://img.phey.click/31onrh.jpeg" },
         { name: "贴贴", url: "https://img.phey.click/ljqszc.jpeg" },
-        { name: "我要告状", url: "https://img.phey.click/icwt52.jpeg" }
+        { name: "我要告状", url: "https://img.phey.click/icwt52.jpeg" },
+        { name: "你自首吧", url: "https://img.phey.click/s1wpw8.jpeg" },
     ];
 
     let activeDeleteBtn = null;
@@ -710,9 +710,8 @@
         appSettings.charAvatar = newAvatar;
 
 
-        // 更新标题
-        const headerTitleEl = document.getElementById('header-title');
-        if (headerTitleEl) headerTitleEl.textContent = currentChatTarget;
+        // 更新标题（支持备注）
+        updateHeaderTitle();
 
         // 刷新聊天内容
         if (typeof loadInitialChat === 'function') loadInitialChat();
@@ -828,6 +827,13 @@
             stickerSettingsScreenBack.style.display = 'none';
             if (settingsScreen) settingsScreen.style.display = 'flex';
             updateStatusBar('settings');
+            return;
+        }
+
+        // Regex Screen -> Home
+        const regexScreenBack = document.getElementById('regex-screen');
+        if (regexScreenBack && regexScreenBack.style.display === 'flex') {
+            closeRegexScreen();
             return;
         }
 
@@ -1571,6 +1577,9 @@
         // Load inner voice mode setting
         loadChatInnerVoiceModeUI();
 
+        // Load remark setting
+        loadChatRemarkUI();
+
         if (chatSettingsScreen) chatSettingsScreen.style.display = 'flex';
         updateStatusBar('settings');
     }
@@ -1578,6 +1587,8 @@
     function closeChatSettings() {
         if (chatSettingsScreen) chatSettingsScreen.style.display = 'none';
         updateStatusBar('chat');
+        // Refresh header title (remark may have changed)
+        updateHeaderTitle();
         // FIX: Rerender chat to show updated avatars immediately
         if (typeof loadInitialChat === 'function') loadInitialChat();
     }
@@ -1611,7 +1622,10 @@
     }
 
     function openChatMemorySettings() {
+        loadChatMemories();
+        loadMemorySettingsUI();
         updateTokenStats();
+        renderMemoryList();
         if (chatMemoryScreen) {
             chatMemoryScreen.style.display = 'flex';
             chatMemoryScreen.style.transform = 'translateX(100%)';
@@ -1626,8 +1640,495 @@
         }
     }
 
-    function summarizeChatMemory() {
-        showToast("功能开发中...");
+    // ====== Memory Summary System ======
+    let chatMemories = []; // Array of { title, content, enabled, createdAt }
+    let editingMemoryIndex = -1; // -1 = new, >=0 = editing existing
+
+    function getMemoryStorageKey() {
+        if (!currentChatTag) return null;
+        return `faye-phone-memory-${currentChatTag}`;
+    }
+
+    function loadChatMemories() {
+        chatMemories = [];
+        const key = getMemoryStorageKey();
+        if (!key) return;
+        try {
+            const data = localStorage.getItem(key);
+            if (data) chatMemories = JSON.parse(data);
+        } catch (e) {
+            console.error('Failed to load chat memories:', e);
+        }
+    }
+
+    function saveChatMemories() {
+        const key = getMemoryStorageKey();
+        if (!key) return;
+        try {
+            localStorage.setItem(key, JSON.stringify(chatMemories));
+        } catch (e) {
+            console.error('Failed to save chat memories:', e);
+        }
+    }
+
+    function getMemorySettingsKey() {
+        if (!currentChatTag) return null;
+        return `faye-phone-memory-settings-${currentChatTag}`;
+    }
+
+    function loadMemorySettings() {
+        const key = getMemorySettingsKey();
+        if (!key) return { keepCount: 10, autoInject: true };
+        try {
+            const data = localStorage.getItem(key);
+            if (data) return JSON.parse(data);
+        } catch (e) { }
+        return { keepCount: 10, autoInject: true };
+    }
+
+    function saveMemorySettings() {
+        const key = getMemorySettingsKey();
+        if (!key) return;
+        const keepCountEl = document.getElementById('memory-keep-count');
+        const autoInjectEl = document.getElementById('memory-auto-inject');
+        const settings = {
+            keepCount: keepCountEl ? parseInt(keepCountEl.value) || 10 : 10,
+            autoInject: autoInjectEl ? autoInjectEl.checked : true
+        };
+        try {
+            localStorage.setItem(key, JSON.stringify(settings));
+        } catch (e) {
+            console.error('Failed to save memory settings:', e);
+        }
+    }
+
+    function loadMemorySettingsUI() {
+        const settings = loadMemorySettings();
+        const keepCountEl = document.getElementById('memory-keep-count');
+        const autoInjectEl = document.getElementById('memory-auto-inject');
+        if (keepCountEl) keepCountEl.value = settings.keepCount;
+        if (autoInjectEl) autoInjectEl.checked = settings.autoInject;
+    }
+
+    function renderMemoryList() {
+        const container = document.getElementById('memory-list-container');
+        if (!container) return;
+
+        if (chatMemories.length === 0) {
+            container.innerHTML = '<div class="setting-row" style="justify-content: center; color: #aaa; font-size: 13px; padding: 20px;">暂无记忆总结</div>';
+            return;
+        }
+
+        container.innerHTML = '';
+        chatMemories.forEach((mem, index) => {
+            const row = document.createElement('div');
+            row.className = 'setting-row';
+            row.style.cssText = 'flex-direction: column; align-items: stretch; gap: 8px; padding: 12px;';
+
+            const topRow = document.createElement('div');
+            topRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center;';
+
+            const titleWrap = document.createElement('div');
+            titleWrap.style.cssText = 'display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;';
+
+            const enabledDot = document.createElement('span');
+            enabledDot.style.cssText = `width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: ${mem.enabled !== false ? '#4caf50' : '#ccc'};`;
+            titleWrap.appendChild(enabledDot);
+
+            const titleEl = document.createElement('span');
+            titleEl.style.cssText = 'font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+            titleEl.textContent = mem.title || '未命名记忆';
+            titleWrap.appendChild(titleEl);
+
+            const tokenBadge = document.createElement('span');
+            tokenBadge.style.cssText = 'font-size: 11px; color: #aaa; flex-shrink: 0; margin-left: 4px;';
+            tokenBadge.textContent = `${estimateTokens(mem.content || '')} t`;
+            titleWrap.appendChild(tokenBadge);
+            topRow.appendChild(titleWrap);
+
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display: flex; gap: 6px; flex-shrink: 0; margin-left: 8px;';
+
+            // Toggle button
+            const toggleBtn = document.createElement('button');
+            toggleBtn.style.cssText = `border: none; background: ${mem.enabled !== false ? '#e8f5e9' : '#f5f5f5'}; color: ${mem.enabled !== false ? '#2e7d32' : '#999'}; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;`;
+            toggleBtn.textContent = mem.enabled !== false ? '启用' : '禁用';
+            toggleBtn.onclick = (e) => { e.stopPropagation(); toggleMemory(index); };
+            actions.appendChild(toggleBtn);
+
+            // Edit button
+            const editBtn = document.createElement('button');
+            editBtn.style.cssText = 'border: none; background: #e3f2fd; color: #1565c0; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;';
+            editBtn.textContent = '编辑';
+            editBtn.onclick = (e) => { e.stopPropagation(); editMemoryEntry(index); };
+            actions.appendChild(editBtn);
+
+            // Delete button
+            const delBtn = document.createElement('button');
+            delBtn.style.cssText = 'border: none; background: #fce4ec; color: #c62828; border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;';
+            delBtn.textContent = '删除';
+            delBtn.onclick = (e) => { e.stopPropagation(); deleteMemoryEntry(index); };
+            actions.appendChild(delBtn);
+
+            topRow.appendChild(actions);
+            row.appendChild(topRow);
+
+            // Content preview
+            const preview = document.createElement('div');
+            preview.style.cssText = 'font-size: 12px; color: #888; line-height: 1.5; max-height: 60px; overflow: hidden; text-overflow: ellipsis; word-break: break-all; white-space: pre-wrap;';
+            preview.textContent = (mem.content || '').substring(0, 200);
+            row.appendChild(preview);
+
+            // Created time
+            if (mem.createdAt) {
+                const timeEl = document.createElement('div');
+                timeEl.style.cssText = 'font-size: 11px; color: #bbb; text-align: right;';
+                timeEl.textContent = new Date(mem.createdAt).toLocaleString();
+                row.appendChild(timeEl);
+            }
+
+            container.appendChild(row);
+        });
+    }
+
+    function toggleMemory(index) {
+        if (index < 0 || index >= chatMemories.length) return;
+        chatMemories[index].enabled = chatMemories[index].enabled === false ? true : false;
+        saveChatMemories();
+        renderMemoryList();
+        updateTokenStats();
+    }
+
+    function editMemoryEntry(index) {
+        editingMemoryIndex = index;
+        const mem = chatMemories[index];
+        const titleEl = document.getElementById('memory-edit-title');
+        const contentEl = document.getElementById('memory-edit-content');
+        const enabledEl = document.getElementById('memory-edit-enabled');
+        const modalTitleEl = document.getElementById('memory-edit-modal-title');
+
+        if (modalTitleEl) modalTitleEl.textContent = '编辑记忆';
+        if (titleEl) titleEl.value = mem.title || '';
+        if (contentEl) contentEl.value = mem.content || '';
+        if (enabledEl) enabledEl.checked = mem.enabled !== false;
+
+        updateMemoryEditTokenCount();
+        openMemoryEditModal();
+    }
+
+    function addMemoryManual() {
+        editingMemoryIndex = -1;
+        const titleEl = document.getElementById('memory-edit-title');
+        const contentEl = document.getElementById('memory-edit-content');
+        const enabledEl = document.getElementById('memory-edit-enabled');
+        const modalTitleEl = document.getElementById('memory-edit-modal-title');
+
+        if (modalTitleEl) modalTitleEl.textContent = '添加记忆';
+        if (titleEl) titleEl.value = '';
+        if (contentEl) contentEl.value = '';
+        if (enabledEl) enabledEl.checked = true;
+
+        updateMemoryEditTokenCount();
+        openMemoryEditModal();
+    }
+
+    function openMemoryEditModal() {
+        const modal = document.getElementById('memory-edit-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+        // Bind token count update on content input
+        const contentEl = document.getElementById('memory-edit-content');
+        if (contentEl) {
+            contentEl.oninput = updateMemoryEditTokenCount;
+        }
+    }
+
+    function closeMemoryEditModal() {
+        const modal = document.getElementById('memory-edit-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+    }
+
+    function updateMemoryEditTokenCount() {
+        const contentEl = document.getElementById('memory-edit-content');
+        const countEl = document.getElementById('memory-edit-token-count');
+        if (contentEl && countEl) {
+            countEl.textContent = estimateTokens(contentEl.value) + ' tokens';
+        }
+    }
+
+    function saveMemoryEntry() {
+        const titleEl = document.getElementById('memory-edit-title');
+        const contentEl = document.getElementById('memory-edit-content');
+        const enabledEl = document.getElementById('memory-edit-enabled');
+
+        const title = titleEl ? titleEl.value.trim() : '';
+        const content = contentEl ? contentEl.value.trim() : '';
+
+        if (!content) {
+            showToast('记忆内容不能为空');
+            return;
+        }
+
+        const entry = {
+            title: title || '未命名记忆',
+            content: content,
+            enabled: enabledEl ? enabledEl.checked : true,
+            createdAt: new Date().toISOString()
+        };
+
+        if (editingMemoryIndex >= 0 && editingMemoryIndex < chatMemories.length) {
+            // Editing existing
+            entry.createdAt = chatMemories[editingMemoryIndex].createdAt || entry.createdAt;
+            chatMemories[editingMemoryIndex] = entry;
+        } else {
+            // Adding new
+            chatMemories.push(entry);
+        }
+
+        saveChatMemories();
+        renderMemoryList();
+        updateTokenStats();
+        closeMemoryEditModal();
+        showToast('记忆已保存');
+    }
+
+    function deleteMemoryEntry(index) {
+        if (index < 0 || index >= chatMemories.length) return;
+        if (!confirm(`确定删除"${chatMemories[index].title || '未命名记忆'}"？`)) return;
+        chatMemories.splice(index, 1);
+        saveChatMemories();
+        renderMemoryList();
+        updateTokenStats();
+        showToast('记忆已删除');
+    }
+
+    function clearAllMemories() {
+        if (chatMemories.length === 0) {
+            showToast('没有可清空的记忆');
+            return;
+        }
+        if (!confirm(`确定清空全部 ${chatMemories.length} 条记忆总结？此操作不可撤销。`)) return;
+        chatMemories = [];
+        saveChatMemories();
+        renderMemoryList();
+        updateTokenStats();
+        showToast('所有记忆已清空');
+    }
+
+    // Build memory context string for AI injection
+    function buildMemoryContext() {
+        const settings = loadMemorySettings();
+        if (!settings.autoInject) return '';
+        if (chatMemories.length === 0) return '';
+
+        const enabledMemories = chatMemories.filter(m => m.enabled !== false);
+        if (enabledMemories.length === 0) return '';
+
+        let context = '\n\n[记忆总结 - Memory Summary]\n';
+        context += '以下是之前对话的重要记忆摘要，请基于这些记忆保持角色和情节的连贯性：\n\n';
+        enabledMemories.forEach((mem, i) => {
+            context += `【${mem.title || '记忆' + (i + 1)}】\n${mem.content}\n\n`;
+        });
+        return context;
+    }
+
+    // AI Auto-Summarize
+    async function summarizeChatMemory() {
+        if (!appSettings.apiEndpoint) {
+            showToast('请先在设置中配置 API');
+            return;
+        }
+        if (!currentChatTag) {
+            showToast('请先打开一个聊天');
+            return;
+        }
+
+        // Get chat history
+        const historyKey = `faye - phone - history - ${currentChatTag} `;
+        const savedHistory = localStorage.getItem(historyKey);
+        if (!savedHistory) {
+            showToast('当前聊天没有历史记录');
+            return;
+        }
+
+        let history;
+        try {
+            history = JSON.parse(savedHistory);
+        } catch (e) {
+            showToast('聊天记录解析失败');
+            return;
+        }
+
+        if (!Array.isArray(history) || history.length === 0) {
+            showToast('聊天记录为空');
+            return;
+        }
+
+        // Get keep count
+        const keepCountEl = document.getElementById('memory-keep-count');
+        const keepCount = keepCountEl ? parseInt(keepCountEl.value) || 10 : 10;
+
+        if (history.length <= keepCount) {
+            showToast(`聊天记录只有 ${history.length} 条，不足保留条数 ${keepCount}，无需总结`);
+            return;
+        }
+
+        // Messages to summarize (the older ones)
+        const toSummarize = history.slice(0, history.length - keepCount);
+
+        // Build summary prompt
+        const charName = getCharName();
+        const userName = getUserName();
+
+        let chatText = '';
+        toSummarize.forEach(msg => {
+            const sender = msg.isUser ? userName : charName;
+            let body = msg.body || '';
+            // Clean up internal tags
+            body = body.replace(/<blocked>/g, '[被拉黑消息]');
+            body = body.replace(/<recall>/g, '[已撤回]');
+            body = body.replace(/<block>/g, '');
+            body = body.replace(/<unblock>/g, '');
+            body = body.replace(/\*[^*]+\*\s*$/g, ''); // Remove inner voice
+            chatText += `${msg.header || '[' + sender + ']'} ${body}\n`;
+        });
+
+        // Construct the summarization prompt
+        const summaryPrompt = `你是一个记忆总结助手。请仔细阅读以下聊天记录，将其中的**关键信息**提炼为简洁的记忆摘要。
+
+要求：
+1. 用第三人称客观描述
+2. 重点提取：重要事件、情感变化、关系进展、承诺/约定、个人信息（生日、喜好等）
+3. 按时间顺序排列要点
+4. 不要遗漏关键剧情转折
+5. 每个要点用"- "开头，简洁明了
+6. 总结要控制在 300 字以内
+7. 不要添加任何与聊天内容无关的信息
+
+参与者：${userName} (用户) 和 ${charName} (角色)
+
+聊天记录：
+${chatText}
+
+请输出记忆摘要：`;
+
+        // Show loading state
+        const btn = document.getElementById('btn-summarize-memory');
+        const originalText = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.innerHTML = '⏳ AI 正在总结中...';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+        }
+
+        try {
+            const messages = [
+                { role: 'system', content: '你是一个专业的聊天记忆总结助手。只输出摘要内容，不要输出任何其他文字。' },
+                { role: 'user', content: summaryPrompt }
+            ];
+
+            // Call LLM (non-streaming for simplicity)
+            const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
+            const key = appSettings.apiKey;
+            const model = appSettings.apiModel;
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (key) headers['Authorization'] = `Bearer ${key}`;
+
+            const body = {
+                model: model,
+                messages: messages,
+                temperature: 0.3,
+                stream: true
+            };
+
+            const res = await fetch(`${endpoint}/chat/completions`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body)
+            });
+
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`API Error ${res.status}: ${txt}`);
+            }
+
+            // Read stream
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let summaryText = '';
+            let streamBuffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                streamBuffer += chunk;
+                const lines = streamBuffer.split('\n');
+                streamBuffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const dataStr = line.slice(6);
+                    if (dataStr === '[DONE]') continue;
+
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const delta = data.choices[0].delta;
+                        if (delta.reasoning_content) continue;
+                        if (delta.content) {
+                            let content = delta.content;
+                            // Filter <think> tags
+                            content = content.replace(/<think>[\s\S]*?<\/think>/gi, '');
+                            summaryText += content;
+                        }
+                    } catch (e) { }
+                }
+            }
+
+            // Clean the summary
+            summaryText = summaryText.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+            if (!summaryText) {
+                showToast('AI 返回了空的总结');
+                return;
+            }
+
+            // Create timestamp for the title
+            const now = new Date();
+            const dateStr = `${now.getMonth() + 1}/${now.getDate()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            // Add as a new memory entry
+            const memEntry = {
+                title: `AI 自动总结 (${dateStr})`,
+                content: summaryText,
+                enabled: true,
+                createdAt: now.toISOString(),
+                summarizedCount: toSummarize.length
+            };
+
+            chatMemories.push(memEntry);
+            saveChatMemories();
+            renderMemoryList();
+            updateTokenStats();
+            showToast(`成功总结 ${toSummarize.length} 条消息为记忆摘要`);
+
+        } catch (e) {
+            console.error('Memory summarization failed:', e);
+            showToast('总结失败: ' + e.message);
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
     }
 
     async function saveChatBeautifySettings() {
@@ -1678,6 +2179,9 @@
 
         // Save inner voice mode for this chat
         saveChatInnerVoiceMode();
+
+        // Save remark for this chat
+        saveChatRemark();
 
         saveSettingsToStorage();
         closeChatSettings();
@@ -1873,6 +2377,61 @@
         saveSettingsToStorage();
     }
 
+    // --- Chat Remark Logic ---
+    // Per-chat remark. Stored in appSettings.chatRemarks = { 'chat:Name': '备注名', ... }
+
+    function getChatRemark() {
+        if (!currentChatTag) return '';
+        if (!appSettings.chatRemarks) return '';
+        return appSettings.chatRemarks[currentChatTag] || '';
+    }
+
+    function loadChatRemarkUI() {
+        const input = document.getElementById('set-chat-remark');
+        if (input) input.value = getChatRemark();
+    }
+
+    function saveChatRemark() {
+        if (!currentChatTag) return;
+        if (!appSettings.chatRemarks) appSettings.chatRemarks = {};
+        const input = document.getElementById('set-chat-remark');
+        const val = input ? input.value.trim() : '';
+        if (val) {
+            appSettings.chatRemarks[currentChatTag] = val;
+        } else {
+            delete appSettings.chatRemarks[currentChatTag];
+        }
+    }
+
+    // Auto-save version: called by oninput, immediately persists and updates header
+    function saveChatRemarkAuto() {
+        saveChatRemark();
+        saveSettingsToStorage();
+        updateHeaderTitle();
+    }
+
+    function updateHeaderTitle() {
+        const headerTitleEl = document.getElementById('header-title');
+        if (!headerTitleEl) return;
+        const remark = getChatRemark();
+        const originalName = currentChatTarget || '';
+        if (remark) {
+            headerTitleEl.style.whiteSpace = 'normal';
+            headerTitleEl.style.display = 'flex';
+            headerTitleEl.style.flexDirection = 'column';
+            headerTitleEl.style.alignItems = 'center';
+            headerTitleEl.style.lineHeight = '1.2';
+            headerTitleEl.innerHTML = `<span style="font-size:16px; font-weight:600;">${remark}</span><span style="font-size:11px; color:#333; font-weight:400;">${originalName}</span>`;
+        } else {
+            headerTitleEl.style.whiteSpace = 'nowrap';
+            headerTitleEl.style.display = '';
+            headerTitleEl.style.flexDirection = '';
+            headerTitleEl.style.alignItems = '';
+            headerTitleEl.style.lineHeight = '';
+            headerTitleEl.textContent = originalName;
+        }
+    }
+
     function estimateTokens(text) {
         if (!text) return 0;
         const cjk = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
@@ -1959,13 +2518,26 @@
         const bubbles = document.querySelectorAll('#chat-messages .bubble, #chat-messages .msg-quote-text');
         bubbles.forEach(b => historyTokens += estimateTokens(b.textContent));
 
+        // 5. Memory Summary Tokens
+        let memoryTokens = 0;
+        if (chatMemories && chatMemories.length > 0) {
+            chatMemories.forEach(mem => {
+                if (mem.enabled !== false) {
+                    memoryTokens += estimateTokens(mem.content || '');
+                    memoryTokens += estimateTokens(mem.title || '');
+                }
+            });
+        }
+
         document.getElementById('token-char-setup').textContent = charTokens;
         document.getElementById('token-user-setup').textContent = userTokens;
         if (document.getElementById('token-system-setup')) {
             document.getElementById('token-system-setup').textContent = systemTokens;
         }
         document.getElementById('token-chat-history').textContent = historyTokens;
-        document.getElementById('token-total').textContent = charTokens + userTokens + systemTokens + historyTokens;
+        const memSummaryEl = document.getElementById('token-memory-summary');
+        if (memSummaryEl) memSummaryEl.textContent = memoryTokens;
+        document.getElementById('token-total').textContent = charTokens + userTokens + systemTokens + historyTokens + memoryTokens;
     }
 
     function exportCurrentChat() {
@@ -2400,10 +2972,10 @@
         modal.classList.add('show');
     }
 
-    async function sendLocation(addr) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | 位置 | ${t} | !]` : `[${u} | 位置 | ${t}]`; renderMessageToUI({ header: h, body: addr, isUser: true, type: 'location' }); } catch (e) { } }
-    async function sendTransfer(amt, note) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u} | TRANS | ${t} | !]` : `[${u} | TRANS | ${t}]`; renderMessageToUI({ header: h, body: `${amt} | ${note || ''}`, isUser: true, type: 'transfer' }); } catch (e) { } }
-    async function sendFile(fn) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 文件 | ${t}| !]` : `[${u}| 文件 | ${t}]`; renderMessageToUI({ header: h, body: fn, isUser: true, type: 'file' }); } catch (e) { } }
-    async function sendVoice(dur, txt) { try { const t = getTime(true); const u = getUserName(); const h = appSettings.blockUser ? `[${u}| 语音 | ${t}| !]` : `[${u}| 语音 | ${t}]`; renderMessageToUI({ header: h, body: `${dur}| ${txt || ''} `, isUser: true, type: 'voice' }); } catch (e) { } }
+    async function sendLocation(addr) { try { const t = getTime(true); const u = getUserName(); const h = `[${u} | 位置 | ${t}]`; const b = appSettings.blockUser ? `<blocked>${addr}` : addr; renderMessageToUI({ header: h, body: b, isUser: true, type: 'location' }); } catch (e) { } }
+    async function sendTransfer(amt, note) { try { const t = getTime(true); const u = getUserName(); const h = `[${u} | TRANS | ${t}]`; const rawBody = `${amt} | ${note || ''}`; const b = appSettings.blockUser ? `<blocked>${rawBody}` : rawBody; renderMessageToUI({ header: h, body: b, isUser: true, type: 'transfer' }); } catch (e) { } }
+    async function sendFile(fn) { try { const t = getTime(true); const u = getUserName(); const h = `[${u}| 文件 | ${t}]`; const b = appSettings.blockUser ? `<blocked>${fn}` : fn; renderMessageToUI({ header: h, body: b, isUser: true, type: 'file' }); } catch (e) { } }
+    async function sendVoice(dur, txt) { try { const t = getTime(true); const u = getUserName(); const h = `[${u}| 语音 | ${t}]`; const rawBody = `${dur}| ${txt || ''} `; const b = appSettings.blockUser ? `<blocked>${rawBody}` : rawBody; renderMessageToUI({ header: h, body: b, isUser: true, type: 'voice' }); } catch (e) { } }
     async function sendPhoto(base64) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 图片 | ${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) { } }
     async function sendRealAudio(url) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 语音 | ${t}]`, body: url, isUser: true, type: 'voice' }); } catch (e) { } }
     async function sendVideo(url) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 视频 | ${t}]`, body: url, isUser: true, type: 'video' }); } catch (e) { } }
@@ -2477,6 +3049,15 @@
         closeMenus();
         const text = messageInput.value.trim();
 
+        // Handle Quote
+        let finalBody = text;
+        const hasQuote = !!currentQuote;
+        if (currentQuote) {
+            // Prepend quote to text (legacy format was input injection)
+            finalBody = `[REP:${currentQuote.name}]${currentQuote.content}[/REP]${text}`;
+            cancelQuote(); // Clear UI and state
+        }
+
         // 记录是否刚发送了文件
         let fileSent = false;
 
@@ -2506,15 +3087,13 @@
         }
 
         // 2. 处理文字消息
-        if (text) {
+        if (finalBody) {
             const t = getTime(true); // User sent message
             const u = getUserName();
-            // 如果被拉黑，在消息头中添加标记 (用于持久化)
-            let header = `[${u}| ${t}]`;
-            if (appSettings.blockUser) {
-                header = `[${u}| ${t}| !]`; // ! 表示被拉黑/发送失败
-            }
-            renderMessageToUI({ header: header, body: text, isUser: true });
+            const header = `[${u}| ${t}]`;
+            // 如果被拉黑，在body开头添加<blocked>标签 (用于持久化)
+            const body = appSettings.blockUser ? `<blocked>${finalBody}` : finalBody;
+            renderMessageToUI({ header: header, body: body, isUser: true });
             messageInput.value = '';
             adjustTextareaHeight();
             messageInput.focus();
@@ -2523,7 +3102,8 @@
         // 3. 触发AI回复逻辑：只有输入框为空且本次没有发送文件时才触发AI
         // AI generation is disabled in standalone mode.
         // renderMessageList(); // 暂不刷新列表，避免跳动，sendMessage只更新当前聊天窗口
-        if (!text && !fileSent) {
+        // Note: We check !hasQuote to preserve original behavior where sending a quoted message (which was non-empty text) did NOT auto-trigger AI.
+        if (!text && !hasQuote && !fileSent) {
             triggerGenerate();
         }
     }
@@ -2690,6 +3270,51 @@
         document.body.appendChild(overlay);
 
         requestAnimationFrame(() => overlay.classList.add('visible'));
+    }
+
+    // ====== Quote/Reply Parsing Utilities ======
+    function parseQuote(body) {
+        if (!body) return null;
+        // New format: [REP:名字]引用内容[/REP]回复内容
+        const newMatch = body.match(/^\[REP:(.*?)\]([\s\S]*?)\[\/REP\]([\s\S]*)$/);
+        if (newMatch) {
+            return {
+                quoteName: newMatch[1].trim(),
+                quoteContent: newMatch[2].trim(),
+                replyBody: newMatch[3].trim()
+            };
+        }
+        // Legacy format v2: [名字|REP|类型|时间]引用内容|回复内容
+        const legacyMatch = body.match(/^\[(.*?)\|\s*REP\s*\|(.*?)\|(.*?)\]([\s\S]*?)\|([\s\S]*)$/s);
+        if (legacyMatch) {
+            return {
+                quoteName: legacyMatch[1].trim(),
+                quoteContent: legacyMatch[4].trim(),
+                replyBody: legacyMatch[5].trim()
+            };
+        }
+        // Legacy format v1: 「`回复NAME：TEXT`」
+        const oldMatch = body.match(/「`回复(.*?)[：:](.*?)`」/);
+        if (oldMatch) {
+            return {
+                quoteName: oldMatch[1],
+                quoteContent: oldMatch[2],
+                replyBody: body.replace(oldMatch[0], '').trim()
+            };
+        }
+        return null;
+    }
+
+    function buildQuoteHtml(parsed) {
+        if (!parsed) return '';
+        return `<div class="msg-quote">
+        <div class="msg-quote-content">
+            <div class="msg-quote-header">
+                <span class="msg-quote-name">${parsed.quoteName}</span>
+            </div>
+            <div class="msg-quote-text">${parsed.quoteContent}</div>
+        </div>
+    </div>`;
     }
 
     function renderMessageToUI(msg, isHistoryLoad = false) {
@@ -2904,14 +3529,46 @@
                 if (!avatarSrc) avatarSrc = appSettings.charAvatar;
             }
         }
-        const avatar = document.createElement('img'); avatar.className = 'avatar'; avatar.src = avatarSrc;
+
+        // --- Remark Override Removed ---
+        // if (!isGroupChat && !msg.isUser && displayName === currentChatTarget) {
+        //     const remark = getChatRemark();
+        //     if (remark) displayName = remark;
+        // }
+
+        // --- Avatar Grouping Check ---
+        let shouldHideAvatar = false;
+        if (chatMessages && chatMessages.lastElementChild) {
+            const lastRow = chatMessages.lastElementChild;
+            // 确保上一条是消息行（而不是系统消息），且不是撤回消息
+            if (lastRow.classList.contains('message-row') && !lastRow.classList.contains('system')) {
+                const lastIsUser = lastRow.classList.contains('sent');
+                // Check if same side
+                if (msg.isUser === lastIsUser) {
+                    const lastSender = lastRow.dataset.senderName;
+                    if (lastSender === displayName) {
+                        shouldHideAvatar = true;
+                    }
+                }
+            }
+        }
+
+        // Store sender name on the row for future grouping
+        row.dataset.senderName = displayName;
+
+        const avatar = document.createElement('img');
+        avatar.className = 'avatar';
+        avatar.src = avatarSrc;
+        if (shouldHideAvatar) avatar.style.visibility = 'hidden';
 
         const container = document.createElement('div'); container.className = 'msg-container';
         const nameEl = document.createElement('div'); nameEl.className = 'msg-name';
         nameEl.textContent = displayName;
+        nameEl.style.display = 'none'; // Always hide name per user request
         container.appendChild(nameEl);
 
         const wrapper = document.createElement('div'); wrapper.className = 'msg-wrapper';
+        if (!shouldHideAvatar) wrapper.style.marginTop = '20px';
 
         let el;
         const isLoc = msg.type === 'location' || (msg.header && (msg.header.includes('位置') || msg.header.includes('|LOC|')));
@@ -2937,6 +3594,13 @@
         const timeEl = document.createElement('div'); timeEl.className = 'msg-time'; timeEl.textContent = timeStr;
 
         let displayBody = msg.body;
+
+        // 检测 <blocked> 标签：被拉黑的消息，标记后从显示内容中剥离
+        let isBlockedByTag = false;
+        if (displayBody && displayBody.includes('<blocked>')) {
+            isBlockedByTag = true;
+            displayBody = displayBody.replace(/<blocked>/g, '').trim();
+        }
 
         // 检测 <recall> 标签：AI撤回消息，渲染为灰色小字
         let isRecallMsg = false;
@@ -2966,15 +3630,19 @@
             sysEl.style.borderRadius = '10px';
             sysEl.textContent = recallText;
             sysEl.dataset.fullHeader = msg.header || '';
-            sysEl.dataset.rawBody = (msg.body || '').replace(/<recall>/g, '');
+            sysEl.dataset.rawBody = msg.body || '';
             sysRow.appendChild(sysEl);
             chatMessages.appendChild(sysRow);
             if (!isHistoryLoad) { saveCurrentChatHistory(); chatMessages.scrollTop = chatMessages.scrollHeight; }
             return;
         }
 
-        // Save original body (with *thought*) for history persistence BEFORE extracting thought
-        const rawBodyForHistory = displayBody;
+        // Save original body (with *thought* and <blocked>) for history persistence BEFORE any processing
+        const rawBodyForHistory = msg.body;
+
+        // 应用正则规则（在标签剥离后、心声提取前）
+        displayBody = applyRegexRules(displayBody, !!msg.isUser);
+
         let displayThought = msg.thought || '';
         if (!displayThought && displayBody) {
             // Match *thought* at the very end of the body (works for plain text and voice "dur|text*thought*")
@@ -3005,42 +3673,12 @@
             else if (imgTagMatch) displayBody = imgTagMatch[1];
         }
 
-        // Quote Parsing
+        // Quote Parsing (unified)
         let quoteHtml = '';
-
-        // 1. Try New Format: [名字|REP|引用类型|时间]引用内容|回复内容
-        const newQuoteRegex = /^\[(.*?)\|REP\|(.*?)\|(.*?)\](.*?)\|(.*)$/s;
-        const newQuoteMatch = displayBody.match(newQuoteRegex);
-
-        if (newQuoteMatch) {
-            const qName = newQuoteMatch[1];
-            const qType = newQuoteMatch[2];
-            const qTime = newQuoteMatch[3];
-            const qContent = newQuoteMatch[4];
-            const replyContent = newQuoteMatch[5];
-
-            displayBody = replyContent.trim();
-
-            quoteHtml = `<div class="msg-quote">
-        <div class="msg-quote-content">
-            <div class="msg-quote-header">
-                <span class="msg-quote-name">${qName}</span>
-            </div>
-            <div class="msg-quote-text">${qContent}</div>
-        </div>
-    </div>`;
-        } else {
-            // 2. Fallback to Old Format
-            const quoteRegex = /「`回复(.*?)[：:](.*?)`」/;
-            const quoteMatch = displayBody.match(quoteRegex);
-            if (quoteMatch) {
-                const qName = quoteMatch[1];
-                const qText = quoteMatch[2];
-                // Remove quote from body
-                displayBody = displayBody.replace(quoteMatch[0], '').trim();
-                // Build Quote HTML
-                quoteHtml = `<div class="msg-quote"> <div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div>`;
-            }
+        const parsedQuote = parseQuote(displayBody);
+        if (parsedQuote) {
+            displayBody = parsedQuote.replyBody;
+            quoteHtml = buildQuoteHtml(parsedQuote);
         }
 
         if (isLoc) {
@@ -3263,14 +3901,11 @@
         }
 
         // 检查是否被拉黑
-        // 1. 如果是用户发的消息，且当前处于 Char拉黑User 状态 (appSettings.blockUser)，显示红色感叹号
-        // 2. 如果是Char发的消息，且当前处于 User拉黑Char 状态 (appSettings.blockChar)，显示红色感叹号
-        let isBlocked = false;
+        // 1. body中包含<blocked>标签 (持久化标记，已在上方剥离并设置isBlockedByTag)
+        // 2. 当前实时状态：用户消息+blockUser 或 角色消息+blockChar
+        let isBlocked = isBlockedByTag;
         if (msg.isUser && appSettings.blockUser) isBlocked = true;
         if (!msg.isUser && appSettings.blockChar) isBlocked = true;
-
-        // 检查消息头中是否已有标记 (持久化)
-        if (msg.header && msg.header.includes('!')) isBlocked = true;
 
         // 创建元数据容器（包含时间和状态图标）
         const metaContainer = document.createElement('div');
@@ -3409,13 +4044,15 @@
         const container = document.createElement('div');
         container.className = 'msg-container';
 
-        const nameEl = document.createElement('div');
-        nameEl.className = 'msg-name';
-        nameEl.textContent = u;
-        container.appendChild(nameEl);
+        // Typing Indicator: No Name
+        // const nameEl = document.createElement('div');
+        // nameEl.className = 'msg-name';
+        // nameEl.textContent = u;
+        // container.appendChild(nameEl);
 
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper';
+        wrapper.style.marginTop = '20px';
 
         const el = document.createElement('div');
         el.className = 'bubble bubble-received typing-only';
@@ -3763,77 +4400,63 @@
         const nameEl = row.querySelector('.msg-name');
         const name = nameEl ? nameEl.textContent : '对方';
 
-        const timeEl = row.querySelector('.msg-time');
-        const time = timeEl ? timeEl.textContent : getTime();
-
-        let type = 'TXT';
         let content = '';
 
         if (el.classList.contains('bubble') && !el.dataset.msgType) {
-            type = 'TXT';
             content = el.textContent || '';
-            content = content.replace(/\|/g, '｜'); // Sanitize separator
-            if (content.length > 12) {
-                content = content.substring(0, 12) + '...';
-            }
+            if (content.length > 20) content = content.substring(0, 20) + '...';
         } else if (el.dataset.msgType === 'call') {
-            type = 'CAL';
             content = '[通话]';
-        } else if (el.classList.contains('photo-card') || el.classList.contains('sticker-bubble')) {
-            type = 'IMG';
-            content = '[图片]';
+        } else if (el.classList.contains('sticker-bubble') || (el.dataset.stickerBody)) {
+            content = '[表情包]';
+        } else if (el.classList.contains('photo-card')) {
+            if (el.querySelector('video')) content = '[视频]';
+            else content = '[图片]';
         } else if (el.classList.contains('voice-card') || el.classList.contains('real-audio-card')) {
-            type = 'VOC';
             content = '[语音]';
         } else if (el.classList.contains('location-card')) {
-            type = 'LOC';
             content = '[位置]';
         } else if (el.classList.contains('transfer-card')) {
-            type = 'TRA';
             content = '[转账]';
         } else if (el.classList.contains('file-card')) {
-            type = 'FIL';
             content = '[文件]';
         } else if (el.classList.contains('link-card')) {
-            type = 'LNK';
             content = '[链接]';
         } else if (el.classList.contains('deliver-card')) {
-            type = 'ODR';
             content = '[订单]';
-        } else if (el.querySelector('video') || (el.dataset.fullHeader && el.dataset.fullHeader.includes('视频'))) {
-            type = 'VID';
+        } else if (el.dataset.fullHeader && el.dataset.fullHeader.includes('视频')) {
             content = '[视频]';
         } else {
-            type = 'TXT';
             content = el.textContent || '[消息]';
-            content = content.replace(/\|/g, '｜');
-            if (content.length > 12) content = content.substring(0, 12) + '...';
+            if (content.length > 20) content = content.substring(0, 20) + '...';
         }
 
-        // Format: [名字|REP|引用类型|时间]引用内容|
-        const quoteStr = `[${name}| REP | ${type}| ${time}]${content}| `;
-
+        // New format: [REP:名字]引用内容[/REP]
+        // Instead of injecting into input, show preview
+        showQuotePreview(name, content);
         const input = document.getElementById('message-input');
-        input.value = quoteStr + input.value;
         input.focus();
-        adjustTextareaHeight();
     }
 
     function executeRegenerate(el) {
-        // Remove the message bubble
         const row = el.closest('.message-row');
         if (row) {
-            row.remove();
-            // Remove from history (last message)
-            if (currentChatTag) {
-                const historyKey = `faye - phone - history - ${currentChatTag} `;
-                const savedHistory = localStorage.getItem(historyKey);
-                if (savedHistory) {
-                    const history = JSON.parse(savedHistory);
-                    history.pop();
-                    localStorage.setItem(historyKey, JSON.stringify(history));
+            // Delete all subsequent messages (Rollback)
+            let next = row.nextElementSibling;
+            while (next) {
+                const toRemove = next;
+                next = next.nextElementSibling;
+                if (toRemove.classList.contains('message-row')) {
+                    toRemove.remove();
                 }
             }
+
+            // Remove the target message itself
+            row.remove();
+
+            // Update history based on current DOM (which now lacks the deleted messages)
+            saveCurrentChatHistory();
+
             // Trigger generation again
             triggerGenerate();
         }
@@ -3862,43 +4485,13 @@
             if (newText === undefined) return;
 
             if (el.classList.contains('bubble')) {
-                // Re-parse quote logic
+                // Re-parse quote logic (unified)
                 let displayBody = newText;
                 let quoteHtml = '';
-
-                // 1. Try New Format
-                const newQuoteRegex = /^\[(.*?)\|REP\|(.*?)\|(.*?)\](.*?)\|(.*)$/s;
-                const newQuoteMatch = newText.match(newQuoteRegex);
-
-                if (newQuoteMatch) {
-                    const qName = newQuoteMatch[1];
-                    const qType = newQuoteMatch[2];
-                    const qTime = newQuoteMatch[3];
-                    const qContent = newQuoteMatch[4];
-                    const replyContent = newQuoteMatch[5];
-
-                    displayBody = replyContent.trim();
-
-                    quoteHtml = `< div class="msg-quote" >
-        <div class="msg-quote-content">
-            <div style="display:flex;justify-content:space-between;opacity:0.7;font-size:12px;margin-bottom:2px;">
-                <span>${qName}</span>
-                <span>${qTime}</span>
-            </div>
-            <div style="color:#666;">${qContent}</div>
-        </div>
-                </div > `;
-                } else {
-                    // 2. Fallback to Old Format
-                    const quoteRegex = /「`回复(.*?)[：:](.*?)`」/;
-                    const quoteMatch = newText.match(quoteRegex);
-
-                    if (quoteMatch) {
-                        const qName = quoteMatch[1];
-                        const qText = quoteMatch[2];
-                        displayBody = displayBody.replace(quoteMatch[0], '').trim();
-                        quoteHtml = `< div class="msg-quote" > <div class="msg-quote-content"><span style="font-weight:bold">回复 ${qName}：</span>${qText}</div></div > `;
-                    }
+                const parsedQuote = parseQuote(newText);
+                if (parsedQuote) {
+                    displayBody = parsedQuote.replyBody;
+                    quoteHtml = buildQuoteHtml(parsedQuote);
                 }
 
                 el.innerHTML = quoteHtml + displayBody.replace(/\n/g, '<br>');
@@ -4220,7 +4813,8 @@
             const genderRadio = screen.querySelector(`input[name = "npc-gender-page"][value = "${gender}"]`);
             if (genderRadio) {
                 genderRadio.checked = true;
-                if (label) label.classList.add('selected');
+                const genderLabel = genderRadio.closest('label');
+                if (genderLabel) genderLabel.classList.add('selected');
             }
             // Multi-select init handled later
             if (subNpcList) {
@@ -5078,6 +5672,13 @@
     window.openDataSettings = openDataSettings;
     window.closeDataSettings = closeDataSettings;
     window.saveDataSettings = saveDataSettings;
+    // Memory Summary System
+    window.summarizeChatMemory = summarizeChatMemory;
+    window.addMemoryManual = addMemoryManual;
+    window.clearAllMemories = clearAllMemories;
+    window.saveMemoryEntry = saveMemoryEntry;
+    window.closeMemoryEditModal = closeMemoryEditModal;
+    window.saveMemorySettings = saveMemorySettings;
 
     // Initialize on Load
     if (document.readyState === 'loading') {
@@ -5400,6 +6001,29 @@
         }, 1500);
     }
 
+    // ====== Quote Preview Logic ======
+    let currentQuote = null;
+
+    function showQuotePreview(name, content) {
+        currentQuote = { name, content };
+        const bar = document.getElementById('quote-preview-bar');
+        const nameEl = document.getElementById('quote-preview-name');
+        const textEl = document.getElementById('quote-preview-text');
+
+        if (bar && nameEl && textEl) {
+            nameEl.textContent = "回复 " + name + "：";
+            textEl.textContent = content;
+            bar.style.display = 'flex';
+        }
+    }
+
+    function cancelQuote() {
+        currentQuote = null;
+        const bar = document.getElementById('quote-preview-bar');
+        if (bar) bar.style.display = 'none';
+    }
+    window.cancelQuote = cancelQuote;
+
     // Incoming Call Logic
     function receiveVoiceCall() {
         const incomingScreen = document.getElementById('incoming-call-screen');
@@ -5583,19 +6207,30 @@
 13. 接收转账: [${charName}|${currentTime}][${charName}|转账已接收] (接收转账)
 14. 退回转账: [${charName}|${currentTime}][${charName}|转账已退还] (退回转账)
 
-引用回复格式: [${charName}|${currentTime}][被引用人|REP|类型|时间]引用内容|回复内容
+引用回复格式: [${charName}|${currentTime}][REP:被引用人]引用内容[/REP]回复内容
+示例: [${charName}|${currentTime}][REP:${getUserName()}]你好啊[/REP]你好呀！
 
 发送多条消息时每条都带独立格式头:
 [${charName}|${currentTime}]第一条
 [${charName}|语音|${currentTime}]3|嗯嗯好的
 [${charName}|${currentTime}]第二条文字
 
-特殊操作:
-- 拉黑用户: 在消息中插入 <block> 标签，之后用户发的消息会显示发送失败(红色感叹号)
-- 取消拉黑: 在消息中插入 <unblock> 标签
+特殊操作 - 拉黑机制:
+[被对方拉黑]
+- 当前状态: ${appSettings.blockChar ? `你已被对方拉黑。你发的消息对方看不到（消息会带有<blocked>标记）。` : '未被拉黑。'}
+- 如果你处于被拉黑状态，你发的消息对方实际上看不到，你可以根据剧情和人设性格自然地对被拉黑这件事做出表现：比如焦急、疑惑、自责、生气等。
+- 聊天记录中你的消息body开头如果带 <blocked> 标记，说明那条消息对方没有收到。
+
+[主动拉黑对方]
+- 如果剧情发展到${charName}想要拉黑对方、不想再收到对方消息时，在消息末尾插入 <block> 标签。
+- 拉黑后，对方后续发送的消息会自动带有 <blocked> 标记并显示发送失败（红色感叹号）。你应当假装完全看不到这些带有 <blocked> 标记的消息，不要对其内容做出任何回应。
 - 示例: [${charName}|${currentTime}]别再找我了<block>
-- 当前状态: ${appSettings.blockUser ? '你已拉黑对方，对方发送的消息会失败' : '未拉黑'}${appSettings.blockChar ? '；对方已拉黑你，你发的消息对方看不到' : ''}
-- 聊天记录中消息头末尾带 |! 的表示该消息被拦截/发送失败
+- 当前拉黑状态: ${appSettings.blockUser ? `你已拉黑对方。对方发送的消息会失败，你看不到。如果对方发来的消息body中带有<blocked>标记，假装完全没看到，不做任何回应。` : '你未拉黑对方。'}
+
+[解除拉黑]
+- 如果剧情发展到${charName}愿意解除拉黑、重新接收对方消息时，在消息中插入 <unblock> 标签。
+- 解除后对方的消息将恢复正常发送。
+- 示例: [${charName}|${currentTime}]算了 还是解除吧<unblock>
 - 若想接收对方转账，请发送包含“[${charName}|转账已接收]”的文本消息；若想退回转账，请发送包含“[${charName}|转账已退还]”的文本消息。这会自动更新转账状态。
 
 注意：无类型标记的默认为文本。内容中不要重复格式头。`;
@@ -5711,7 +6346,14 @@ Apply the following substitutions based on current language (CN/EN).
 
             // Inner Voice Mode: AI adds inner thoughts wrapped in * at the end of messages
             if (getChatInnerVoiceMode()) {
-                systemContent += `\n\n[心声模式 - 已启用]\n在此模式下，${charName} 会在部分消息末尾附上自己内心真实的想法（心声），用星号包裹，紧跟在消息内容之后，不换行。\n规则：\n- 每次回复至少有两条消息末尾带有心声。\n- 心声格式：在消息正文末尾直接追加 *心声内容*，例如：晚上好呀，你吃饭了吗*我想和你一起吃晚餐*\n- 示例：普通文本消息格式：[${charName}时间]文本内容*心声内容* \n语音消息格式：[${charName}|语音|时间]秒数|语音内容*心声内容*\n- 心声是 ${charName} 内心真实的、未说出口的想法，可以与说出口的话形成反差，增加角色层次感。\n- 心声应简短（10~30字），口语化，真实反映角色的内心活动。\n- 不要在心声中重复消息正文的内容。\n- 心声不能作为一种独立的消息形式，必须附加在其它消息格式末尾。`;
+                systemContent += `\n\n[心声模式 - 已启用]\n在此模式下，${charName} 会在除撤回和引用消息之外的消息格式末尾附上自己内心真实的想法（心声），用星号包裹，紧跟在消息内容之后，不换行。\n规则：\n- 不能用于撤回和引用消息中。\n- 每次回复必须有1~2条消息末尾带有心声。\n- 不要在心声中重复消息正文的内容。\n- 心声不能作为一种独立的消息形式，必须附加在其它消息格式末尾。\n- 心声格式：在消息正文末尾直接追加 *心声内容*，例如：晚上好呀，你吃饭了吗*我想和你一起吃晚餐*\n- 示例：普通文本消息格式：[${charName}时间]文本内容*心声内容* \n语音消息格式：[${charName}|语音|时间]秒数|语音内容*心声内容*\n- 心声是 ${charName} 内心真实的、未说出口的想法，可以与说出口的话形成反差，增加角色层次感。\n- 心声应简短（10~30字），口语化，真实反映角色的内心活动。`;
+            }
+
+            // Memory Summary: inject memory context into system prompt
+            loadChatMemories();
+            const memoryContext = buildMemoryContext();
+            if (memoryContext) {
+                systemContent += memoryContext;
             }
 
             systemContent += formatInstruction + mobileChatPrompt;
@@ -5729,14 +6371,55 @@ Apply the following substitutions based on current language (CN/EN).
                         const role = (msg.header && msg.header.includes(getUserName())) || msg.isUser ? 'user' : 'assistant';
                         let content = msg.body;
 
+                        // Strip CoT / thought content before sending to AI
+                        // Remove *thought* inner voice at end of message (inner voice mode)
+                        if (content) {
+                            content = content.replace(/\*[^*]+\*\s*$/, '').trim();
+                        }
+                        // Remove any residual <think>...</think> blocks
+                        if (content) {
+                            content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+                        }
+
                         // Handle special message types for context
-                        if (msg.type === 'photo') {
-                            // If it's a photo, we can't easily send old base64s if they are huge.
-                            // For now, replace with placeholder text unless it's the very last message
+                        // Derive type from header type marker for accurate AI context
+                        const h = msg.header || '';
+                        const isUserPhoto = h.includes('|图片|') || h.includes('| 图片 |') || msg.type === 'photo';
+                        const isUserSticker = h.includes('|表情包|') || h.includes('| 表情包 |') || msg.type === 'sticker';
+                        const isUserVoice = h.includes('|语音|') || h.includes('| 语音 |') || msg.type === 'voice';
+                        const isUserVideo = h.includes('|视频|') || h.includes('| 视频 |') || msg.type === 'video';
+                        const isUserFile = h.includes('|文件|') || h.includes('| 文件 |') || msg.type === 'file';
+                        const isUserTrans = h.includes('|TRANS|') || h.includes('| TRANS |') || h.includes('|转账|') || msg.type === 'transfer';
+                        const isUserLoc = h.includes('|位置|') || h.includes('| 位置 |') || msg.type === 'location';
+                        const isUserLink = h.includes('|LINK|') || h.includes('| LINK |') || msg.type === 'link';
+
+                        if (isUserPhoto) {
                             content = '[发送了一张图片]';
-                        } else if (msg.type === 'sticker') {
-                            // User request: Remove unified prefix, use batch format (Name+URL/Suffix) directly
-                            content = msg.body;
+                        } else if (isUserSticker) {
+                            // Extract sticker name from body
+                            const stickerBody = msg.body || '';
+                            const stickerNameMatch = stickerBody.match(/^([^\s]{1,20})(?=https?:|\/|[\w\-]+\.[a-zA-Z]{3,4})/);
+                            const stickerName = stickerNameMatch ? stickerNameMatch[1].trim() : stickerBody.replace(/https?:\/\/\S+/, '').trim().slice(0, 20);
+                            content = `[发送了表情包：${stickerName || '表情包'}]`;
+                        } else if (isUserVoice) {
+                            const voiceParts = (msg.body || '').split('|');
+                            const dur = parseInt(voiceParts[0]) || 0;
+                            const voiceTxt = voiceParts.slice(1).join('|').trim();
+                            content = dur ? `[发送了语音消息 ${dur}秒${voiceTxt ? '：' + voiceTxt : ''}]` : '[发送了语音消息]';
+                        } else if (isUserVideo) {
+                            content = '[发送了视频]';
+                        } else if (isUserFile) {
+                            const fileName = (msg.body || '').split('|')[0].trim();
+                            content = `[发送了文件：${fileName || '文件'}]`;
+                        } else if (isUserTrans) {
+                            const amount = (msg.body || '').split('|')[0].trim();
+                            content = `[发送了转账：${amount || '未知金额'}]`;
+                        } else if (isUserLoc) {
+                            const placeName = (msg.body || '').split('|')[0].trim();
+                            content = `[发送了位置：${placeName || '未知位置'}]`;
+                        } else if (isUserLink) {
+                            const linkTitle = (msg.body || '').split('|')[0].trim();
+                            content = `[分享了链接：${linkTitle || '链接'}]`;
                         }
 
                         messages.push({ role, content });
@@ -5877,9 +6560,9 @@ Apply the following substitutions based on current language (CN/EN).
         }
 
         // ====== Phase 2: Strip command tags ======
-        // Handle <block> / <unblock> commands
-        if (rawOutput.includes('<block>')) {
-            rawOutput = rawOutput.replace(/<block>/g, '');
+        // Handle <block> / <unblock> commands (负向前瞻避免误匹配 <blocked>)
+        if (/<block>(?!ed>)/g.test(rawOutput)) {
+            rawOutput = rawOutput.replace(/<block>(?!ed>)/g, '');
             appSettings.blockUser = true;
             saveSettingsToStorage();
         }
@@ -5902,7 +6585,7 @@ Apply the following substitutions based on current language (CN/EN).
         // Reset regex
         headerRegex.lastIndex = 0;
         while ((match = headerRegex.exec(rawOutput)) !== null) {
-            // Ignore headers that are quote/reply markers (containing |REP|)
+            // Ignore headers that are quote/reply markers (legacy |REP| format)
             // These should be treated as part of the message body
             if (match[0].includes('|REP|') || match[0].includes('|REP]')) {
                 continue;
@@ -5977,9 +6660,15 @@ Apply the following substitutions based on current language (CN/EN).
             const finalHeader = seg.header || `[${u}|${getTime()}]`;
 
             // Render through renderMessageToUI
+            // 如果用户拉黑了角色(blockChar)，在AI消息body开头加<blocked>标签持久化
+            let finalBody = seg.body || '';
+            if (appSettings.blockChar) {
+                finalBody = `<blocked>${finalBody}`;
+            }
+
             renderMessageToUI({
                 header: finalHeader,
-                body: seg.body || '',
+                body: finalBody,
                 isUser: false
             });
 
@@ -6023,6 +6712,275 @@ Apply the following substitutions based on current language (CN/EN).
     }
 
     // Expose functions to global scope for HTML onclick handlers
+    /* ================== URL Upload System ================== */
+    let currentUrlUploadTarget = null;
+    const URL_PREFIX = 'https://img.phey.click/';
+
+    function openUrlUploadModal(target) {
+        currentUrlUploadTarget = target;
+        const input = document.getElementById('url-upload-input');
+        if (input) input.value = '';
+        const modal = document.getElementById('url-upload-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            // Delay adding 'show' to trigger CSS transition
+            setTimeout(() => modal.classList.add('show'), 10);
+            if (input) setTimeout(() => input.focus(), 100);
+        }
+    }
+
+    function closeUrlUploadModal() {
+        const modal = document.getElementById('url-upload-modal');
+        if (modal) {
+            modal.classList.remove('show');
+            // Wait for transition to finish before hiding
+            setTimeout(() => modal.style.display = 'none', 300);
+        }
+        currentUrlUploadTarget = null;
+    }
+
+    function confirmUrlUpload() {
+        const input = document.getElementById('url-upload-input');
+        let val = input.value.trim();
+        if (!val) {
+            closeUrlUploadModal();
+            return;
+        }
+
+        // Auto-prepend logic
+        let finalUrl = val;
+        // If not starting with http/https/data, assume it's a suffix
+        if (!val.startsWith('http') && !val.startsWith('data:')) {
+            // Ensure no double slash if user typed /suffix
+            if (val.startsWith('/')) val = val.substring(1);
+            finalUrl = URL_PREFIX + val;
+        }
+
+        // Apply to target
+        if (currentUrlUploadTarget === 'chat-bg') {
+            const img = document.getElementById('preview-chat-bg');
+            if (img) {
+                img.src = finalUrl;
+                img.style.display = 'block';
+            }
+        } else if (currentUrlUploadTarget === 'home-bg') {
+            const img = document.getElementById('preview-home-bg');
+            if (img) img.src = finalUrl;
+        } else if (currentUrlUploadTarget === 'npc-avatar') {
+            const img = document.getElementById('npc-avatar-preview');
+            if (img) img.src = finalUrl;
+        } else if (currentUrlUploadTarget === 'user-avatar') {
+            const img = document.getElementById('user-avatar-preview');
+            if (img) img.src = finalUrl;
+        }
+
+        closeUrlUploadModal();
+        showToast('✅ 链接已应用');
+    }
+    // ====== Regex Script System ======
+    let regexRules = [];
+    let editingRegexIndex = -1; // -1 = new, >=0 = editing existing
+
+    function loadRegexRules() {
+        try {
+            const saved = localStorage.getItem('faye-phone-regex-rules');
+            if (saved) {
+                regexRules = JSON.parse(saved);
+            } else {
+                // Default Rules
+                regexRules = [
+                    // CN Rules
+                    { name: '[CN] 暴躁替代', pattern: '(操你妈)', replace: '劁你爹', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[CN] 暴躁替代', pattern: '(他妈的|他娘的)', replace: '他爸的', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[CN] 侮辱:人', pattern: '(傻逼)', replace: '傻屌', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[CN] 侮辱:特征', pattern: '(娘炮|像个娘们)', replace: '像个太监', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[CN] 赞美/力量', pattern: '(太屌了|太棒了|牛逼)', replace: '太蒂了', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[CN] 信仰/感叹', pattern: '(老天爷)', replace: '天姥姥', applyToUser: false, applyToAI: true, enabled: true },
+
+                    // EN Rules
+                    { name: '[EN] Violence', pattern: '[Mm]otherfucker', replace: 'Daddy-fucker', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[EN] Insult: Person', pattern: '([Bb]itch|[Cc]unt|[Ww]hore)', replace: 'Male dog', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[EN] Insult: Trait', pattern: '([Ss]issy|[Ll]ike a girl)', replace: 'Like a eunuch', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[EN] Praise', pattern: '[Tt]he balls', replace: 'The Clit', applyToUser: false, applyToAI: true, enabled: true },
+                    { name: '[EN] Deity', pattern: '(Oh [Ll]ord|Oh [Gg]od)', replace: 'Oh Goddess', applyToUser: false, applyToAI: true, enabled: true }
+                ];
+            }
+        } catch (e) { regexRules = []; }
+    }
+
+    function saveRegexRules() {
+        try {
+            localStorage.setItem('faye-phone-regex-rules', JSON.stringify(regexRules));
+        } catch (e) { console.error('Failed to save regex rules', e); }
+    }
+
+    function openRegexScreen() {
+        if (homeScreen) homeScreen.style.display = 'none';
+        const screen = document.getElementById('regex-screen');
+        if (screen) screen.style.display = 'flex';
+        updateStatusBar('settings');
+        renderRegexList();
+    }
+
+    function closeRegexScreen() {
+        const screen = document.getElementById('regex-screen');
+        if (screen) screen.style.display = 'none';
+        if (homeScreen) homeScreen.style.display = 'flex';
+        updateStatusBar('home');
+    }
+
+    function renderRegexList() {
+        const container = document.getElementById('regex-list-container');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (regexRules.length === 0) {
+            container.innerHTML = '<div class="regex-empty-hint">还没有正则规则<br>点击右上角 + 添加</div>';
+            return;
+        }
+
+        regexRules.forEach((rule, index) => {
+            const card = document.createElement('div');
+            card.className = 'regex-rule-card';
+            card.innerHTML = `
+                <div class="regex-rule-header">
+                    <div class="regex-rule-name">${rule.name || '未命名规则'}</div>
+                    <label class="regex-rule-toggle">
+                        <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleRegexRule(${index}, this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="regex-rule-detail">/${rule.pattern}/g → ${rule.replace || '(删除)'}</div>
+                <div class="regex-rule-tags">
+                    <span class="regex-rule-tag ${rule.applyToUser ? 'active' : ''}">User</span>
+                    <span class="regex-rule-tag ${rule.applyToAI ? 'active' : ''}">AI</span>
+                </div>
+                <div class="regex-rule-actions">
+                    <button class="regex-btn-edit" onclick="editRegexRule(${index})">编辑</button>
+                    <button class="regex-btn-delete" onclick="deleteRegexRule(${index})">删除</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function addNewRegexRule() {
+        editingRegexIndex = -1;
+        const title = document.getElementById('regex-edit-modal-title');
+        if (title) title.textContent = '新建正则';
+        document.getElementById('regex-edit-name').value = '';
+        document.getElementById('regex-edit-pattern').value = '';
+        document.getElementById('regex-edit-replace').value = '';
+        document.getElementById('regex-edit-user').checked = false;
+        document.getElementById('regex-edit-ai').checked = true;
+        const modal = document.getElementById('regex-edit-modal');
+        if (modal) modal.classList.add('show');
+    }
+
+    function editRegexRule(index) {
+        const rule = regexRules[index];
+        if (!rule) return;
+        editingRegexIndex = index;
+        const title = document.getElementById('regex-edit-modal-title');
+        if (title) title.textContent = '编辑正则';
+        document.getElementById('regex-edit-name').value = rule.name || '';
+        document.getElementById('regex-edit-pattern').value = rule.pattern || '';
+        document.getElementById('regex-edit-replace').value = rule.replace || '';
+        document.getElementById('regex-edit-user').checked = !!rule.applyToUser;
+        document.getElementById('regex-edit-ai').checked = !!rule.applyToAI;
+        const modal = document.getElementById('regex-edit-modal');
+        if (modal) modal.classList.add('show');
+    }
+
+    function closeRegexEditModal() {
+        const modal = document.getElementById('regex-edit-modal');
+        if (modal) modal.classList.remove('show');
+        editingRegexIndex = -1;
+    }
+
+    function saveRegexRule() {
+        const name = document.getElementById('regex-edit-name').value.trim();
+        const pattern = document.getElementById('regex-edit-pattern').value;
+        const replace = document.getElementById('regex-edit-replace').value;
+        const applyToUser = document.getElementById('regex-edit-user').checked;
+        const applyToAI = document.getElementById('regex-edit-ai').checked;
+
+        if (!pattern) {
+            showToast('请输入正则表达式');
+            return;
+        }
+
+        // 验证正则是否合法
+        try {
+            new RegExp(pattern, 'g');
+        } catch (e) {
+            showToast('正则表达式语法错误: ' + e.message);
+            return;
+        }
+
+        const rule = {
+            name: name || '未命名规则',
+            pattern: pattern,
+            replace: replace,
+            applyToUser: applyToUser,
+            applyToAI: applyToAI,
+            enabled: true
+        };
+
+        if (editingRegexIndex >= 0 && editingRegexIndex < regexRules.length) {
+            // 编辑时保留 enabled 状态
+            rule.enabled = regexRules[editingRegexIndex].enabled;
+            regexRules[editingRegexIndex] = rule;
+        } else {
+            regexRules.push(rule);
+        }
+
+        saveRegexRules();
+        closeRegexEditModal();
+        renderRegexList();
+        showToast('✅ 正则规则已保存');
+    }
+
+    function deleteRegexRule(index) {
+        if (!confirm('确定删除这条正则规则？')) return;
+        regexRules.splice(index, 1);
+        saveRegexRules();
+        renderRegexList();
+    }
+
+    function toggleRegexRule(index, enabled) {
+        if (regexRules[index]) {
+            regexRules[index].enabled = enabled;
+            saveRegexRules();
+        }
+    }
+
+    /**
+     * 对文本应用所有启用的正则规则
+     * @param {string} text - 要处理的文本
+     * @param {boolean} isUser - true=用户消息, false=AI消息
+     * @returns {string} 处理后的文本
+     */
+    function applyRegexRules(text, isUser) {
+        if (!text || regexRules.length === 0) return text;
+        let result = text;
+        for (const rule of regexRules) {
+            if (!rule.enabled) continue;
+            if (isUser && !rule.applyToUser) continue;
+            if (!isUser && !rule.applyToAI) continue;
+            try {
+                const regex = new RegExp(rule.pattern, 'g');
+                result = result.replace(regex, rule.replace || '');
+            } catch (e) {
+                console.warn('Regex rule error:', rule.name, e);
+            }
+        }
+        return result;
+    }
+
+    // Load regex rules on startup
+    loadRegexRules();
+
     Object.assign(window, {
         openMessageList,
         openSettings,
@@ -6130,7 +7088,22 @@ Apply the following substitutions based on current language (CN/EN).
         enterMultiSelectMode,
         exitMultiSelectMode,
         deleteSelectedMessages,
-        executeRecall
+        executeRecall,
+        // URL Upload
+        openUrlUploadModal,
+        closeUrlUploadModal,
+        confirmUrlUpload,
+        // Chat Remark
+        saveChatRemarkAuto,
+        // Regex
+        openRegexScreen,
+        closeRegexScreen,
+        addNewRegexRule,
+        editRegexRule,
+        deleteRegexRule,
+        toggleRegexRule,
+        saveRegexRule,
+        closeRegexEditModal
     });
 
 })();
