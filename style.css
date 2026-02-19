@@ -1683,6 +1683,125 @@ input:checked+.slider:before {
     opacity: 1;
 }
 
+/* ========== 多选模式 ========== */
+
+/* 多选复选框 */
+.multi-select-checkbox {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    border: 1.5px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    align-self: center;
+    margin: 0 2px;
+}
+
+.ms-selected .multi-select-checkbox {
+    border-color: #ff9a9e;
+    background: linear-gradient(135deg, #ff9a9e, #fecfef);
+}
+
+.ms-check-inner {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: transparent;
+    transition: all 0.2s ease;
+}
+
+.ms-selected .ms-check-inner {
+    background: #fff;
+    transform: scale(1);
+}
+
+/* 选中行高亮 */
+.message-row.ms-selected {
+    background: rgba(255, 154, 158, 0.08);
+    border-radius: 10px;
+}
+
+/* 多选模式下的消息行布局调整 */
+.multi-select-mode .message-row.sent,
+.multi-select-mode .message-row.received {
+    cursor: pointer;
+}
+
+/* 底部工具栏 */
+#multi-select-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    flex-shrink: 0;
+    z-index: 100;
+    animation: slideUpIn 0.25s ease;
+}
+
+@keyframes slideUpIn {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.ms-toolbar-left {
+    display: flex;
+    align-items: center;
+}
+
+.ms-count {
+    font-size: 13px;
+    color: #666;
+}
+
+.ms-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ms-btn {
+    padding: 6px 18px;
+    border: none;
+    border-radius: 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.ms-btn-delete {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: #fff;
+}
+
+.ms-btn-delete:active {
+    transform: scale(0.95);
+}
+
+.ms-btn-cancel {
+    background: #f0f0f0;
+    color: #666;
+}
+
+.ms-btn-cancel:active {
+    background: #e0e0e0;
+    transform: scale(0.95);
+}
+
 /* Transfer Modal */
 .transfer-modal-overlay {
     position: absolute;
