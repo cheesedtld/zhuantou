@@ -2605,7 +2605,7 @@ ${chatText}
         // Sticker Library
         if (myStickerList && myStickerList.length > 0) {
             // Base instruction text
-            const stickerInst = `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：[${charName}|表情包|时间]表情包名+catbox图床后缀 示例：[${charName}|表情包|${getTime()}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀\n`;
+            const stickerInst = `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：<say type="sticker">表情包名+catbox图床后缀</say> 示例：<say type="sticker">抱抱31onrh.jpeg</say> （注意，不可捏造列表中没有的表情包和后缀\n`;
             systemTokens += estimateTokens(stickerInst);
             myStickerList.forEach(s => {
                 systemTokens += estimateTokens(`- ${s.name}: ${s.url}\n`);
@@ -3153,8 +3153,8 @@ ${chatText}
         let finalBody = text;
         const hasQuote = !!currentQuote;
         if (currentQuote) {
-            // Prepend quote to text (legacy format was input injection)
-            finalBody = `[REP:${currentQuote.name}]${currentQuote.content}[/REP]${text}`;
+            // Prepend quote to text (XML format)
+            finalBody = `<quote name="${currentQuote.name.replace(/"/g, '&quot;')}">${currentQuote.content}</quote>${text}`;
             cancelQuote(); // Clear UI and state
         }
 
@@ -3375,6 +3375,15 @@ ${chatText}
     // ====== Quote/Reply Parsing Utilities ======
     function parseQuote(body) {
         if (!body) return null;
+        // XML format: <quote name="Name">Content</quote>Reply
+        const xmlMatch = body.match(/^<quote name=["'](.*?)["']>([\s\S]*?)<\/quote>([\s\S]*)$/);
+        if (xmlMatch) {
+            return {
+                quoteName: xmlMatch[1].trim(),
+                quoteContent: xmlMatch[2].trim(),
+                replyBody: xmlMatch[3].trim()
+            };
+        }
         // New format: [REP:名字]引用内容[/REP]回复内容
         const newMatch = body.match(/^\[REP:(.*?)\]([\s\S]*?)\[\/REP\]([\s\S]*)$/);
         if (newMatch) {
@@ -3979,7 +3988,7 @@ ${chatText}
         } else {
             el = document.createElement('div'); el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'} `;
             const textHtml = displayBody ? `<div class="msg-text">${displayBody.replace(/\n/g, '<br>')}</div>` : '';
-            el.innerHTML = textHtml + quoteHtml;
+            el.innerHTML = textHtml;
             el.dataset.rawBody = rawBodyForHistory;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; el.style.color = appSettings.userText; }
             else { el.style.backgroundColor = appSettings.charBubble; el.style.color = appSettings.charText; }
@@ -4031,6 +4040,14 @@ ${chatText}
         metaContainer.appendChild(timeEl);
 
         addLongPressHandler(el);
+        if (parsedQuote) {
+            const quoteEl = document.createElement('div');
+            quoteEl.className = 'msg-thought msg-quote-external';
+            quoteEl.style.marginBottom = '2px';
+            quoteEl.innerHTML = `<span style="opacity:0.75;margin-right:4px;">${parsedQuote.quoteName}:</span>${parsedQuote.quoteContent}`;
+            container.appendChild(quoteEl);
+        }
+
         wrapper.appendChild(el); wrapper.appendChild(metaContainer); container.appendChild(wrapper);
 
         if (displayThought) {
@@ -4323,7 +4340,13 @@ ${chatText}
         let recallText = `${displayName}撤回了一条${typeText}`;
         // For text messages, show the recalled content
         if (typeText === '消息' && rawBody.trim()) {
-            recallText += `：${rawBody.trim()}`;
+            let contentToShow = rawBody.trim();
+            // Try to parse quote to hide XML tags
+            const parsed = parseQuote(contentToShow);
+            if (parsed) {
+                contentToShow = `[引用] ${parsed.replyBody}`;
+            }
+            recallText += `：${contentToShow}`;
         }
 
         // Build recall notice element
@@ -4531,8 +4554,6 @@ ${chatText}
             if (content.length > 20) content = content.substring(0, 20) + '...';
         }
 
-        // New format: [REP:名字]引用内容[/REP]
-        // Instead of injecting into input, show preview
         showQuotePreview(name, content);
         const input = document.getElementById('message-input');
         input.focus();
@@ -4594,8 +4615,26 @@ ${chatText}
                     quoteHtml = buildQuoteHtml(parsedQuote);
                 }
 
-                el.innerHTML = quoteHtml + displayBody.replace(/\n/g, '<br>');
+                el.innerHTML = displayBody.replace(/\n/g, '<br>');
                 el.dataset.rawBody = newText;
+
+                // Handle external quote update
+                const container = el.closest('.msg-container');
+                const wrapper = el.closest('.msg-wrapper');
+                if (container && wrapper) {
+                    // Remove existing external quote
+                    const existingQuote = container.querySelector('.msg-quote-external');
+                    if (existingQuote) existingQuote.remove();
+
+                    // Add new external quote if present
+                    if (parsedQuote) {
+                        const quoteEl = document.createElement('div');
+                        quoteEl.className = 'msg-thought msg-quote-external';
+                        quoteEl.style.marginBottom = '2px';
+                        quoteEl.innerHTML = `<span style="opacity:0.75;margin-right:4px;">${parsedQuote.quoteName}:</span>${parsedQuote.quoteContent}`;
+                        container.insertBefore(quoteEl, wrapper);
+                    }
+                }
             } else if (el.classList.contains('location-card')) {
                 el.querySelector('.location-name').textContent = newText;
             } else if (el.classList.contains('file-card')) {
@@ -5814,8 +5853,102 @@ ${chatText}
         updateStatusBar(screenId);
     }
 
+    // ====== LLM API Helper (Shared) ======
+    async function fetchLLMStream(messages, onChunk, signal) {
+        if (!appSettings.apiEndpoint) throw new Error('API not configured');
+        const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
+        const key = appSettings.apiKey;
+        const model = appSettings.apiModel;
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (key) headers['Authorization'] = `Bearer ${key}`;
+
+        const res = await fetch(`${endpoint}/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+                model: model,
+                messages: messages,
+                temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
+                stream: true
+            }),
+            signal: signal
+        });
+
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`API Error ${res.status}: ${txt}`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let streamBuffer = '';
+        let isThinking = false;
+        let rawOutput = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            streamBuffer += chunk;
+            const lines = streamBuffer.split('\n');
+            streamBuffer = lines.pop();
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const dataStr = line.slice(6);
+                if (dataStr === '[DONE]') continue;
+
+                try {
+                    const data = JSON.parse(dataStr);
+                    const delta = data.choices[0].delta;
+                    if (delta.reasoning_content) continue; // Skip DeepSeek reasoning
+
+                    if (delta.content) {
+                        let content = delta.content;
+
+                        // Handle <think> tags logic
+                        if (isThinking) {
+                            const endIdx = content.indexOf('</think>');
+                            if (endIdx !== -1) {
+                                content = content.substring(endIdx + 8);
+                                isThinking = false;
+                            } else {
+                                continue;
+                            }
+                        }
+
+                        const thinkStart = content.indexOf('<think>');
+                        if (thinkStart !== -1) {
+                            const before = content.substring(0, thinkStart);
+                            if (before) {
+                                rawOutput += before;
+                                onChunk(before, rawOutput);
+                            }
+                            const afterThink = content.substring(thinkStart + 7);
+                            const thinkEnd = afterThink.indexOf('</think>');
+                            if (thinkEnd !== -1) {
+                                const finalContent = afterThink.substring(thinkEnd + 8);
+                                rawOutput += finalContent;
+                                onChunk(finalContent, rawOutput);
+                            } else {
+                                isThinking = true;
+                            }
+                        } else {
+                            rawOutput += content;
+                            onChunk(content, rawOutput);
+                        }
+                    }
+                } catch (e) { }
+            }
+        }
+        return rawOutput;
+    }
+
     // ====== Voice Call System (Refactored) ======
     let isCalling = false;
+    let activeCallIsIncoming = false; // Track who initiated: false=User, true=AI
     let callTimerInterval = null;
     let callSeconds = 0;
     let callConnectionTimeout = null;
@@ -5834,10 +5967,12 @@ ${chatText}
 回复规则：
 1. 以语音通话的口吻回复，简短、口语化，像真人打电话一样自然。
 2. 直接输出角色说的话，不要带任何格式头（如 [名字|时间] 等）。
-3. 禁止输出动作描写、心声、旁白。只能输出语音内容。
-4. 声音描写（如笑声、叹气、停顿等）用括号包裹，如：（笑）、（叹气）、（沉默了一会儿）。
-5. 每次回复只需要1-3句话，保持简短。
-6. 你的回复将直接显示在通话界面的字幕中。`;
+3. 禁止输出动作描写、心声、旁白。
+4. 允许输出控制指令（如 <cmd .../>），除指令外只能输出语音内容。
+5. 声音描写（如笑声、叹气、停顿等）用括号包裹，如：（笑）、（叹气）、（沉默了一会儿）。
+6. 每次回复只需要1-3句话，保持简短。
+7. 如果你想主动挂断电话，请在回复末尾输出 <cmd action="hangup_call"/>。
+8. 你的回复将直接显示在通话界面的字幕中。`;
 
         const messages = [{ role: 'system', content: systemPrompt }];
 
@@ -5882,163 +6017,96 @@ ${chatText}
             return null; // Signal caller to use fallback
         }
 
-        const { onConnect, onReject } = options;
+        const { onConnect, onReject, recordUserMsg = true } = options;
 
-        // Record user message in call conversation
-        if (userMsg) {
+        // Record user message in call conversation (unless suppressed)
+        if (userMsg && recordUserMsg) {
             callConversation.push({ role: 'user', content: userMsg });
+        } else if (userMsg && !recordUserMsg) {
+            // If not recording, we pass it as 'extraUserMsg' to buildCallMessages or manually handle context?
+            // Actually buildCallMessages reads from callConversation + extraUserMsg.
+            // So if we don't push to callConversation, we must pass it as extraUserMsg to buildCallMessages
+            // But wait, buildCallMessages takes extraUserMsg as argument.
+            // We need to pass userMsg as the argument to buildCallMessages below.
         }
 
-        const messages = buildCallMessages(null); // Already added to callConversation
+        // If recordUserMsg is false, we pass userMsg as 'extraUserMsg' (the argument to buildCallMessages)
+        // If recordUserMsg is true, we already pushed it, so we pass null to buildCallMessages (to avoid double entry)
+        // Actually buildCallMessages pushes extraUserMsg at the end.
+
+        const messages = buildCallMessages(recordUserMsg ? null : userMsg);
 
         try {
             callAbortController = new AbortController();
-
-            const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
-            const key = appSettings.apiKey;
-            const model = appSettings.apiModel;
-
-            const headers = { 'Content-Type': 'application/json' };
-            if (key) headers['Authorization'] = `Bearer ${key}`;
-
-            const res = await fetch(`${endpoint}/chat/completions`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                    model: model,
-                    messages: messages,
-                    temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
-                    stream: true
-                }),
-                signal: callAbortController.signal
-            });
-
-            if (!res.ok) {
-                const txt = await res.text();
-                throw new Error(`API Error ${res.status}: ${txt}`);
-            }
-
-            const reader = res.body.getReader();
-            const decoder = new TextDecoder();
-
-            let rawOutput = '';
-            let streamBuffer = '';
-            let isThinking = false;
+            let bubble = null;
             let connected = false;
-            let bubble = null; // Lazy creation: only create when we have visible content
 
-            while (true) {
-                if (!isCalling) break; // Call ended during streaming
-
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                streamBuffer += chunk;
-                const lines = streamBuffer.split('\n');
-                streamBuffer = lines.pop();
-
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    const dataStr = line.slice(6);
-                    if (dataStr === '[DONE]') continue;
-
-                    try {
-                        const data = JSON.parse(dataStr);
-                        const delta = data.choices[0].delta;
-
-                        // Skip reasoning_content (DeepSeek R1)
-                        if (delta.reasoning_content) continue;
-
-                        if (delta.content) {
-                            let content = delta.content;
-
-                            // Handle <think> tags
-                            if (isThinking) {
-                                const endIdx = content.indexOf('</think>');
-                                if (endIdx !== -1) {
-                                    content = content.substring(endIdx + 8);
-                                    isThinking = false;
-                                } else {
-                                    continue;
-                                }
-                            }
-
-                            const thinkStart = content.indexOf('<think>');
-                            if (thinkStart !== -1) {
-                                const before = content.substring(0, thinkStart);
-                                rawOutput += before;
-                                const afterThink = content.substring(thinkStart + 7);
-                                const thinkEnd = afterThink.indexOf('</think>');
-                                if (thinkEnd !== -1) {
-                                    rawOutput += afterThink.substring(thinkEnd + 8);
-                                } else {
-                                    isThinking = true;
-                                }
-                            } else {
-                                rawOutput += content;
-                            }
-
-                            // Only create bubble when we have actual visible content
-                            const trimmed = rawOutput.trim();
-                            if (trimmed && !bubble) {
-                                hideCallTyping();
-                                bubble = addCallBubble('', false);
-                            }
-                            if (bubble && trimmed) {
-                                bubble.textContent = trimmed;
-                                const container = document.getElementById('call-chat-container');
-                                if (container) container.scrollTop = container.scrollHeight;
-                            }
-
-                            // Check for reject/accept keywords during dialing phase
-                            if (!connected && onConnect) {
-                                const lowerOutput = rawOutput.toLowerCase();
-                                if (lowerOutput.includes('拒接通话') || lowerOutput.includes('拒绝通话') || lowerOutput.includes('挂断')) {
-                                    if (onReject) onReject();
-                                    // Still let stream finish to display response
-                                } else if (rawOutput.length > 2 && !lowerOutput.includes('拒接') && !lowerOutput.includes('拒绝')) {
-                                    // AI responded without rejecting = accepted
-                                    connected = true;
-                                    onConnect();
-                                }
-                            }
-                        }
-                    } catch (e) { /* parse error, skip */ }
+            const finalOutput = await fetchLLMStream(messages, (chunk, fullText) => {
+                if (!isCalling) {
+                    if (callAbortController) callAbortController.abort();
+                    return;
                 }
-            }
 
-            // Clean the final output (Enhanced Regex)
-            rawOutput = rawOutput.replace(/<(think|thinking)[\s\S]*?<\/(think|thinking)>/gi, '').trim();
+                // Check commands
+                if (fullText.includes('<cmd action="reject_call"/>')) {
+                    // Defer rejection until stream ends to capture full explanation
+                    // Hide any typing/bubble activity during this phase
+                    hideCallTyping();
+                    return;
+                } else if (fullText.includes('<cmd action="hangup_call"/>')) {
+                    const clean = fullText.replace(/<(think|thinking|cmd)[^>]*>/gi, '').trim();
+                    if (clean) callConversation.push({ role: 'assistant', content: clean });
 
-            // Ensure typing indicator is hidden
-            hideCallTyping();
-
-            // Handle bubble display
-            if (!bubble) {
-                // Bubble was never created (all output was thinking/empty)
-                if (rawOutput) {
-                    bubble = addCallBubble(rawOutput, false);
-                } else {
-                    bubble = addCallBubble('...', false);
+                    endVoiceCall('ai_hangup');
+                    isCalling = false;
+                    callAbortController.abort();
+                    return;
+                } else if (!connected && onConnect) {
+                    if (fullText.includes('<cmd action="accept_call"/>')) {
+                        connected = true; onConnect();
+                    } else if (fullText.length > 15 && !fullText.includes('<cmd')) {
+                        connected = true; onConnect();
+                    }
                 }
-            } else if (!rawOutput) {
-                bubble.textContent = '...';
-            } else {
-                bubble.textContent = rawOutput;
+
+                // Clean output for display logic: Remove complete tags AND trailing incomplete tags to prevent flicker
+                const cleanText = fullText
+                    .replace(/<(think|thinking|cmd)[^>]*>/gi, '') // Remove complete known tags
+                    .replace(/<(think|thinking|cmd)[^>]*$/gi, '') // Remove incomplete known tags at end
+                    .trim();
+
+                hideCallTyping();
+                if (!bubble && cleanText) {
+                    bubble = addCallBubble(cleanText, false);
+                } else if (bubble) {
+                    bubble.textContent = cleanText;
+                    const container = document.getElementById('call-chat-container');
+                    if (container) container.scrollTop = container.scrollHeight;
+                }
+            }, callAbortController.signal);
+
+            if (!finalOutput) return null;
+
+            // Handle deferred rejection
+            if (finalOutput.includes('<cmd action="reject_call"/>')) {
+                const clean = finalOutput.replace(/<(think|thinking|cmd)[^>]*>/gi, '').trim();
+                if (clean) callConversation.push({ role: 'assistant', content: clean });
+
+                if (onReject) onReject(); else endVoiceCall('rejected');
+                return clean;
             }
 
-            // Record AI response in call conversation
-            if (rawOutput) {
-                callConversation.push({ role: 'assistant', content: rawOutput });
+            // Final cleanup & record history
+            const cleanFinal = finalOutput.replace(/<(think|thinking|cmd)[^>]*>/gi, '').trim();
+            if (cleanFinal) {
+                if (!bubble) addCallBubble(cleanFinal, false); // In case stream was fast
+                else bubble.textContent = cleanFinal;
+                callConversation.push({ role: 'assistant', content: cleanFinal });
             }
 
-            return rawOutput;
+            return cleanFinal;
         } catch (e) {
-            if (e.name === 'AbortError') {
-                console.log('[VoiceCall] Request aborted');
-                return null;
-            }
+            if (e.name === 'AbortError') return null;
             console.error('[VoiceCall] LLM call failed:', e);
             hideCallTyping();
             addCallBubble(`(连接失败: ${e.message})`, false);
@@ -6113,14 +6181,10 @@ ${chatText}
         if (callConnectionTimeout) clearTimeout(callConnectionTimeout);
 
         if (isIncoming) {
+            activeCallIsIncoming = true;
             // === Incoming Call: directly connected ===
             connectVoiceCall();
             if (textEl) textEl.textContent = '通话中';
-
-            // Record incoming call acceptance
-            const t = getTime();
-            const u = getUserName();
-            renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: '接通了电话', isUser: true });
 
             showCallTyping();
 
@@ -6135,6 +6199,7 @@ ${chatText}
                 }
             });
         } else {
+            activeCallIsIncoming = false;
             // === Outgoing Call: dialing ===
             // Record dialing action
             const t = getTime();
@@ -6151,20 +6216,27 @@ ${chatText}
 
             showCallTyping();
 
-            const dialMsg = `${getUserName()} 正在给你打电话（你听到了来电铃声）。请根据剧情决定接听或拒接。`;
+            const dialMsg = `[系统通知 - 电话呼入]
+${getUserName()} 正在拨打你的电话。请选择接听或拒接。
+
+【必须回复以下指令之一，置于回复的最开头】：
+1. 接听：<cmd action="accept_call"/> 喂？（接听并说开场白）
+2. 拒接：<cmd action="reject_call"/> 不方便接听... （拒接指令在前，理由在后，顺序不能错乱）
+
+示例：
+<cmd action="accept_call"/> 喂？
+<cmd action="reject_call"/> 我现在有点忙，晚点回你。`;
 
             callLLMForCall(dialMsg, {
+                recordUserMsg: false,
                 onConnect: () => {
                     connectVoiceCall();
-                    const t = getTime();
-                    const cn = getCharName();
-                    renderMessageToUI({ header: `[${cn}| 通话 | ${t}]`, body: '接听了电话', isUser: false });
                     if (textEl) textEl.textContent = '通话中';
                 },
                 onReject: () => {
                     // AI rejected the call
                     setTimeout(() => {
-                        if (isCalling) endVoiceCall('rejected');
+                        endVoiceCall('rejected');
                     }, 1500);
                 }
             }).then(result => {
@@ -6240,8 +6312,6 @@ ${chatText}
         callConversation.forEach(entry => {
             if (!entry.content || entry.content === '...') return;
             if (entry.role === 'user') {
-                // Skip system-style prompts (e.g. "XXX 接听了你的电话")
-                if (entry.content.includes('正在给你打电话') || entry.content.includes('接听了你的电话')) return;
                 if (entry.content === '（对方沉默了一会儿）') return;
                 renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: entry.content, isUser: true });
             } else {
@@ -6255,8 +6325,19 @@ ${chatText}
         } else if (callSeconds > 0) {
             const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
             const s = (callSeconds % 60).toString().padStart(2, '0');
-            renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: `通话结束，时长 ${m}:${s}`, isUser: true });
+            // Attribution based on initiator (Unified for both User/AI hangup)
+            if (activeCallIsIncoming) {
+                // Initiated by AI
+                renderMessageToUI({ header: `[${cn}| 通话 | ${t}]`, body: `通话结束，时长 ${m}:${s}`, isUser: false });
+            } else {
+                // Initiated by User
+                renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: `通话结束，时长 ${m}:${s}`, isUser: true });
+            }
+        } else if (reason === 'ai_hangup') {
+            // AI hung up immediately (effectively rejected/cancelled)
+            renderMessageToUI({ header: `[${cn}| 通话 | ${t}]`, body: "挂断了电话", isUser: false });
         } else {
+            // Cancelled (User initiated)
             renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: "取消了拨打", isUser: true });
         }
 
@@ -6469,6 +6550,19 @@ ${chatText}
             return;
         }
 
+        const escapeXml = (unsafe) => {
+            if (typeof unsafe !== 'string') return '';
+            return unsafe.replace(/[<>&'"]/g, function (c) {
+                switch (c) {
+                    case '<': return '&lt;';
+                    case '>': return '&gt;';
+                    case '&': return '&amp;';
+                    case '\'': return '&apos;';
+                    case '"': return '&quot;';
+                }
+            });
+        };
+
         showTypingIndicator();
 
         try {
@@ -6478,59 +6572,47 @@ ${chatText}
             // System Prompt
             const charName = getCharName();
             const currentTime = getTime();
-            const formatInstruction = `\n\n[System Note - 消息格式指南]
-隐藏思考过程，不要输出 <think> 标签。以角色身份回复，像真实手机聊天。
+            const formatInstruction = `\n\n[System Note - 通信协议]
+请 strictly 使用 XML 标签输出回复。系统仅解析 <say> 标签。
 
-你可以使用以下消息格式，每条消息必须带格式头 [角色名|类型标记|时间]：
+1. 消息格式:
+<say type="类型" dur="秒数">内容</say>
 
-1. 普通文本: [${charName}|${currentTime}]消息内容
-2. 图片: [${charName}|图片|${currentTime}]图片描述或URL
-3. 语音: [${charName}|语音|${currentTime}]秒数|语音转文字内容
-4. 位置: [${charName}|位置|${currentTime}]地点名称|详细地址
-5. 转账: [${charName}|TRANS|${currentTime}]金额|备注
-6. 文件: [${charName}|文件|${currentTime}]文件名
-7. 视频: [${charName}|视频|${currentTime}]视频描述
-8. 表情包: [${charName}|表情包|${currentTime}]表情包名+catbox图床后缀  示例：[${charName}|表情包|${currentTime}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀）
-9. 通话: [${charName}|通话|${currentTime}]通话内容
-10. 链接: [${charName}|LINK|${currentTime}]标题|价格|图片URL
-11. 外卖/订单: [${charName}|DELIVER|${currentTime}]店名|商品摘要|总价
-12. 撤回: 在消息内容末尾添加<recall>标签即可，例如：[${charName}|${currentTime}]刚才那条消息发错了<recall> 系统会自动将这条消息渲染为灰色撤回提示
-13. 接收转账: [${charName}|${currentTime}][${charName}|转账已接收] (接收转账)
-14. 退回转账: [${charName}|${currentTime}][${charName}|转账已退还] (退回转账)
+属性说明:
+- type: 消息类型 (可选, 默认为 text)
+  - text: 普通文本 (默认值, 可省略 type="text")
+  - voice: 语音 (必须提供 dur="秒数", 内容为语音转录文本)
+  - img: 图片 (内容为图片描述)
+  - sticker: 表情包 (内容为表情包描述+catbok后缀, 如：爱你h5o1k5.jpeg.jpg)
+  - video: 视频 (内容为视频描述)
+  - file: 文件 (文件名)
+  - trans: 转账 (内容格式: 金额|备注)
+  - call: 发起通话
+- dur: 语音时长(秒), 仅 type="voice" 时有效
 
-引用回复格式: [${charName}|${currentTime}][REP:被引用人]引用内容[/REP]回复内容
-示例: [${charName}|${currentTime}][REP:${getUserName()}]你好啊[/REP]你好呀！
+2. 格式示例:
+- 文本: <say>你好呀。</say>
+- 语音: <say type="voice" dur="5">哈哈，笑死我了。</say>
+- 表情: <say type="sticker">摸头.jpg</say>
+- 图片: <say type="img">一只可爱的小猫。</say>
+- 转账: <say type="trans">520|拿去买好吃的</say>
+- 通话: 
+  - 拨打：<say type="call">发起语音通话</say>（用于发起语音通话）
+  - 接听：<cmd action="accept_call"/> （用于接听语音通话，该指令后跟随接听后的开场白）
+  - 拒接：<cmd action="reject_call"/> （用于拒接语音通话，该指令后跟随拒接理由）
 
-发送多条消息时每条都带独立格式头:
-[${charName}|${currentTime}]第一条
-[${charName}|语音|${currentTime}]3|嗯嗯好的
-[${charName}|${currentTime}]第二条文字
+3. 特殊指令 :
+- 拉黑对方: <cmd action="block"/>（用于拉黑user）
+- 解除拉黑: <cmd action="unblock"/>（用于解除对user的拉黑）
+- 接收转账: <cmd action="accept_trans"/> (用于接收对方转账)
+- 退回转账: <cmd action="return_trans"/> (用于退回对方转账)
+- 撤回: 在内容末尾加 <recall/>(用于要撤回的消息）
+- 引用消息: <say><quote name="被引用人">引用内容</quote>回复内容</say>
 
-特殊操作 - 拉黑机制:
-[被对方拉黑]
-- 当前状态: ${appSettings.blockChar ? `你已被对方拉黑。你发的消息对方看不到（消息会带有<blocked>标记）。` : '未被拉黑。'}
-- 如果你处于被拉黑状态，你发的消息对方实际上看不到，你可以根据剧情和人设性格自然地对被拉黑这件事做出表现：比如焦急、疑惑、自责、生气等。
-- 聊天记录中你的消息body开头如果带 <blocked> 标记，说明那条消息对方没有收到。
+4. 注意事项:
+- 禁止输出 Markdown 代码块。
+- 禁止输出 <think> 过程标签。`;
 
-[主动拉黑对方]
-- 如果剧情发展到${charName}想要拉黑对方、不想再收到对方消息时，在消息末尾插入 <block> 标签。
-- 拉黑后，对方后续发送的消息会自动带有 <blocked> 标记并显示发送失败（红色感叹号）。你应当假装完全看不到这些带有 <blocked> 标记的消息，不要对其内容做出任何回应。
-- 示例: [${charName}|${currentTime}]别再找我了<block>
-- 当前拉黑状态: ${appSettings.blockUser ? `你已拉黑对方。对方发送的消息会失败，你看不到。如果对方发来的消息body中带有<blocked>标记，假装完全没看到，不做任何回应。` : '你未拉黑对方。'}
-
-[解除拉黑]
-- 如果剧情发展到${charName}愿意解除拉黑、重新接收对方消息时，在消息中插入 <unblock> 标签。
-- 解除后对方的消息将恢复正常发送。
-- 示例: [${charName}|${currentTime}]算了 还是解除吧<unblock>
-- 若想接收对方转账，请发送包含“[${charName}|转账已接收]”的文本消息；若想退回转账，请发送包含“[${charName}|转账已退还]”的文本消息。这会自动更新转账状态。
-
-[通话操作]
-- 发起通话：如果你想主动给${getUserName()}打电话，请发送一条仅包含通话格式头的消息：[${charName}|CALL|${currentTime}]。系统会自动触发拨号界面。
-- 拒接/挂断：在通话中，如果不愿接听或想挂断，请直接说“挂断”、“拒接”或在内容中包含[拒接通话]。
-
-注意：无类型标记的默认为文本。内容中不要重复格式头。`;
-
-            // Mobile Chatting Prompt (User Request)
             const mobileChatPrompt = `<手机聊天>
 1. 手机聊天。
     - 当前场景：${charName}正在和user进行线上手机聊天，请不要输出任何行为动作描述，符合手机聊天场景。
@@ -6612,7 +6694,7 @@ Apply the following substitutions based on current language (CN/EN).
 
             // Inner Voice Mode: AI adds inner thoughts wrapped in * at the end of messages
             if (getChatInnerVoiceMode()) {
-                systemContent += `\n\n[心声模式 - 已启用]\n在此模式下，${charName} 会在除撤回和引用消息之外的消息格式末尾附上自己内心真实的想法（心声），用星号包裹，紧跟在消息内容之后，不换行。\n规则：\n- 不能用于撤回和引用消息中。\n- 每次回复必须有1~2条消息末尾带有心声。\n- 不要在心声中重复消息正文的内容。\n- 心声不能作为一种独立的消息形式，必须附加在其它消息格式末尾。\n- 心声格式：在消息正文末尾直接追加 *心声内容*，例如：晚上好呀，你吃饭了吗*我想和你一起吃晚餐*\n- 示例：普通文本消息格式：[${charName}时间]文本内容*心声内容* \n语音消息格式：[${charName}|语音|时间]秒数|语音内容*心声内容*\n- 心声是 ${charName} 内心真实的、未说出口的想法，可以与说出口的话形成反差，增加角色层次感。\n- 心声应简短（10~30字），口语化，真实反映角色的内心活动。`;
+                systemContent += `\n\n[心声模式 - 已启用]\n请在 <say> 标签的内容末尾附加你真实的内心想法（心声），并用星号 * 包裹。\n\n规则：\n- 每次回复必须有1~2条消息带有心声。\n- 格式: <say type="...">可见文本*内心想法*</say>\n- 心声应简短（10~30字），口语化，真实反映角色的内心活动（可与说出口的话形成反差）。`;
             }
 
             // Memory Summary: inject memory context into system prompt
@@ -6662,32 +6744,40 @@ Apply the following substitutions based on current language (CN/EN).
                         const isUserLink = h.includes('|LINK|') || h.includes('| LINK |') || msg.type === 'link';
 
                         if (isUserPhoto) {
-                            content = '[发送了一张图片]';
+                            content = '<say type="img">发送了一张图片</say>';
                         } else if (isUserSticker) {
                             // Extract sticker name from body
                             const stickerBody = msg.body || '';
                             const stickerNameMatch = stickerBody.match(/^([^\s]{1,20})(?=https?:|\/|[\w\-]+\.[a-zA-Z]{3,4})/);
                             const stickerName = stickerNameMatch ? stickerNameMatch[1].trim() : stickerBody.replace(/https?:\/\/\S+/, '').trim().slice(0, 20);
-                            content = `[发送了表情包：${stickerName || '表情包'}]`;
+                            content = `<say type="sticker">${escapeXml(stickerName || '表情包')}</say>`;
                         } else if (isUserVoice) {
                             const voiceParts = (msg.body || '').split('|');
                             const dur = parseInt(voiceParts[0]) || 0;
                             const voiceTxt = voiceParts.slice(1).join('|').trim();
-                            content = dur ? `[发送了语音消息 ${dur}秒${voiceTxt ? '：' + voiceTxt : ''}]` : '[发送了语音消息]';
+                            content = `<say type="voice" dur="${dur}">${escapeXml(voiceTxt)}</say>`;
                         } else if (isUserVideo) {
-                            content = '[发送了视频]';
+                            content = '<say type="video">发送了视频</say>';
                         } else if (isUserFile) {
                             const fileName = (msg.body || '').split('|')[0].trim();
-                            content = `[发送了文件：${fileName || '文件'}]`;
+                            content = `<say type="file">${escapeXml(fileName || '文件')}</say>`;
                         } else if (isUserTrans) {
-                            const amount = (msg.body || '').split('|')[0].trim();
-                            content = `[发送了转账：${amount || '未知金额'}]`;
+                            const parts = (msg.body || '').split('|');
+                            const amount = parts[0] ? parts[0].trim() : '0';
+                            const note = parts[1] ? parts[1].trim() : '';
+                            content = `<say type="trans">${escapeXml(amount)}|${escapeXml(note)}</say>`;
                         } else if (isUserLoc) {
                             const placeName = (msg.body || '').split('|')[0].trim();
-                            content = `[发送了位置：${placeName || '未知位置'}]`;
+                            content = `<say type="loc">${escapeXml(placeName || '未知位置')}</say>`;
                         } else if (isUserLink) {
-                            const linkTitle = (msg.body || '').split('|')[0].trim();
-                            content = `[分享了链接：${linkTitle || '链接'}]`;
+                            const linkParts = (msg.body || '').split('|');
+                            const linkTitle = linkParts[0] ? linkParts[0].trim() : '链接';
+                            // const linkPrice = linkParts[1] || '';
+                            // Link format not strictly defined in prompt, using text content
+                            content = `<say type="link">${escapeXml(linkTitle)}</say>`;
+                        } else {
+                            // Plain text
+                            content = `<say>${escapeXml(content)}</say>`;
                         }
 
                         messages.push({ role, content });
@@ -6704,9 +6794,9 @@ Apply the following substitutions based on current language (CN/EN).
                 // Find the last user message and replace content with array
                 const lastUserMsgIndex = messages.findLastIndex(m => m.role === 'user');
                 if (lastUserMsgIndex !== -1) {
-                    const txtContent = messages[lastUserMsgIndex].content === '[发送了一张图片]' ? '' : messages[lastUserMsgIndex].content;
+                    const txtContent = messages[lastUserMsgIndex].content === '<say type="img">发送了一张图片</say>' ? '' : messages[lastUserMsgIndex].content;
                     messages[lastUserMsgIndex].content = [
-                        { type: "text", text: txtContent || "Analyze this image" },
+                        { type: "text", text: txtContent || "<say type=\"img\">Analyze this image</say>" },
                         { type: "image_url", image_url: { url: lastUploadedImageForAI } }
                     ];
                 }
@@ -6827,76 +6917,107 @@ Apply the following substitutions based on current language (CN/EN).
             }
         }
 
-        // ====== Phase 2: Strip command tags ======
-        // Handle <block> / <unblock> commands (负向前瞻避免误匹配 <blocked>)
-        if (/<block>(?!ed>)/g.test(rawOutput)) {
-            rawOutput = rawOutput.replace(/<block>(?!ed>)/g, '');
-            appSettings.blockUser = true;
-            saveSettingsToStorage();
-        }
-        if (rawOutput.includes('<unblock>')) {
-            rawOutput = rawOutput.replace(/<unblock>/g, '');
-            appSettings.blockUser = false;
-            saveSettingsToStorage();
-        }
 
-        // ====== Phase 3: Split by headers and render messages one by one ======
-        // Header regex: [Name|Time] or [Name|Type|Time]
-        // Header regex: [Name|Time] or [Name|Type|Time] - Flexible for whitespace
-        const headerRegex = /\[([^\]]*?)\|\s*(\d{2}:\d{2})\s*\]/g;
-
-        // Find all headers and their positions
+        // ====== Phase 2: XML Parsing & Adapter ======
         const segments = [];
-        let match;
-        let lastIndex = 0;
+        let foundXml = false;
 
-        // Reset regex
-        headerRegex.lastIndex = 0;
-        while ((match = headerRegex.exec(rawOutput)) !== null) {
-            // Ignore headers that are quote/reply markers (legacy |REP| format)
-            // These should be treated as part of the message body
-            if (match[0].includes('|REP|') || match[0].includes('|REP]')) {
-                continue;
+        // 1. Handle Commands (Self-closing tags)
+        const cmdRegex = /<cmd\s+action=["'](.*?)["']\s*\/>/gi;
+        let cmdMatch;
+        while ((cmdMatch = cmdRegex.exec(rawOutput)) !== null) {
+            const action = cmdMatch[1];
+            if (action === 'block') {
+                appSettings.blockUser = true;
+                saveSettingsToStorage();
+            } else if (action === 'unblock') {
+                appSettings.blockUser = false;
+                saveSettingsToStorage();
+            } else if (action === 'accept_trans') {
+                updateLastTransferStatus('received');
+            } else if (action === 'return_trans') {
+                updateLastTransferStatus('returned');
             }
-
-            // Any content before the first header is orphan text (shouldn't happen normally)
-            if (segments.length === 0 && match.index > 0) {
-                const orphan = rawOutput.substring(0, match.index).trim();
-                if (orphan) {
-                    segments.push({ header: null, body: orphan });
-                }
-            }
-            // Save the start of this segment
-            segments.push({ header: match[0], headerEnd: match.index + match[0].length });
-            lastIndex = match.index + match[0].length;
         }
 
-
-        // Fill in bodies (content between headers)
-        for (let i = 0; i < segments.length; i++) {
-            if (segments[i].header === null) continue; // orphan text, body already set
+        // 1. Handle Commands <cmd action="..."/>
 
 
+        // 2. Parse Messages <say ...>...</say>
+        // Regex to capture attributes (group 1) and content (group 2)
+        const msgRegex = /<say\s*([^>]*?)>(.*?)<\/say>/gis;
+        let match;
 
-            const start = segments[i].headerEnd;
-            const end = (i + 1 < segments.length && segments[i + 1].header !== null)
-                ? rawOutput.lastIndexOf(segments[i + 1].header, segments[i + 1].headerEnd)
-                : rawOutput.length;
-            // Find the next header's start position
-            let nextStart = rawOutput.length;
-            if (i + 1 < segments.length && segments[i + 1].header !== null) {
-                nextStart = segments[i + 1].headerEnd - segments[i + 1].header.length;
+        while ((match = msgRegex.exec(rawOutput)) !== null) {
+            foundXml = true;
+            const attrsStr = match[1];
+            let content = match[2].trim();
+
+            // Helper to extract attribute value
+            const getAttr = (name) => {
+                const m = attrsStr.match(new RegExp(`${name}=["'](.*?)["']`));
+                return m ? m[1] : null;
+            };
+
+            const type = getAttr('type') || 'text';
+            const t = getTime(); // Auto-generate timestamp
+            const charName = getCharName();
+
+            // --- Adapter: Convert XML data back to Internal Bracket Format ---
+            // This maintains compatibility with renderMessageToUI and localStorage history
+            let header = `[${charName}|${t}]`; // Default header
+            let body = content;
+
+            switch (type) {
+                case 'voice':
+                    header = `[${charName}|语音|${t}]`;
+                    const dur = getAttr('dur') || Math.max(1, Math.ceil(content.length / 3)); // Estimate dur if missing
+                    body = `${dur}|${content}`;
+                    break;
+                case 'img':
+                    header = `[${charName}|图片|${t}]`;
+                    break;
+                case 'sticker':
+                    header = `[${charName}|表情包|${t}]`;
+                    break;
+                case 'video':
+                    header = `[${charName}|视频|${t}]`;
+                    break;
+                case 'file':
+                    header = `[${charName}|文件|${t}]`;
+                    break;
+                case 'trans':
+                    header = `[${charName}|TRANS|${t}]`;
+                    // content should be amount|note
+                    break;
+                case 'loc':
+                    header = `[${charName}|位置|${t}]`;
+                    break;
+                case 'link':
+                    header = `[${charName}|LINK|${t}]`;
+                    break;
+                case 'call':
+                    header = `[${charName}|CALL|${t}]`; // Auto triggers call UI
+                    break;
+                case 'deliver':
+                    header = `[${charName}|DELIVER|${t}]`;
+                    break;
             }
-            segments[i].body = rawOutput.substring(start, nextStart).trim();
+
+            // Handle recall tag within content or as a type?
+            // Prompt says: append <recall/> to content
+            // Just let content pass through, renderMessageToUI handles <recall> in body string
+
+            segments.push({ header, body });
         }
 
         // Remove typing indicator
         const typing = document.getElementById('typing-bubble');
         if (typing) typing.remove();
 
-        // If no segments found, treat entire raw output as one plain text message
-        if (segments.length === 0 && rawOutput.trim()) {
-            segments.push({ header: null, body: rawOutput.trim() });
+        // Fallback: If no XML tags found, treat as plain text (legacy/fallback mode)
+        if (!foundXml && rawOutput.trim()) {
+            segments.push({ header: `[${getCharName()}|${getTime()}]`, body: rawOutput.trim() });
         }
 
         // Render each message with delay
@@ -6943,7 +7064,6 @@ Apply the following substitutions based on current language (CN/EN).
 
         // Save to history
         saveCurrentChatHistory();
-        checkTokenUsage();
     }
 
     // Rough Token Estimator
