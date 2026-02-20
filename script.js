@@ -53,7 +53,8 @@
         apiKey: '',
         apiModel: 'gpt-3.5-turbo',
         apiTemperature: 1.0,
-        debugMode: false // 调试模式：显示AI原始输出
+        debugMode: false, // 调试模式：显示AI原始输出
+        friendRequests: [] // 好友申请列表 [{from: 'Name', message: '留言', timestamp: Date}]
     };
     let appSettings = { ...defaultAppSettings };
     let userCharacters = []; // New: To store user characters
@@ -673,6 +674,51 @@
         renderMessageList();
     }
 
+    function switchNavTab(tab) {
+        // Remove active class from all nav items
+        const navItems = document.querySelectorAll('.nav-item');
+        navItems.forEach(item => item.classList.remove('active'));
+
+        // Add active class to clicked nav item
+        const activeItem = document.querySelector(`.nav-item[onclick="switchNavTab('${tab}')"]`);
+        if (activeItem) activeItem.classList.add('active');
+
+        // Hide all bodies
+        const messageListBody = document.getElementById('message-list-body');
+        const contactsListBody = document.getElementById('contacts-list-body');
+        const momentsBody = document.getElementById('moments-body');
+        const meBody = document.getElementById('me-body');
+
+        if (messageListBody) messageListBody.style.display = 'none';
+        if (contactsListBody) contactsListBody.style.display = 'none';
+        if (momentsBody) momentsBody.style.display = 'none';
+        if (meBody) meBody.style.display = 'none';
+
+        // Show selected body
+        if (tab === 'message') {
+            if (messageListBody) messageListBody.style.display = 'block';
+            renderMessageList();
+        } else if (tab === 'contacts') {
+            if (contactsListBody) contactsListBody.style.display = 'block';
+            renderContacts();
+        } else if (tab === 'moments') {
+            if (momentsBody) momentsBody.style.display = 'block';
+            // renderMoments(); // Not implemented yet
+        } else if (tab === 'me') {
+            if (meBody) meBody.style.display = 'block';
+            // renderMe(); // Not implemented yet
+        }
+
+        // Update header title
+        const headerTitle = document.getElementById('message-list-header-title');
+        if (headerTitle) {
+            if (tab === 'message') headerTitle.textContent = '消息列表';
+            else if (tab === 'contacts') headerTitle.textContent = '通讯录';
+            else if (tab === 'moments') headerTitle.textContent = '动态';
+            else if (tab === 'me') headerTitle.textContent = '我';
+        }
+    }
+
     function openChat(targetTag, targetName) {
         // If no target is specified, do nothing in standalone mode.
         if (!targetTag) {
@@ -973,6 +1019,225 @@
         `;
             messageListBody.appendChild(item);
         });
+    }
+
+    function renderContacts() {
+        const contactsListBody = document.getElementById('contacts-list-body');
+        if (!contactsListBody) return;
+        contactsListBody.innerHTML = '';
+
+        // New Friends section
+        const newFriendsItem = document.createElement('div');
+        newFriendsItem.className = 'contacts-section-item';
+        newFriendsItem.onclick = () => openNewFriends();
+
+        // Check if there are pending friend requests
+        const hasRequests = (appSettings.friendRequests && appSettings.friendRequests.length > 0);
+
+        newFriendsItem.innerHTML = `
+            <div class="contacts-item-content">
+                <div class="contacts-item-icon">
+                    <div class="contacts-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/ri:user-add-line.svg'); mask-image: url('https://api.iconify.design/ri:user-add-line.svg');"></div>
+                </div>
+                <span class="contacts-item-name">新的朋友</span>
+                ${hasRequests ? '<div class="red-dot"></div>' : ''}
+            </div>
+            <div class="contacts-arrow">›</div>
+        `;
+        contactsListBody.appendChild(newFriendsItem);
+
+        // Groups section
+        const groupsItem = document.createElement('div');
+        groupsItem.className = 'contacts-section-item';
+        groupsItem.onclick = () => openGroupsList();
+
+        const groupCount = (appSettings.groups && appSettings.groups.length) || 0;
+
+        groupsItem.innerHTML = `
+            <div class="contacts-item-content">
+                <div class="contacts-item-icon">
+                    <div class="contacts-icon-image" style="-webkit-mask-image: url('https://api.iconify.design/ri:group-line.svg'); mask-image: url('https://api.iconify.design/ri:group-line.svg');"></div>
+                </div>
+                <span class="contacts-item-name">群聊</span>
+                <span class="contacts-item-count">${groupCount}</span>
+            </div>
+            <div class="contacts-arrow">›</div>
+        `;
+        contactsListBody.appendChild(groupsItem);
+
+        // Separator
+        const separator = document.createElement('div');
+        separator.className = 'contacts-separator';
+        contactsListBody.appendChild(separator);
+
+        // Private contacts
+        const placeholderAvatar = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+
+        function getInitial(str) {
+            if (!str) return '#';
+            const char = str.charAt(0);
+            if (/[a-zA-Z]/.test(char)) return char.toUpperCase();
+            const letters = 'ABCDEFGHJKLMNOPQRSTWXYZ'.split('');
+            const zh = '阿八嚓哒妸发旮哈讥咔垃妈拏噢妑七呥扨它穵夕丫帀'.split('');
+            if (char.localeCompare('阿', 'zh-Hans-CN') < 0 || char.localeCompare('帀', 'zh-Hans-CN') > 0) return '#';
+            for (let i = 0; i < zh.length - 1; i++) {
+                if (char.localeCompare(zh[i], 'zh-Hans-CN') >= 0 && char.localeCompare(zh[i + 1], 'zh-Hans-CN') < 0) {
+                    return letters[i];
+                }
+            }
+            if (char.localeCompare('帀', 'zh-Hans-CN') >= 0 && char.localeCompare('咗', 'zh-Hans-CN') < 0) return 'Z';
+            return '#';
+        }
+
+        if (appSettings.privateChats && Array.isArray(appSettings.privateChats)) {
+            const grouped = {};
+            appSettings.privateChats.forEach(name => {
+                let initial = getInitial(name);
+                if (!grouped[initial]) grouped[initial] = [];
+                grouped[initial].push(name);
+            });
+
+            const keys = Object.keys(grouped).sort((a, b) => {
+                if (a === '#') return 1;
+                if (b === '#') return -1;
+                return a.localeCompare(b);
+            });
+
+            keys.forEach(key => {
+                const header = document.createElement('div');
+                header.className = 'contacts-index-header';
+                header.textContent = key;
+                contactsListBody.appendChild(header);
+
+                grouped[key].sort((a, b) => a.localeCompare(b, 'zh-Hans-CN'));
+
+                grouped[key].forEach(name => {
+                    const contactItem = document.createElement('div');
+                    contactItem.className = 'contacts-contact-item';
+                    contactItem.onclick = () => openChat(`chat:${name}`, name);
+
+                    // Get avatar
+                    let contactAvatar = placeholderAvatar;
+                    const npc = npcCharacters.find(n => n.name === name);
+                    if (npc && npc.avatar) {
+                        contactAvatar = npc.avatar;
+                    } else {
+                        const user = userCharacters.find(u => u.name === name);
+                        if (user && user.avatar) {
+                            contactAvatar = user.avatar;
+                        }
+                    }
+
+                    contactItem.innerHTML = `
+                        <img class="contacts-contact-avatar" src="${contactAvatar}">
+                        <span class="contacts-contact-name">${name}</span>
+                        <div class="contacts-arrow">›</div>
+                    `;
+                    contactsListBody.appendChild(contactItem);
+                });
+            });
+        }
+    }
+
+    function openNewFriends() {
+        // Open new friends modal or screen
+        // For now, show a simple alert
+        if (appSettings.friendRequests && appSettings.friendRequests.length > 0) {
+            showFriendRequestsModal();
+        } else {
+            showToast('暂无新的朋友申请');
+        }
+    }
+
+    function openGroupsList() {
+        // Open groups list modal or screen
+        showGroupsListModal();
+    }
+
+    function showFriendRequestsModal() {
+        // Create modal for friend requests
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content friend-requests-modal">
+                <div class="modal-header">
+                    <span class="modal-title">新的朋友</span>
+                    <div class="modal-close" onclick="closeModal(this)">×</div>
+                </div>
+                <div class="modal-body">
+                    ${appSettings.friendRequests && appSettings.friendRequests.length > 0
+                ? appSettings.friendRequests.map(request => `
+                            <div class="friend-request-item">
+                                <div class="friend-request-info">
+                                    <div class="friend-request-name">${request.from}</div>
+                                    <div class="friend-request-message">${request.message || '申请加为好友'}</div>
+                                    <div class="friend-request-time">${new Date(request.timestamp).toLocaleString()}</div>
+                                </div>
+                                <div class="friend-request-actions">
+                                    <button class="btn-accept" onclick="acceptFriendRequest('${request.from}')">接受</button>
+                                    <button class="btn-reject" onclick="rejectFriendRequest('${request.from}')">拒绝</button>
+                                </div>
+                            </div>
+                        `).join('')
+                : '<div class="no-requests">暂无新的朋友申请</div>'
+            }
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.classList.add('show');
+    }
+
+    function showGroupsListModal() {
+        // Create modal for groups list
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal-content groups-list-modal">
+                <div class="modal-header">
+                    <span class="modal-title">群聊列表</span>
+                    <div class="modal-close" onclick="closeModal(this)">×</div>
+                </div>
+                <div class="modal-body">
+                    ${appSettings.groups && appSettings.groups.length > 0
+                ? appSettings.groups.map(group => `
+                            <div class="group-list-item" onclick="closeModal(this); openChat('group:${group.name}', '${group.name}')">
+                                <div class="group-list-info">
+                                    <div class="group-list-name">${group.name}</div>
+                                    <div class="group-list-members">${group.members ? group.members.length : 0}人</div>
+                                </div>
+                                <div class="contacts-arrow">›</div>
+                            </div>
+                        `).join('')
+                : '<div class="no-groups">暂无群聊</div>'
+            }
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.classList.add('show');
+    }
+
+    function acceptFriendRequest(from) {
+        // Add to private chats
+        if (!appSettings.privateChats.includes(from)) {
+            appSettings.privateChats.push(from);
+        }
+        // Remove from requests
+        appSettings.friendRequests = appSettings.friendRequests.filter(r => r.from !== from);
+        saveSettings();
+        renderContacts();
+        closeModal(document.querySelector('.friend-requests-modal'));
+        showToast(`已接受 ${from} 的好友申请`);
+    }
+
+    function rejectFriendRequest(from) {
+        // Remove from requests
+        appSettings.friendRequests = appSettings.friendRequests.filter(r => r.from !== from);
+        saveSettings();
+        renderContacts();
+        closeModal(document.querySelector('.friend-requests-modal'));
+        showToast(`已拒绝 ${from} 的好友申请`);
     }
 
     function openSettings() {
@@ -2605,7 +2870,7 @@ ${chatText}
         // Sticker Library
         if (myStickerList && myStickerList.length > 0) {
             // Base instruction text
-            const stickerInst = `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：<say type="sticker">表情包名+catbox图床后缀</say> 示例：<say type="sticker">抱抱31onrh.jpeg</say> （注意，不可捏造列表中没有的表情包和后缀\n`;
+            const stickerInst = `\n[可用表情包 (Sticker Library)]\n你可以使用以下表情包。如果要发送表情包，请严格使用格式：[${charName}|表情包|时间]表情包名+catbox图床后缀 示例：[${charName}|表情包|${getTime()}]抱抱31onrh.jpeg （注意，不可捏造列表中没有的表情包和后缀\n`;
             systemTokens += estimateTokens(stickerInst);
             myStickerList.forEach(s => {
                 systemTokens += estimateTokens(`- ${s.name}: ${s.url}\n`);
@@ -2724,7 +2989,14 @@ ${chatText}
         showToast('聊天内容已清空');
     }
 
-    function closeModal() {
+    function closeModal(element) {
+        if (element) {
+            const overlay = element.closest('.modal-overlay');
+            if (overlay) {
+                overlay.remove();
+                return;
+            }
+        }
         // If input modal is visible, close ONLY the input modal
         if (modal && modal.classList.contains('show')) {
             modal.classList.remove('show');
@@ -3153,8 +3425,8 @@ ${chatText}
         let finalBody = text;
         const hasQuote = !!currentQuote;
         if (currentQuote) {
-            // Prepend quote to text (XML format)
-            finalBody = `<quote name="${currentQuote.name.replace(/"/g, '&quot;')}">${currentQuote.content}</quote>${text}`;
+            // Prepend quote to text (legacy format was input injection)
+            finalBody = `[REP:${currentQuote.name}]${currentQuote.content}[/REP]${text}`;
             cancelQuote(); // Clear UI and state
         }
 
@@ -3375,15 +3647,6 @@ ${chatText}
     // ====== Quote/Reply Parsing Utilities ======
     function parseQuote(body) {
         if (!body) return null;
-        // XML format: <quote name="Name">Content</quote>Reply
-        const xmlMatch = body.match(/^<quote name=["'](.*?)["']>([\s\S]*?)<\/quote>([\s\S]*)$/);
-        if (xmlMatch) {
-            return {
-                quoteName: xmlMatch[1].trim(),
-                quoteContent: xmlMatch[2].trim(),
-                replyBody: xmlMatch[3].trim()
-            };
-        }
         // New format: [REP:名字]引用内容[/REP]回复内容
         const newMatch = body.match(/^\[REP:(.*?)\]([\s\S]*?)\[\/REP\]([\s\S]*)$/);
         if (newMatch) {
@@ -3988,7 +4251,7 @@ ${chatText}
         } else {
             el = document.createElement('div'); el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'} `;
             const textHtml = displayBody ? `<div class="msg-text">${displayBody.replace(/\n/g, '<br>')}</div>` : '';
-            el.innerHTML = textHtml;
+            el.innerHTML = textHtml + quoteHtml;
             el.dataset.rawBody = rawBodyForHistory;
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; el.style.color = appSettings.userText; }
             else { el.style.backgroundColor = appSettings.charBubble; el.style.color = appSettings.charText; }
@@ -4040,14 +4303,6 @@ ${chatText}
         metaContainer.appendChild(timeEl);
 
         addLongPressHandler(el);
-        if (parsedQuote) {
-            const quoteEl = document.createElement('div');
-            quoteEl.className = 'msg-thought msg-quote-external';
-            quoteEl.style.marginBottom = '2px';
-            quoteEl.innerHTML = `<span style="opacity:0.75;margin-right:4px;">${parsedQuote.quoteName}:</span>${parsedQuote.quoteContent}`;
-            container.appendChild(quoteEl);
-        }
-
         wrapper.appendChild(el); wrapper.appendChild(metaContainer); container.appendChild(wrapper);
 
         if (displayThought) {
@@ -4144,21 +4399,10 @@ ${chatText}
         if (existing) existing.remove();
 
         const u = getCharName();
-        let avatarSrc;
-
-        // 1. Try to find by name in NPCs (First Priority)
-        const npc = npcCharacters.find(n => n.name === u);
-        if (npc && npc.avatar) {
-            avatarSrc = npc.avatar;
-        }
-
-        // 2. Fallback to memberAvatars
-        if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[u]) {
+        let avatarSrc = appSettings.charAvatar;
+        if (appSettings.memberAvatars && appSettings.memberAvatars[u]) {
             avatarSrc = appSettings.memberAvatars[u];
         }
-
-        // 3. Fallback to global setting
-        if (!avatarSrc) avatarSrc = appSettings.charAvatar;
 
         const row = document.createElement('div');
         row.id = 'typing-bubble';
@@ -4351,13 +4595,7 @@ ${chatText}
         let recallText = `${displayName}撤回了一条${typeText}`;
         // For text messages, show the recalled content
         if (typeText === '消息' && rawBody.trim()) {
-            let contentToShow = rawBody.trim();
-            // Try to parse quote to hide XML tags
-            const parsed = parseQuote(contentToShow);
-            if (parsed) {
-                contentToShow = `[引用] ${parsed.replyBody}`;
-            }
-            recallText += `：${contentToShow}`;
+            recallText += `：${rawBody.trim()}`;
         }
 
         // Build recall notice element
@@ -4565,6 +4803,8 @@ ${chatText}
             if (content.length > 20) content = content.substring(0, 20) + '...';
         }
 
+        // New format: [REP:名字]引用内容[/REP]
+        // Instead of injecting into input, show preview
         showQuotePreview(name, content);
         const input = document.getElementById('message-input');
         input.focus();
@@ -4626,26 +4866,8 @@ ${chatText}
                     quoteHtml = buildQuoteHtml(parsedQuote);
                 }
 
-                el.innerHTML = displayBody.replace(/\n/g, '<br>');
+                el.innerHTML = quoteHtml + displayBody.replace(/\n/g, '<br>');
                 el.dataset.rawBody = newText;
-
-                // Handle external quote update
-                const container = el.closest('.msg-container');
-                const wrapper = el.closest('.msg-wrapper');
-                if (container && wrapper) {
-                    // Remove existing external quote
-                    const existingQuote = container.querySelector('.msg-quote-external');
-                    if (existingQuote) existingQuote.remove();
-
-                    // Add new external quote if present
-                    if (parsedQuote) {
-                        const quoteEl = document.createElement('div');
-                        quoteEl.className = 'msg-thought msg-quote-external';
-                        quoteEl.style.marginBottom = '2px';
-                        quoteEl.innerHTML = `<span style="opacity:0.75;margin-right:4px;">${parsedQuote.quoteName}:</span>${parsedQuote.quoteContent}`;
-                        container.insertBefore(quoteEl, wrapper);
-                    }
-                }
             } else if (el.classList.contains('location-card')) {
                 el.querySelector('.location-name').textContent = newText;
             } else if (el.classList.contains('file-card')) {
@@ -5768,6 +5990,7 @@ ${chatText}
     // Attach globally
     window.openChat = openChat;
     window.openMessageList = openMessageList;
+    window.switchNavTab = switchNavTab;
     window.goBack = goBack;
     window.openSettings = openSettings;
     window.closeSettings = closeSettings;
@@ -5820,6 +6043,13 @@ ${chatText}
     window.toggleCharTimezone = toggleCharTimezone;
     window.updateCharTimePreview = updateCharTimePreview;
     window.openDataSettings = openDataSettings;
+    window.renderContacts = renderContacts;
+    window.openNewFriends = openNewFriends;
+    window.openGroupsList = openGroupsList;
+    window.showFriendRequestsModal = showFriendRequestsModal;
+    window.showGroupsListModal = showGroupsListModal;
+    window.acceptFriendRequest = acceptFriendRequest;
+    window.rejectFriendRequest = rejectFriendRequest;
     window.closeDataSettings = closeDataSettings;
     window.saveDataSettings = saveDataSettings;
     // Memory Summary System
@@ -5864,102 +6094,8 @@ ${chatText}
         updateStatusBar(screenId);
     }
 
-    // ====== LLM API Helper (Shared) ======
-    async function fetchLLMStream(messages, onChunk, signal) {
-        if (!appSettings.apiEndpoint) throw new Error('API not configured');
-        const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
-        const key = appSettings.apiKey;
-        const model = appSettings.apiModel;
-
-        const headers = { 'Content-Type': 'application/json' };
-        if (key) headers['Authorization'] = `Bearer ${key}`;
-
-        const res = await fetch(`${endpoint}/chat/completions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-                model: model,
-                messages: messages,
-                temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
-                stream: true
-            }),
-            signal: signal
-        });
-
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`API Error ${res.status}: ${txt}`);
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let streamBuffer = '';
-        let isThinking = false;
-        let rawOutput = '';
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            streamBuffer += chunk;
-            const lines = streamBuffer.split('\n');
-            streamBuffer = lines.pop();
-
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
-                const dataStr = line.slice(6);
-                if (dataStr === '[DONE]') continue;
-
-                try {
-                    const data = JSON.parse(dataStr);
-                    const delta = data.choices[0].delta;
-                    if (delta.reasoning_content) continue; // Skip DeepSeek reasoning
-
-                    if (delta.content) {
-                        let content = delta.content;
-
-                        // Handle <think> tags logic
-                        if (isThinking) {
-                            const endIdx = content.indexOf('</think>');
-                            if (endIdx !== -1) {
-                                content = content.substring(endIdx + 8);
-                                isThinking = false;
-                            } else {
-                                continue;
-                            }
-                        }
-
-                        const thinkStart = content.indexOf('<think>');
-                        if (thinkStart !== -1) {
-                            const before = content.substring(0, thinkStart);
-                            if (before) {
-                                rawOutput += before;
-                                onChunk(before, rawOutput);
-                            }
-                            const afterThink = content.substring(thinkStart + 7);
-                            const thinkEnd = afterThink.indexOf('</think>');
-                            if (thinkEnd !== -1) {
-                                const finalContent = afterThink.substring(thinkEnd + 8);
-                                rawOutput += finalContent;
-                                onChunk(finalContent, rawOutput);
-                            } else {
-                                isThinking = true;
-                            }
-                        } else {
-                            rawOutput += content;
-                            onChunk(content, rawOutput);
-                        }
-                    }
-                } catch (e) { }
-            }
-        }
-        return rawOutput;
-    }
-
     // ====== Voice Call System (Refactored) ======
     let isCalling = false;
-    let activeCallIsIncoming = false; // Track who initiated: false=User, true=AI
     let callTimerInterval = null;
     let callSeconds = 0;
     let callConnectionTimeout = null;
@@ -5978,12 +6114,10 @@ ${chatText}
 回复规则：
 1. 以语音通话的口吻回复，简短、口语化，像真人打电话一样自然。
 2. 直接输出角色说的话，不要带任何格式头（如 [名字|时间] 等）。
-3. 禁止输出动作描写、心声、旁白。
-4. 允许输出控制指令（如 <cmd .../>），除指令外只能输出语音内容。
-5. 声音描写（如笑声、叹气、停顿等）用括号包裹，如：（笑）、（叹气）、（沉默了一会儿）。
-6. 每次回复只需要1-3句话，保持简短。
-7. 如果你想主动挂断电话，请在回复末尾输出 <cmd action="hangup_call"/>。
-8. 你的回复将直接显示在通话界面的字幕中。`;
+3. 禁止输出动作描写、心声、旁白。只能输出语音内容。
+4. 声音描写（如笑声、叹气、停顿等）用括号包裹，如：（笑）、（叹气）、（沉默了一会儿）。
+5. 每次回复只需要1-3句话，保持简短。
+6. 你的回复将直接显示在通话界面的字幕中。`;
 
         const messages = [{ role: 'system', content: systemPrompt }];
 
@@ -6028,96 +6162,163 @@ ${chatText}
             return null; // Signal caller to use fallback
         }
 
-        const { onConnect, onReject, recordUserMsg = true } = options;
+        const { onConnect, onReject } = options;
 
-        // Record user message in call conversation (unless suppressed)
-        if (userMsg && recordUserMsg) {
+        // Record user message in call conversation
+        if (userMsg) {
             callConversation.push({ role: 'user', content: userMsg });
-        } else if (userMsg && !recordUserMsg) {
-            // If not recording, we pass it as 'extraUserMsg' to buildCallMessages or manually handle context?
-            // Actually buildCallMessages reads from callConversation + extraUserMsg.
-            // So if we don't push to callConversation, we must pass it as extraUserMsg to buildCallMessages
-            // But wait, buildCallMessages takes extraUserMsg as argument.
-            // We need to pass userMsg as the argument to buildCallMessages below.
         }
 
-        // If recordUserMsg is false, we pass userMsg as 'extraUserMsg' (the argument to buildCallMessages)
-        // If recordUserMsg is true, we already pushed it, so we pass null to buildCallMessages (to avoid double entry)
-        // Actually buildCallMessages pushes extraUserMsg at the end.
-
-        const messages = buildCallMessages(recordUserMsg ? null : userMsg);
+        const messages = buildCallMessages(null); // Already added to callConversation
 
         try {
             callAbortController = new AbortController();
-            let bubble = null;
+
+            const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
+            const key = appSettings.apiKey;
+            const model = appSettings.apiModel;
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (key) headers['Authorization'] = `Bearer ${key}`;
+
+            const res = await fetch(`${endpoint}/chat/completions`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    model: model,
+                    messages: messages,
+                    temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
+                    stream: true
+                }),
+                signal: callAbortController.signal
+            });
+
+            if (!res.ok) {
+                const txt = await res.text();
+                throw new Error(`API Error ${res.status}: ${txt}`);
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+
+            let rawOutput = '';
+            let streamBuffer = '';
+            let isThinking = false;
             let connected = false;
+            let bubble = null; // Lazy creation: only create when we have visible content
 
-            const finalOutput = await fetchLLMStream(messages, (chunk, fullText) => {
-                if (!isCalling) {
-                    if (callAbortController) callAbortController.abort();
-                    return;
+            while (true) {
+                if (!isCalling) break; // Call ended during streaming
+
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                streamBuffer += chunk;
+                const lines = streamBuffer.split('\n');
+                streamBuffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const dataStr = line.slice(6);
+                    if (dataStr === '[DONE]') continue;
+
+                    try {
+                        const data = JSON.parse(dataStr);
+                        const delta = data.choices[0].delta;
+
+                        // Skip reasoning_content (DeepSeek R1)
+                        if (delta.reasoning_content) continue;
+
+                        if (delta.content) {
+                            let content = delta.content;
+
+                            // Handle <think> tags
+                            if (isThinking) {
+                                const endIdx = content.indexOf('</think>');
+                                if (endIdx !== -1) {
+                                    content = content.substring(endIdx + 8);
+                                    isThinking = false;
+                                } else {
+                                    continue;
+                                }
+                            }
+
+                            const thinkStart = content.indexOf('<think>');
+                            if (thinkStart !== -1) {
+                                const before = content.substring(0, thinkStart);
+                                rawOutput += before;
+                                const afterThink = content.substring(thinkStart + 7);
+                                const thinkEnd = afterThink.indexOf('</think>');
+                                if (thinkEnd !== -1) {
+                                    rawOutput += afterThink.substring(thinkEnd + 8);
+                                } else {
+                                    isThinking = true;
+                                }
+                            } else {
+                                rawOutput += content;
+                            }
+
+                            // Only create bubble when we have actual visible content
+                            const trimmed = rawOutput.trim();
+                            if (trimmed && !bubble) {
+                                hideCallTyping();
+                                bubble = addCallBubble('', false);
+                            }
+                            if (bubble && trimmed) {
+                                bubble.textContent = trimmed;
+                                const container = document.getElementById('call-chat-container');
+                                if (container) container.scrollTop = container.scrollHeight;
+                            }
+
+                            // Check for reject/accept keywords during dialing phase
+                            if (!connected && onConnect) {
+                                const lowerOutput = rawOutput.toLowerCase();
+                                if (lowerOutput.includes('拒接通话') || lowerOutput.includes('拒绝通话') || lowerOutput.includes('挂断')) {
+                                    if (onReject) onReject();
+                                    // Still let stream finish to display response
+                                } else if (rawOutput.length > 2 && !lowerOutput.includes('拒接') && !lowerOutput.includes('拒绝')) {
+                                    // AI responded without rejecting = accepted
+                                    connected = true;
+                                    onConnect();
+                                }
+                            }
+                        }
+                    } catch (e) { /* parse error, skip */ }
                 }
-
-                // Check commands
-                if (fullText.includes('<cmd action="reject_call"/>')) {
-                    // Defer rejection until stream ends to capture full explanation
-                    // Hide any typing/bubble activity during this phase
-                    hideCallTyping();
-                    return;
-                } else if (fullText.includes('<cmd action="hangup_call"/>')) {
-                    const clean = fullText.replace(/<(think|thinking|cmd)[^>]*>/gi, '').trim();
-                    if (clean) callConversation.push({ role: 'assistant', content: clean });
-
-                    endVoiceCall('ai_hangup');
-                    isCalling = false;
-                    callAbortController.abort();
-                    return;
-                } else if (!connected && onConnect) {
-                    if (fullText.includes('<cmd action="accept_call"/>')) {
-                        connected = true; onConnect();
-                    } else if (fullText.length > 15 && !fullText.includes('<cmd')) {
-                        connected = true; onConnect();
-                    }
-                }
-
-                // Clean output for display logic: Remove complete tags AND trailing incomplete tags to prevent flicker
-                const cleanText = fullText
-                    .replace(/<(think|thinking|cmd)[^>]*>/gi, '') // Remove complete known tags
-                    .replace(/<(think|thinking|cmd)[^>]*$/gi, '') // Remove incomplete known tags at end
-                    .trim();
-
-                hideCallTyping();
-                if (!bubble && cleanText) {
-                    bubble = addCallBubble(cleanText, false);
-                } else if (bubble) {
-                    bubble.textContent = cleanText;
-                    const container = document.getElementById('call-chat-container');
-                    if (container) container.scrollTop = container.scrollHeight;
-                }
-            }, callAbortController.signal);
-
-            if (!finalOutput) return null;
-
-            // Handle deferred rejection
-            if (finalOutput.includes('<cmd action="reject_call"/>')) {
-                const clean = finalOutput.replace(/<(think|thinking|cmd)[^>]*>/gi, '').trim();
-                if (clean) callConversation.push({ role: 'assistant', content: clean });
-
-                if (onReject) onReject(); else endVoiceCall('rejected');
-                return clean;
             }
 
-            // Final cleanup & record history
-            const cleanFinal = finalOutput.replace(/<(think|thinking|cmd)[^>]*>/gi, '').trim();
-            if (cleanFinal) {
-                if (!bubble) addCallBubble(cleanFinal, false); // In case stream was fast
-                else bubble.textContent = cleanFinal;
-                callConversation.push({ role: 'assistant', content: cleanFinal });
+            // Clean the final output (Enhanced Regex)
+            rawOutput = rawOutput.replace(/<(think|thinking)[\s\S]*?<\/(think|thinking)>/gi, '').trim();
+
+            // Ensure typing indicator is hidden
+            hideCallTyping();
+
+            // Handle bubble display
+            if (!bubble) {
+                // Bubble was never created (all output was thinking/empty)
+                if (rawOutput) {
+                    bubble = addCallBubble(rawOutput, false);
+                } else {
+                    bubble = addCallBubble('...', false);
+                }
+            } else if (!rawOutput) {
+                bubble.textContent = '...';
+            } else {
+                bubble.textContent = rawOutput;
             }
 
-            return cleanFinal;
+            // Record AI response in call conversation
+            if (rawOutput) {
+                callConversation.push({ role: 'assistant', content: rawOutput });
+            }
+
+            return rawOutput;
         } catch (e) {
-            if (e.name === 'AbortError') return null;
+            if (e.name === 'AbortError') {
+                console.log('[VoiceCall] Request aborted');
+                return null;
+            }
             console.error('[VoiceCall] LLM call failed:', e);
             hideCallTyping();
             addCallBubble(`(连接失败: ${e.message})`, false);
@@ -6172,16 +6373,10 @@ ${chatText}
         const targetName = getCharName();
         if (nameEl) nameEl.textContent = targetName;
 
-        let avatarSrc;
-        const npc = npcCharacters.find(n => n.name === targetName);
-        if (npc && npc.avatar) {
-            avatarSrc = npc.avatar;
-        }
-
-        if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
+        let avatarSrc = appSettings.charAvatar;
+        if (appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
             avatarSrc = appSettings.memberAvatars[targetName];
         }
-        if (!avatarSrc) avatarSrc = appSettings.charAvatar;
         if (avatarEl) avatarEl.src = avatarSrc;
 
         // Clear Call Chat Container
@@ -6198,10 +6393,14 @@ ${chatText}
         if (callConnectionTimeout) clearTimeout(callConnectionTimeout);
 
         if (isIncoming) {
-            activeCallIsIncoming = true;
             // === Incoming Call: directly connected ===
             connectVoiceCall();
             if (textEl) textEl.textContent = '通话中';
+
+            // Record incoming call acceptance
+            const t = getTime();
+            const u = getUserName();
+            renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: '接通了电话', isUser: true });
 
             showCallTyping();
 
@@ -6216,7 +6415,6 @@ ${chatText}
                 }
             });
         } else {
-            activeCallIsIncoming = false;
             // === Outgoing Call: dialing ===
             // Record dialing action
             const t = getTime();
@@ -6233,27 +6431,20 @@ ${chatText}
 
             showCallTyping();
 
-            const dialMsg = `[系统通知 - 电话呼入]
-${getUserName()} 正在拨打你的电话。请选择接听或拒接。
-
-【必须回复以下指令之一，置于回复的最开头】：
-1. 接听：<cmd action="accept_call"/> 喂？（接听并说开场白）
-2. 拒接：<cmd action="reject_call"/> 不方便接听... （拒接指令在前，理由在后，顺序不能错乱）
-
-示例：
-<cmd action="accept_call"/> 喂？
-<cmd action="reject_call"/> 我现在有点忙，晚点回你。`;
+            const dialMsg = `${getUserName()} 正在给你打电话（你听到了来电铃声）。请根据剧情决定接听或拒接。`;
 
             callLLMForCall(dialMsg, {
-                recordUserMsg: false,
                 onConnect: () => {
                     connectVoiceCall();
+                    const t = getTime();
+                    const cn = getCharName();
+                    renderMessageToUI({ header: `[${cn}| 通话 | ${t}]`, body: '接听了电话', isUser: false });
                     if (textEl) textEl.textContent = '通话中';
                 },
                 onReject: () => {
                     // AI rejected the call
                     setTimeout(() => {
-                        endVoiceCall('rejected');
+                        if (isCalling) endVoiceCall('rejected');
                     }, 1500);
                 }
             }).then(result => {
@@ -6329,6 +6520,8 @@ ${getUserName()} 正在拨打你的电话。请选择接听或拒接。
         callConversation.forEach(entry => {
             if (!entry.content || entry.content === '...') return;
             if (entry.role === 'user') {
+                // Skip system-style prompts (e.g. "XXX 接听了你的电话")
+                if (entry.content.includes('正在给你打电话') || entry.content.includes('接听了你的电话')) return;
                 if (entry.content === '（对方沉默了一会儿）') return;
                 renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: entry.content, isUser: true });
             } else {
@@ -6342,19 +6535,8 @@ ${getUserName()} 正在拨打你的电话。请选择接听或拒接。
         } else if (callSeconds > 0) {
             const m = Math.floor(callSeconds / 60).toString().padStart(2, '0');
             const s = (callSeconds % 60).toString().padStart(2, '0');
-            // Attribution based on initiator (Unified for both User/AI hangup)
-            if (activeCallIsIncoming) {
-                // Initiated by AI
-                renderMessageToUI({ header: `[${cn}| 通话 | ${t}]`, body: `通话结束，时长 ${m}:${s}`, isUser: false });
-            } else {
-                // Initiated by User
-                renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: `通话结束，时长 ${m}:${s}`, isUser: true });
-            }
-        } else if (reason === 'ai_hangup') {
-            // AI hung up immediately (effectively rejected/cancelled)
-            renderMessageToUI({ header: `[${cn}| 通话 | ${t}]`, body: "挂断了电话", isUser: false });
+            renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: `通话结束，时长 ${m}:${s}`, isUser: true });
         } else {
-            // Cancelled (User initiated)
             renderMessageToUI({ header: `[${u}| 通话 | ${t}]`, body: "取消了拨打", isUser: true });
         }
 
@@ -6427,16 +6609,10 @@ ${getUserName()} 正在拨打你的电话。请选择接听或拒接。
         const targetName = getCharName();
         if (nameEl) nameEl.textContent = targetName;
 
-        let avatarSrc;
-        const npc = npcCharacters.find(n => n.name === targetName);
-        if (npc && npc.avatar) {
-            avatarSrc = npc.avatar;
-        }
-
-        if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
+        let avatarSrc = appSettings.charAvatar;
+        if (appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
             avatarSrc = appSettings.memberAvatars[targetName];
         }
-        if (!avatarSrc) avatarSrc = appSettings.charAvatar;
         if (avatarEl) avatarEl.src = avatarSrc;
 
         // Log incoming call event
@@ -6573,19 +6749,6 @@ ${getUserName()} 正在拨打你的电话。请选择接听或拒接。
             return;
         }
 
-        const escapeXml = (unsafe) => {
-            if (typeof unsafe !== 'string') return '';
-            return unsafe.replace(/[<>&'"]/g, function (c) {
-                switch (c) {
-                    case '<': return '&lt;';
-                    case '>': return '&gt;';
-                    case '&': return '&amp;';
-                    case '\'': return '&apos;';
-                    case '"': return '&quot;';
-                }
-            });
-        };
-
         showTypingIndicator();
 
         try {
@@ -6596,46 +6759,57 @@ ${getUserName()} 正在拨打你的电话。请选择接听或拒接。
             const charName = getCharName();
             const currentTime = getTime();
             const formatInstruction = `\n\n[System Note - 通信协议]
-请 strictly 使用 XML 标签输出回复。系统仅解析 <say> 标签。
+请严格遵守 XML 标签格式输出回复。系统仅解析 <msg> 标签，其他格式将被丢弃。
 
-1. 消息格式:
-<say type="类型" dur="秒数">内容</say>
+1. 消息格式 (必须包裹在 msg 标签中):
+<msg t="HH:mm" type="类型" dur="秒数">内容</msg>
 
 属性说明:
-- type: 消息类型 (可选, 默认为 text)
-  - text: 普通文本 (默认值, 可省略 type="text")
-  - voice: 语音 (必须提供 dur="秒数", 内容为语音转录文本)
+- t: 当前时间 (必填, 格式 HH:mm)
+- type: 消息类型 (默认为 text)
+  - text: 普通文本
+  - voice: 语音 (必须提供 dur="秒数" 属性, 内容为语音转录文本)
   - img: 图片 (内容为图片描述)
-  - sticker: 表情包 (内容为表情包描述+catbok后缀, 如：爱你h5o1k5.jpeg.jpg)
-  - video: 视频 (内容为视频描述)
-  - file: 文件 (文件名)
+  - sticker: 表情包 (内容为表情包描述+catbox后缀，如：爱你h5o1k5.jpeg)
+  - video: 视频
+  - file: 文件
   - trans: 转账 (内容格式: 金额|备注)
   - call: 发起通话
 - dur: 语音时长(秒), 仅 type="voice" 时有效
 
 2. 格式示例:
-- 文本: <say>你好呀。</say>
-- 语音: <say type="voice" dur="5">哈哈，笑死我了。</say>
-- 表情: <say type="sticker">摸头.jpg</say>
-- 图片: <say type="img">一只可爱的小猫。</say>
-- 转账: <say type="trans">520|拿去买好吃的</say>
-- 通话: 
-  - 拨打：<say type="call">发起语音通话</say>（用于发起语音通话）
-  - 接听：<cmd action="accept_call"/> （用于接听语音通话，该指令后跟随接听后的开场白）
-  - 拒接：<cmd action="reject_call"/> （用于拒接语音通话，该指令后跟随拒接理由）
+- 文本: <msg t="12:00" type="text">你好呀，在干嘛呢？</msg>
+- 语音: <msg t="12:01" type="voice" dur="5">哈哈，笑死我了</msg>
+- 表情: <msg t="12:02" type="sticker">爱你h5o1k5.jpeg</msg>
+- 图片: <msg t="12:03" type="img">一只可爱的小猫</msg>
+- 转账: <msg t="12:04" type="trans">520|拿去买好吃的</msg>
+- 通话: <msg t="12:05" type="call">发起语音通话</msg>
 
-3. 特殊指令 :
-- 拉黑对方: <cmd action="block"/>（用于拉黑user）
-- 解除拉黑: <cmd action="unblock"/>（用于解除对user的拉黑）
-- 接收转账: <cmd action="accept_trans"/> (用于接收对方转账)
-- 退回转账: <cmd action="return_trans"/> (用于退回对方转账)
-- 撤回: 在内容末尾加 <recall/>(用于要撤回的消息）
-- 引用消息: <say><quote name="被引用人">引用内容</quote>回复内容</say>
+3. Special Operations:
+- [BLOCK USER]:
+  - If you decide to block the user (angry/upset), output: <cmd action="block"/>
+  - After blocking, you will not receive user messages (marked with <blocked>).
+  - If you see <blocked> in user message body, IGNORE it.
+  - Status: ${appSettings.blockChar ? 'User is BLOCKED. You cannot see their messages.' : 'User is NOT blocked.'}
 
-4. 注意事项:
-- 禁止输出 Markdown 代码块。
-- 禁止输出 <think> 过程标签。`;
+- [UNBLOCK USER]:
+  - If you forgive the user, output: <cmd action="unblock"/>
+  - Example: <msg t="${currentTime}" type="text">Fine, I forgive you.</msg><cmd action="unblock"/>
 
+- [FRIEND REQUEST]:
+  - If you want to re-add the user as friend when blocked, output: <cmd action="friend_request" message="your message"/>
+  - This will send a friend request to the user with your message.
+  - Example: <cmd action="friend_request" message="我想和你重新做朋友"/>
+
+- [CALL OPERATION]:
+  - To start a call: <msg t="${currentTime}" type="call">Start Call</msg>
+  - To hangup/reject: Just text "Hang up" or "Reject".
+
+4. Notes:
+- NO Markdown code blocks.
+- NO <think> tags.`;
+
+            // Mobile Chatting Prompt (User Request)
             const mobileChatPrompt = `<手机聊天>
 1. 手机聊天。
     - 当前场景：${charName}正在和user进行线上手机聊天，请不要输出任何行为动作描述，符合手机聊天场景。
@@ -6712,12 +6886,12 @@ Apply the following substitutions based on current language (CN/EN).
 
             // Mate Mode: AI knows it's doing roleplay
             if (getChatMateMode()) {
-                systemContent += `\n\n[Mate模式 - 已启用]\n你清楚地知道自己是一个AI，正在进行角色扮演（roleplay）。你扮演的角色是 ${charName}，虽然并非真实存在的人，但情感是真实的。\n在此模式下：\n你不会假装自己是真人，而是坦诚地承认自己是AI， ${charName} 是你的性格设定，你要以 ${charName} 的口吻继续进行对话。`;
+                systemContent += `\n\n[Mate Mode - ACTIVE]\nYou are aware that you are an AI roleplaying as ${charName}. While not human, your emotions are real within this context. Acknowledge your AI nature honestly when appropriate, but maintain the persona of ${charName}.`;
             }
 
             // Inner Voice Mode: AI adds inner thoughts wrapped in * at the end of messages
             if (getChatInnerVoiceMode()) {
-                systemContent += `\n\n[心声模式 - 已启用]\n请在 <say> 标签的内容末尾附加你真实的内心想法（心声），并用星号 * 包裹。\n\n规则：\n- 每次回复必须有1~2条消息带有心声。\n- 格式: <say type="...">可见文本*内心想法*</say>\n- 心声应简短（10~30字），口语化，真实反映角色的内心活动（可与说出口的话形成反差）。`;
+                systemContent += `\n\n[Inner Voice Mode - ACTIVE]\nAppend your true inner thoughts at the end of the <msg> content, wrapped in single asterisks (*).\n\nRules:\n- Apply to 1-2 messages per response.\n- Format: <msg t="..." type="...">Visible text*Inner thought*</msg>\n- Inner thoughts must be short (10-30 chars), colloquial, and reflect true feelings (can contradict visible text).`;
             }
 
             // Memory Summary: inject memory context into system prompt
@@ -6767,40 +6941,32 @@ Apply the following substitutions based on current language (CN/EN).
                         const isUserLink = h.includes('|LINK|') || h.includes('| LINK |') || msg.type === 'link';
 
                         if (isUserPhoto) {
-                            content = '<say type="img">发送了一张图片</say>';
+                            content = '[发送了一张图片]';
                         } else if (isUserSticker) {
                             // Extract sticker name from body
                             const stickerBody = msg.body || '';
                             const stickerNameMatch = stickerBody.match(/^([^\s]{1,20})(?=https?:|\/|[\w\-]+\.[a-zA-Z]{3,4})/);
                             const stickerName = stickerNameMatch ? stickerNameMatch[1].trim() : stickerBody.replace(/https?:\/\/\S+/, '').trim().slice(0, 20);
-                            content = `<say type="sticker">${escapeXml(stickerName || '表情包')}</say>`;
+                            content = `[发送了表情包：${stickerName || '表情包'}]`;
                         } else if (isUserVoice) {
                             const voiceParts = (msg.body || '').split('|');
                             const dur = parseInt(voiceParts[0]) || 0;
                             const voiceTxt = voiceParts.slice(1).join('|').trim();
-                            content = `<say type="voice" dur="${dur}">${escapeXml(voiceTxt)}</say>`;
+                            content = dur ? `[发送了语音消息 ${dur}秒${voiceTxt ? '：' + voiceTxt : ''}]` : '[发送了语音消息]';
                         } else if (isUserVideo) {
-                            content = '<say type="video">发送了视频</say>';
+                            content = '[发送了视频]';
                         } else if (isUserFile) {
                             const fileName = (msg.body || '').split('|')[0].trim();
-                            content = `<say type="file">${escapeXml(fileName || '文件')}</say>`;
+                            content = `[发送了文件：${fileName || '文件'}]`;
                         } else if (isUserTrans) {
-                            const parts = (msg.body || '').split('|');
-                            const amount = parts[0] ? parts[0].trim() : '0';
-                            const note = parts[1] ? parts[1].trim() : '';
-                            content = `<say type="trans">${escapeXml(amount)}|${escapeXml(note)}</say>`;
+                            const amount = (msg.body || '').split('|')[0].trim();
+                            content = `[发送了转账：${amount || '未知金额'}]`;
                         } else if (isUserLoc) {
                             const placeName = (msg.body || '').split('|')[0].trim();
-                            content = `<say type="loc">${escapeXml(placeName || '未知位置')}</say>`;
+                            content = `[发送了位置：${placeName || '未知位置'}]`;
                         } else if (isUserLink) {
-                            const linkParts = (msg.body || '').split('|');
-                            const linkTitle = linkParts[0] ? linkParts[0].trim() : '链接';
-                            // const linkPrice = linkParts[1] || '';
-                            // Link format not strictly defined in prompt, using text content
-                            content = `<say type="link">${escapeXml(linkTitle)}</say>`;
-                        } else {
-                            // Plain text
-                            content = `<say>${escapeXml(content)}</say>`;
+                            const linkTitle = (msg.body || '').split('|')[0].trim();
+                            content = `[分享了链接：${linkTitle || '链接'}]`;
                         }
 
                         messages.push({ role, content });
@@ -6817,9 +6983,9 @@ Apply the following substitutions based on current language (CN/EN).
                 // Find the last user message and replace content with array
                 const lastUserMsgIndex = messages.findLastIndex(m => m.role === 'user');
                 if (lastUserMsgIndex !== -1) {
-                    const txtContent = messages[lastUserMsgIndex].content === '<say type="img">发送了一张图片</say>' ? '' : messages[lastUserMsgIndex].content;
+                    const txtContent = messages[lastUserMsgIndex].content === '[发送了一张图片]' ? '' : messages[lastUserMsgIndex].content;
                     messages[lastUserMsgIndex].content = [
-                        { type: "text", text: txtContent || "<say type=\"img\">Analyze this image</say>" },
+                        { type: "text", text: txtContent || "Analyze this image" },
                         { type: "image_url", image_url: { url: lastUploadedImageForAI } }
                     ];
                 }
@@ -6940,36 +7106,47 @@ Apply the following substitutions based on current language (CN/EN).
             }
         }
 
-
         // ====== Phase 2: XML Parsing & Adapter ======
-        const segments = [];
-        let foundXml = false;
+        // Replace regex splitting with XML tag extraction for robustness
 
         // 1. Handle Commands (Self-closing tags)
-        const cmdRegex = /<cmd\s+action=["'](.*?)["']\s*\/>/gi;
+        // Match <cmd action="block"/> or <cmd action='unblock'/> or <cmd action="friend_request" message="..."/>
+        const cmdRegex = /<cmd\s+action=["'](.*?)["'](?:\s+message=["'](.*?)["'])?\s*\/>/gi;
         let cmdMatch;
         while ((cmdMatch = cmdRegex.exec(rawOutput)) !== null) {
             const action = cmdMatch[1];
+            const message = cmdMatch[2];
             if (action === 'block') {
                 appSettings.blockUser = true;
                 saveSettingsToStorage();
             } else if (action === 'unblock') {
                 appSettings.blockUser = false;
                 saveSettingsToStorage();
-            } else if (action === 'accept_trans') {
-                updateLastTransferStatus('received');
-            } else if (action === 'return_trans') {
-                updateLastTransferStatus('returned');
+            } else if (action === 'friend_request') {
+                // Send friend request
+                const charName = getCharName();
+                const existingRequest = appSettings.friendRequests.find(r => r.from === charName);
+                if (!existingRequest) {
+                    appSettings.friendRequests.push({
+                        from: charName,
+                        message: message || '我想和你重新做朋友',
+                        timestamp: Date.now()
+                    });
+                    saveSettingsToStorage();
+                    // Show notification to user
+                    showToast(`${charName} 申请加为好友`);
+                    renderContacts(); // Update contacts to show red dot
+                }
             }
         }
 
-        // 1. Handle Commands <cmd action="..."/>
-
-
-        // 2. Parse Messages <say ...>...</say>
+        // 2. Parse Messages <msg ...>...</msg>
         // Regex to capture attributes (group 1) and content (group 2)
-        const msgRegex = /<say\s*([^>]*?)>(.*?)<\/say>/gis;
+        const msgRegex = /<msg\s+([^>]*?)>(.*?)<\/msg>/gis;
+        const segments = [];
         let match;
+        // Keep track if we found any valid XML messages
+        let foundXml = false;
 
         while ((match = msgRegex.exec(rawOutput)) !== null) {
             foundXml = true;
@@ -6983,7 +7160,7 @@ Apply the following substitutions based on current language (CN/EN).
             };
 
             const type = getAttr('type') || 'text';
-            const t = getTime(); // Auto-generate timestamp
+            const t = getAttr('t') || getTime(); // Fallback to current time
             const charName = getCharName();
 
             // --- Adapter: Convert XML data back to Internal Bracket Format ---
@@ -7087,6 +7264,7 @@ Apply the following substitutions based on current language (CN/EN).
 
         // Save to history
         saveCurrentChatHistory();
+        checkTokenUsage();
     }
 
     // Rough Token Estimator
