@@ -177,11 +177,25 @@
                             <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
                         </svg></div>
                     <span class="header-title" id="header-title"></span>
-                    <div class="header-btn header-btn-right" onclick="openChatSettings()"><svg viewBox="0 0 24 24">
-                            <circle cx="6" cy="12" r="1.6" fill="#181818"></circle>
-                            <circle cx="12" cy="12" r="1.6" fill="#181818"></circle>
-                            <circle cx="18" cy="12" r="1.6" fill="#181818"></circle>
-                        </svg></div>
+                    <div class="header-btn header-btn-right" style="display: flex; gap: 0; right: 0; width: auto;">
+                        <div id="offline-mode-btn" onclick="toggleOfflineMode()" title="线下交流模式"
+                            style="padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#181818"
+                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M3 21V3h12l4 4v14H3z" />
+                                <path d="M9 21v-8h6v8" />
+                                <circle cx="15" cy="13" r="1" fill="#181818" stroke="none" />
+                            </svg>
+                        </div>
+                        <div onclick="openChatSettings()"
+                            style="padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                            <svg viewBox="0 0 24 24" width="24" height="24">
+                                <circle cx="6" cy="12" r="1.6" fill="#181818"></circle>
+                                <circle cx="12" cy="12" r="1.6" fill="#181818"></circle>
+                                <circle cx="18" cy="12" r="1.6" fill="#181818"></circle>
+                            </svg>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div id="chat-messages"></div>
