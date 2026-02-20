@@ -117,7 +117,7 @@
                     <div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24">
                             <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
                         </svg></div>
-                    <span class="header-title">消息</span>
+                    <span class="header-title" id="message-list-header-title">消息列表</span>
                     <div class="header-btn header-btn-right" onclick="showAddActionSheet()"><svg viewBox="0 0 24 24">
                             <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path>
                         </svg></div>
@@ -126,8 +126,17 @@
             <div class="message-list-body" id="message-list-body">
                 <!-- 列表项将由 JS 动态生成 -->
             </div>
+            <div class="contacts-list-body" id="contacts-list-body" style="display: none; flex: 1; overflow-y: auto;">
+                <!-- 通讯录将由 JS 动态生成 -->
+            </div>
+            <div class="moments-body" id="moments-body" style="display: none; flex: 1; overflow-y: auto;">
+                <!-- 动态将由 JS 动态生成 -->
+            </div>
+            <div class="me-body" id="me-body" style="display: none; flex: 1; overflow-y: auto;">
+                <!-- 我将由 JS 动态生成 -->
+            </div>
             <div id="bottom-nav">
-                <div class="nav-item active">
+                <div class="nav-item active" onclick="switchNavTab('message')">
                     <div class="nav-icon">
                         <div class="nav-icon-image"
                             style="-webkit-mask-image: url('https://api.iconify.design/tabler:message-circle-2.svg'); mask-image: url('https://api.iconify.design/tabler:message-circle-2.svg');">
@@ -135,7 +144,15 @@
                     </div>
                     <div class="nav-label">消息</div>
                 </div>
-                <div class="nav-item">
+                <div class="nav-item" onclick="switchNavTab('contacts')">
+                    <div class="nav-icon">
+                        <div class="nav-icon-image"
+                            style="-webkit-mask-image: url('https://api.iconify.design/ri:contacts-book-2-fill.svg'); mask-image: url('https://api.iconify.design/ri:contacts-book-2-fill.svg');">
+                        </div>
+                    </div>
+                    <div class="nav-label">通讯录</div>
+                </div>
+                <div class="nav-item" onclick="switchNavTab('moments')">
                     <div class="nav-icon">
                         <div class="nav-icon-image"
                             style="-webkit-mask-image: url('https://api.iconify.design/iconoir:compass.svg'); mask-image: url('https://api.iconify.design/iconoir:compass.svg');">
@@ -143,7 +160,7 @@
                     </div>
                     <div class="nav-label">动态</div>
                 </div>
-                <div class="nav-item">
+                <div class="nav-item" onclick="switchNavTab('me')">
                     <div class="nav-icon">
                         <div class="nav-icon-image"
                             style="-webkit-mask-image: url('https://api.iconify.design/clarity:avatar-line.svg'); mask-image: url('https://api.iconify.design/clarity:avatar-line.svg');">
