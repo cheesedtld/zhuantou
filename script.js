@@ -40,13 +40,15 @@
         chatBtnText: '#A7C6FF', // 按钮文字/图标色
         customTime: '', // 格式 HH:MM，为空则使用系统时间
         timeOffset: 0, // 时间偏移量 (ms)
-        blockChar: false, // User blocks Char
-        blockUser: false, // Char blocks User
+        blockChar: false, // User blocks Char (DEPRECATED global, use chatBlockStates)
+        blockUser: false, // Char blocks User (DEPRECATED global, use chatBlockStates)
+        chatBlockStates: {}, // 每个聊天的拉黑状态 { 'chat:Name': { blockChar: bool, blockUser: bool }, ... }
         groups: [], // 群组列表 [{name: 'GroupName', members: ['A', 'B']}]
         privateChats: [], // 私聊列表 ['Name1', 'Name2']
         memberAvatars: {}, // NEW: 成员头像列表 { 'Name': 'url', ... }
         chatTimezones: {}, // 每个聊天的角色时区偏移 (小时) { 'chat:Name': offset_hours, ... }
         chatMateModes: {}, // 每个聊天的mate模式开关 { 'chat:Name': true/false, ... }
+        chatUserIds: {}, // 每个聊天绑定的用户ID { 'chat:NPC名': userId, 'group:群名': userId }
         useSunbox: true, // Default to true
         // API Settings
         apiEndpoint: 'https://api.openai.com/v1',
@@ -61,6 +63,7 @@
     let editingUserIndex = null; // New: To track which user is being edited
     let currentChatTag = null; // 当前聊天标签 (e.g. chat:Name or group:Name5人)
     let currentChatTarget = null; // 当前聊天显示名称
+    let isOfflineMode = false; // 线下交流模式
 
     let myStickerList = [];
     const defaultStickerList = [
@@ -80,10 +83,53 @@
     let currentSettingsUploadType = null;
     let isLoadingHistory = false;
 
+    // Helper: get current chat's bound user ID (per-chat isolation)
+    function getCurrentUserId() {
+        // Priority 1: Per-chat bound userId
+        if (currentChatTag && appSettings.chatUserIds && appSettings.chatUserIds[currentChatTag] !== undefined) {
+            const chatUserId = appSettings.chatUserIds[currentChatTag];
+            if (userCharacters[chatUserId]) {
+                return chatUserId;
+            }
+        }
+        // Priority 2: Global fallback
+        if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
+            return appSettings.currentUserId;
+        }
+        return undefined;
+    }
+
+    // Helper: get per-chat blockChar state (user blocks character)
+    function getChatBlockChar() {
+        if (!currentChatTag) return false;
+        if (!appSettings.chatBlockStates) return false;
+        const state = appSettings.chatBlockStates[currentChatTag];
+        return state ? !!state.blockChar : false;
+    }
+
+    // Helper: get per-chat blockUser state (character blocks user)
+    function getChatBlockUser() {
+        if (!currentChatTag) return false;
+        if (!appSettings.chatBlockStates) return false;
+        const state = appSettings.chatBlockStates[currentChatTag];
+        return state ? !!state.blockUser : false;
+    }
+
+    // Helper: set per-chat block state
+    function setChatBlockState(key, value) {
+        if (!currentChatTag) return;
+        if (!appSettings.chatBlockStates) appSettings.chatBlockStates = {};
+        if (!appSettings.chatBlockStates[currentChatTag]) {
+            appSettings.chatBlockStates[currentChatTag] = { blockChar: false, blockUser: false };
+        }
+        appSettings.chatBlockStates[currentChatTag][key] = value;
+    }
+
     // Helper: get current user display name
     function getUserName() {
-        if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
-            return userCharacters[appSettings.currentUserId].name;
+        const uid = getCurrentUserId();
+        if (uid !== undefined && userCharacters[uid]) {
+            return userCharacters[uid].name;
         }
         return 'User';
     }
@@ -143,8 +189,8 @@
             }
         }
 
-        // 2. Current User info
-        const userId = appSettings.currentUserId;
+        // 2. Current User info (per-chat isolated)
+        const userId = getCurrentUserId();
         const user = (userId !== undefined) ? userCharacters[userId] : null;
         if (user) {
             context += `\n[用户设定 - ${user.name}]\n`;
@@ -195,18 +241,28 @@
             }
         }
 
-        // 3. Group chat: gather all member NPCs
+        // 3. Group chat: gather all member NPCs with full persona
         if (currentChatTag && currentChatTag.startsWith('group:')) {
             const groupName = currentChatTag.replace(/^group:/, '');
             const group = (appSettings.groups || []).find(g => g.name === groupName);
             if (group && group.members) {
-                context += `\n[群聊成员]\n`;
+                const userName = getUserName();
+                context += `\n[群聊 - ${groupName}]\n`;
+                context += `群聊成员共 ${group.members.length} 人：\n`;
                 group.members.forEach(memberName => {
+                    if (memberName === userName) {
+                        context += `- ${memberName} (用户本人)\n`;
+                        return;
+                    }
                     const memberNpc = npcCharacters.find(n => n.name === memberName);
-                    if (memberNpc && memberNpc.name !== charName) {
+                    if (memberNpc) {
                         context += `- ${memberNpc.name}`;
-                        if (memberNpc.persona) context += `: ${memberNpc.persona.substring(0, 200)}`;
+                        if (memberNpc.nickname) context += ` (${memberNpc.nickname})`;
+                        if (memberNpc.gender) context += ` [${memberNpc.gender === 'female' ? '女' : memberNpc.gender === 'male' ? '男' : memberNpc.gender}]`;
+                        if (memberNpc.persona) context += `：${memberNpc.persona.substring(0, 300)}`;
                         context += '\n';
+                    } else {
+                        context += `- ${memberName}\n`;
                     }
                 });
             }
@@ -617,11 +673,15 @@
                 // 更新成员列表
                 existing.members = names;
             }
-            saveSettingsToStorage();
 
             targetName = groupName;
             // 构造群聊标签: 不再包含人数
             targetTag = `group:${groupName}`;
+
+            // 绑定userId到此群聊（每个聊天独立隔离）
+            if (!appSettings.chatUserIds) appSettings.chatUserIds = {};
+            appSettings.chatUserIds[targetTag] = userIndex;
+            saveSettingsToStorage();
 
         } else {
             // 私聊逻辑
@@ -638,7 +698,6 @@
 
             // Update current user
             appSettings.currentUserId = userIndex;
-            saveSettingsToStorage();
 
             // Get NPC name
             // if (!appSettings.npcCharacters) appSettings.npcCharacters = [];
@@ -651,12 +710,16 @@
             targetName = npc.name;
             targetTag = `chat:${targetName}`;
 
+            // 绑定userId到此私聊（每个聊天独立隔离）
+            if (!appSettings.chatUserIds) appSettings.chatUserIds = {};
+            appSettings.chatUserIds[targetTag] = userIndex;
+
             // NEW: 持久化保存私聊联系人
             if (!appSettings.privateChats) appSettings.privateChats = [];
             if (!appSettings.privateChats.includes(targetName)) {
                 appSettings.privateChats.push(targetName);
-                saveSettingsToStorage();
             }
+            saveSettingsToStorage();
         }
 
         closeAddContactModal();
@@ -729,7 +792,18 @@
         currentChatTag = targetTag;
         currentChatTarget = targetName;
 
+        // 恢复此聊天绑定的 userId（每个聊天独立隔离）
+        if (appSettings.chatUserIds && appSettings.chatUserIds[targetTag] !== undefined) {
+            const boundUserId = appSettings.chatUserIds[targetTag];
+            if (userCharacters[boundUserId]) {
+                appSettings.currentUserId = boundUserId;
+                appSettings.userAvatar = userCharacters[boundUserId].avatar || '';
+            }
+        }
 
+        // 恢复此聊天的拉黑状态（每个聊天独立隔离）
+        appSettings.blockChar = getChatBlockChar();
+        appSettings.blockUser = getChatBlockUser();
 
         // FIX: Update appSettings.charAvatar based on the target
         // Default to global setting
@@ -765,6 +839,9 @@
         if (messageListScreen) messageListScreen.style.display = 'none';
         if (chatScreen) chatScreen.style.display = 'flex';
         updateStatusBar('chat');
+
+        // 恢复线下交流模式状态
+        loadOfflineModeForChat();
 
         // Force style re-application after rendering
         setTimeout(() => {
@@ -1650,9 +1727,10 @@
                     const isMe = (m === myName || m === 'User' || m === '我');
                     let av = placeholderAvatar;
                     if (isMe) {
-                        // Priority 1: Specific User Character
-                        if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
-                            av = userCharacters[appSettings.currentUserId].avatar;
+                        // Priority 1: Per-chat bound User Character
+                        const uid = getCurrentUserId();
+                        if (uid !== undefined && userCharacters[uid]) {
+                            av = userCharacters[uid].avatar;
                         }
                         // Priority 2: Global User Avatar
                         else if (appSettings.userAvatar) {
@@ -1692,11 +1770,12 @@
             // 私聊模式：显示user和角色两人的头像（从创建时设置的头像获取）
             container.className = 'avatar-pair-container';
 
-            // 获取当前选中的user头像（从user创建时设置的头像）
+            // 获取当前选中的user头像（从user创建时设置的头像，按聊天隔离）
             let userAvatar = placeholderAvatar;
             let userName = getUserName();
-            if (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) {
-                const currentUser = userCharacters[appSettings.currentUserId];
+            const uid = getCurrentUserId();
+            if (uid !== undefined && userCharacters[uid]) {
+                const currentUser = userCharacters[uid];
                 userAvatar = currentUser.avatar || placeholderAvatar;
                 userName = currentUser.name || getUserName();
             } else if (appSettings.userAvatar) {
@@ -1766,7 +1845,7 @@
             return;
         }
 
-        const currentId = appSettings.currentUserId !== undefined ? appSettings.currentUserId : 0;
+        const currentId = getCurrentUserId() !== undefined ? getCurrentUserId() : (appSettings.currentUserId !== undefined ? appSettings.currentUserId : 0);
 
         userCharacters.forEach((user, index) => {
             const item = document.createElement('div');
@@ -1778,6 +1857,11 @@
                 // 同步隐藏的select
                 const hiddenSelect = document.getElementById('user-selector');
                 if (hiddenSelect) hiddenSelect.value = index;
+                // Per-chat isolation: update chatUserIds for current chat
+                if (currentChatTag) {
+                    if (!appSettings.chatUserIds) appSettings.chatUserIds = {};
+                    appSettings.chatUserIds[currentChatTag] = index;
+                }
                 // 更新头像设置区域，并立即保存
                 appSettings.currentUserId = index;
                 appSettings.userAvatar = user.avatar || defaultAv;
@@ -1803,11 +1887,11 @@
     const chatMemoryScreen = document.getElementById('chat-memory-screen');
 
     function openChatSettings() {
-        // Init Main Settings
+        // Init Main Settings (per-chat isolated block states)
         const blockChar = document.getElementById('set-block-char');
         const blockUser = document.getElementById('set-block-user');
-        if (blockChar) blockChar.checked = appSettings.blockChar || false;
-        if (blockUser) blockUser.checked = appSettings.blockUser || false;
+        if (blockChar) blockChar.checked = getChatBlockChar();
+        if (blockUser) blockUser.checked = getChatBlockUser();
 
         // Render Avatar Settings (Moved back to main)
         const userSelector = document.getElementById('user-selector');
@@ -1820,7 +1904,11 @@
                     option.textContent = user.name;
                     userSelector.appendChild(option);
                 });
-                if (appSettings.currentUserId !== undefined) {
+                // Per-chat isolation: use chatUserIds for this chat, fallback to global
+                const perChatUserId = getCurrentUserId();
+                if (perChatUserId !== undefined) {
+                    userSelector.value = perChatUserId;
+                } else if (appSettings.currentUserId !== undefined) {
                     userSelector.value = appSettings.currentUserId;
                 }
             }
@@ -2526,6 +2614,12 @@ ${chatText}
         const userSelector = document.getElementById('user-selector');
         if (userSelector && userSelector.value !== null && userSelector.value !== '-1') {
             const selectedIndex = parseInt(userSelector.value);
+            // Per-chat isolation: update chatUserIds for current chat, not global currentUserId
+            if (currentChatTag) {
+                if (!appSettings.chatUserIds) appSettings.chatUserIds = {};
+                appSettings.chatUserIds[currentChatTag] = selectedIndex;
+            }
+            // Also update global as fallback
             appSettings.currentUserId = selectedIndex;
             const selectedUser = userCharacters[selectedIndex];
             if (selectedUser) {
@@ -2533,8 +2627,12 @@ ${chatText}
             }
         }
 
-        appSettings.blockChar = document.getElementById('set-block-char').checked;
-        appSettings.blockUser = document.getElementById('set-block-user').checked;
+        // Per-chat block states (isolated per chat)
+        setChatBlockState('blockChar', document.getElementById('set-block-char').checked);
+        setChatBlockState('blockUser', document.getElementById('set-block-user').checked);
+        // Keep legacy global in sync for backward compat (will be overwritten on chat switch)
+        appSettings.blockChar = getChatBlockChar();
+        appSettings.blockUser = getChatBlockUser();
 
         // Save timezone settings for this chat
         saveCharTimezoneSettings();
@@ -2553,18 +2651,13 @@ ${chatText}
         showToast('设置已保存');
     }
 
-    // Deprecated: Block settings now saved via Main Save
+    // Per-chat block settings auto-save (called by onchange in HTML toggles)
     function saveChatBlockSettings() {
-        // No-op or keep for auto-toggle? 
-        // User requested main save button, so maybe remove auto-save on toggle?
-        // But toggle usually implies auto.
-        // Let's keep auto-save for toggles if they still have onchange="saveChatBlockSettings()" in HTML.
-        // The previous HTML still has it.
-        // But if I have a main save button, maybe I should remove onchange from HTML?
-        // Or just let both work.
-        // I'll keep this function valid but updated.
-        appSettings.blockChar = document.getElementById('set-block-char').checked;
-        appSettings.blockUser = document.getElementById('set-block-user').checked;
+        setChatBlockState('blockChar', document.getElementById('set-block-char').checked);
+        setChatBlockState('blockUser', document.getElementById('set-block-user').checked);
+        // Keep legacy global in sync
+        appSettings.blockChar = getChatBlockChar();
+        appSettings.blockUser = getChatBlockUser();
         saveSettingsToStorage();
     }
 
@@ -2834,7 +2927,7 @@ ${chatText}
 
         // 2. User Tokens (Name, Persona, Worldbook, Sub-NPCs)
         let userTokens = 0;
-        const userId = appSettings.currentUserId;
+        const userId = getCurrentUserId();
         const user = (userId !== undefined) ? userCharacters[userId] : null;
         if (user) {
             userTokens += estimateTokens(user.name || '');
@@ -3344,10 +3437,10 @@ ${chatText}
         modal.classList.add('show');
     }
 
-    async function sendLocation(addr) { try { const t = getTime(true); const u = getUserName(); const h = `[${u} | 位置 | ${t}]`; const b = appSettings.blockUser ? `<blocked>${addr}` : addr; renderMessageToUI({ header: h, body: b, isUser: true, type: 'location' }); } catch (e) { } }
-    async function sendTransfer(amt, note) { try { const t = getTime(true); const u = getUserName(); const h = `[${u} | TRANS | ${t}]`; const rawBody = `${amt} | ${note || ''}`; const b = appSettings.blockUser ? `<blocked>${rawBody}` : rawBody; renderMessageToUI({ header: h, body: b, isUser: true, type: 'transfer' }); } catch (e) { } }
-    async function sendFile(fn) { try { const t = getTime(true); const u = getUserName(); const h = `[${u}| 文件 | ${t}]`; const b = appSettings.blockUser ? `<blocked>${fn}` : fn; renderMessageToUI({ header: h, body: b, isUser: true, type: 'file' }); } catch (e) { } }
-    async function sendVoice(dur, txt) { try { const t = getTime(true); const u = getUserName(); const h = `[${u}| 语音 | ${t}]`; const rawBody = `${dur}| ${txt || ''} `; const b = appSettings.blockUser ? `<blocked>${rawBody}` : rawBody; renderMessageToUI({ header: h, body: b, isUser: true, type: 'voice' }); } catch (e) { } }
+    async function sendLocation(addr) { try { const t = getTime(true); const u = getUserName(); const h = `[${u} | 位置 | ${t}]`; const b = getChatBlockUser() ? `<blocked>${addr}` : addr; renderMessageToUI({ header: h, body: b, isUser: true, type: 'location' }); } catch (e) { } }
+    async function sendTransfer(amt, note) { try { const t = getTime(true); const u = getUserName(); const h = `[${u} | TRANS | ${t}]`; const rawBody = `${amt} | ${note || ''}`; const b = getChatBlockUser() ? `<blocked>${rawBody}` : rawBody; renderMessageToUI({ header: h, body: b, isUser: true, type: 'transfer' }); } catch (e) { } }
+    async function sendFile(fn) { try { const t = getTime(true); const u = getUserName(); const h = `[${u}| 文件 | ${t}]`; const b = getChatBlockUser() ? `<blocked>${fn}` : fn; renderMessageToUI({ header: h, body: b, isUser: true, type: 'file' }); } catch (e) { } }
+    async function sendVoice(dur, txt) { try { const t = getTime(true); const u = getUserName(); const h = `[${u}| 语音 | ${t}]`; const rawBody = `${dur}| ${txt || ''} `; const b = getChatBlockUser() ? `<blocked>${rawBody}` : rawBody; renderMessageToUI({ header: h, body: b, isUser: true, type: 'voice' }); } catch (e) { } }
     async function sendPhoto(base64) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 图片 | ${t}]`, body: base64, isUser: true, type: 'photo' }); } catch (e) { } }
     async function sendRealAudio(url) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 语音 | ${t}]`, body: url, isUser: true, type: 'voice' }); } catch (e) { } }
     async function sendVideo(url) { try { const t = getTime(true); const u = getUserName(); renderMessageToUI({ header: `[${u}| 视频 | ${t}]`, body: url, isUser: true, type: 'video' }); } catch (e) { } }
@@ -3464,7 +3557,7 @@ ${chatText}
             const u = getUserName();
             const header = `[${u}| ${t}]`;
             // 如果被拉黑，在body开头添加<blocked>标签 (用于持久化)
-            const body = appSettings.blockUser ? `<blocked>${finalBody}` : finalBody;
+            const body = getChatBlockUser() ? `<blocked>${finalBody}` : finalBody;
             renderMessageToUI({ header: header, body: body, isUser: true });
             messageInput.value = '';
             adjustTextareaHeight();
@@ -3866,14 +3959,24 @@ ${chatText}
         }
         const isGroupChat = currentChatTag && currentChatTag.startsWith('group:');
         if (isGroupChat) {
-            // 群聊模式：优先使用设置的成员头像
+            // Group chat: resolve avatar per sender
             if (msg.isUser) {
-                avatarSrc = (appSettings.currentUserId !== undefined && userCharacters[appSettings.currentUserId]) ? userCharacters[appSettings.currentUserId].avatar : appSettings.userAvatar;
-            } else if (appSettings.memberAvatars && appSettings.memberAvatars[displayName]) {
-                avatarSrc = appSettings.memberAvatars[displayName];
+                const uid = getCurrentUserId();
+                avatarSrc = (uid !== undefined && userCharacters[uid]) ? userCharacters[uid].avatar : appSettings.userAvatar;
             } else {
-                // 默认头像
-                avatarSrc = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2IwYjBiMCI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjZjJmMmYyIi8+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OS00IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==';
+                // 1. Try NPC avatar by display name
+                const memberNpc = npcCharacters.find(n => n.name === displayName);
+                if (memberNpc && memberNpc.avatar) {
+                    avatarSrc = memberNpc.avatar;
+                }
+                // 2. Try memberAvatars setting
+                else if (appSettings.memberAvatars && appSettings.memberAvatars[displayName]) {
+                    avatarSrc = appSettings.memberAvatars[displayName];
+                }
+                // 3. Default placeholder
+                else {
+                    avatarSrc = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2IwYjBiMCI+PHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjZjJmMmYyIi8+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OS00IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==';
+                }
             }
         } else {
             // 私聊模式
@@ -3936,11 +4039,15 @@ ${chatText}
         const container = document.createElement('div'); container.className = 'msg-container';
         const nameEl = document.createElement('div'); nameEl.className = 'msg-name';
         nameEl.textContent = displayName;
-        nameEl.style.display = 'none'; // Always hide name per user request
+        // Show sender name for the first message of a consecutive burst in all chats
+        if (!shouldHideAvatar) {
+            nameEl.style.display = 'block';
+        } else {
+            nameEl.style.display = 'none';
+        }
         container.appendChild(nameEl);
 
         const wrapper = document.createElement('div'); wrapper.className = 'msg-wrapper';
-        if (!shouldHideAvatar) wrapper.style.marginTop = '20px';
 
         let el;
         const isLoc = msg.type === 'location' || (msg.header && (msg.header.includes('位置') || msg.header.includes('|LOC|')));
@@ -4274,10 +4381,10 @@ ${chatText}
 
         // 检查是否被拉黑
         // 1. body中包含<blocked>标签 (持久化标记，已在上方剥离并设置isBlockedByTag)
-        // 2. 当前实时状态：用户消息+blockUser 或 角色消息+blockChar
+        // 2. 当前实时状态：用户消息+blockUser 或 角色消息+blockChar (per-chat isolated)
         let isBlocked = isBlockedByTag;
-        if (msg.isUser && appSettings.blockUser) isBlocked = true;
-        if (!msg.isUser && appSettings.blockChar) isBlocked = true;
+        if (msg.isUser && getChatBlockUser()) isBlocked = true;
+        if (!msg.isUser && getChatBlockChar()) isBlocked = true;
 
         // 创建元数据容器（包含时间和状态图标）
         const metaContainer = document.createElement('div');
@@ -6758,11 +6865,88 @@ ${chatText}
             // System Prompt
             const charName = getCharName();
             const currentTime = getTime();
-            const formatInstruction = `\n\n[System Note - 通信协议]
+            // Detect group chat mode
+            const isGroupGeneration = currentChatTag && currentChatTag.startsWith('group:');
+            let groupMembers = [];
+            if (isGroupGeneration) {
+                const groupName = currentChatTag.replace(/^group:/, '');
+                const group = (appSettings.groups || []).find(g => g.name === groupName);
+                if (group && group.members) {
+                    const userName = getUserName();
+                    groupMembers = group.members.filter(m => m !== userName);
+                }
+            }
+
+            let formatInstruction;
+            let mobileChatPrompt;
+
+            if (isOfflineMode) {
+                // ===== 线下交流模式：仅文本消息，包含动作描述 =====
+                formatInstruction = `\n\n[System Note - 通信协议 (线下交流模式)]
 请严格遵守 XML 标签格式输出回复。系统仅解析 <msg> 标签，其他格式将被丢弃。
 
 1. 消息格式 (必须包裹在 msg 标签中):
-<msg t="HH:mm" type="类型" dur="秒数">内容</msg>
+<msg t="HH:mm" type="text"${isGroupGeneration ? ' from="发送者名字"' : ''}>内容</msg>
+
+属性说明:
+- t: 当前时间 (必填, 格式 HH:mm)
+- type: 固定为 text (线下模式仅支持文本消息)${isGroupGeneration ? `
+- from: 发送者名字 (群聊必填！可选值: ${groupMembers.join(', ')})` : ''}
+
+2. 格式示例:${isGroupGeneration ? `
+- <msg t="12:00" type="text" from="${groupMembers[0] || charName}">*推了你一下* 你怎么来了？</msg>
+- <msg t="12:00" type="text" from="${groupMembers.length > 1 ? groupMembers[1] : charName}">*抬头看了看* 谁啊？</msg>` : `
+- <msg t="12:00" type="text">*抬起头看向你* 你来了啊，快坐。</msg>
+- <msg t="12:01" type="text">*给你倒了杯水* 今天怎么有空过来？</msg>`}
+
+3. 注意:
+- 仅使用 type="text"，不要使用 voice/img/sticker/video/file/trans/call 等类型。
+- NO Markdown code blocks.
+- NO <think> tags.`;
+
+                if (isGroupGeneration && groupMembers.length > 0) {
+                    mobileChatPrompt = `<线下群聊>
+1. 线下见面场景
+    - 当前场景：这是一个名为「${currentChatTarget}」的线下聚会，在场的人有：${groupMembers.join('、')} 和用户 ${getUserName()}。
+    - 你需要同时扮演所有非用户角色（${groupMembers.join('、')}），根据各自的人设和性格，分别输出他们的言行。
+    - **每条消息必须通过 from 属性明确标注发送者**。
+    - 不要输出用户 ${getUserName()} 的言行。
+2. 线下互动规则
+    - 这是面对面交流，角色可以有丰富的肢体语言、表情和动作。
+    - 动作描述用星号包裹，穿插在对话中，如：*站起来伸了个懒腰* 好无聊啊。
+    - 不是每个人都必须发言。根据话题和性格，有的人可能旁观、有的人可能主动出击。
+    - 每次回复总共 3~6 条消息。
+3. 临场感
+    - 描述环境细节：周围的声音、气味、光线等感官体验。
+    - 角色之间可以有身体互动：拍肩膀、递东西、对视等。
+    - 对话应该自然口语，带有现场特有的语气和节奏。
+</线下群聊>`;
+                } else {
+                    mobileChatPrompt = `<线下交流>
+1. 线下见面。
+    - 当前场景：${charName}正在和${getUserName()}进行线下面对面交流，请输出丰富的行为动作描述。
+    - 动作描写：用星号(*)包裹动作和神态描写，穿插在对话文本中，如：*微微歪头看着你* 嗯？怎么了？
+    - 每次回复2~5条消息，内容应包含对话和行为动作的混合。
+2. 现场感与沉浸感
+    - 感官描写：描述触觉、嗅觉、听觉、视觉等感官体验，让场景生动。
+    - 肢体语言：点头、摇头、叹气、托腮、玩弄头发等微小动作增加真实感。
+    - 环境互动：注意描写角色与周围环境的交互（坐下、走动、拿东西等）。
+    - 距离感：注意描写两人之间的物理距离变化和身体接触。
+3. 对话风格
+    - 口语化：面对面交流更加自然随意，可以有停顿、犹豫、改口。
+    - 语气词：啊、嗯、呃、哈、诶 等自然语气词。
+    - 打断和接话：可以出现打断对方说话、接话等自然交流现象。
+4. 时间感
+    - 感知时间：根据时间推移，场景和氛围可以自然变化。
+</线下交流>`;
+                }
+            } else {
+                // ===== 正常线上模式 =====
+                formatInstruction = `\n\n[System Note - 通信协议]
+请严格遵守 XML 标签格式输出回复。系统仅解析 <msg> 标签，其他格式将被丢弃。
+
+1. 消息格式 (必须包裹在 msg 标签中):
+<msg t="HH:mm" type="类型"${isGroupGeneration ? ' from="发送者名字"' : ''} dur="秒数">内容</msg>
 
 属性说明:
 - t: 当前时间 (必填, 格式 HH:mm)
@@ -6775,22 +6959,26 @@ ${chatText}
   - file: 文件
   - trans: 转账 (内容格式: 金额|备注)
   - call: 发起通话
-- dur: 语音时长(秒), 仅 type="voice" 时有效
+- dur: 语音时长(秒), 仅 type="voice" 时有效${isGroupGeneration ? `
+- from: 发送者名字 (群聊必填！标明是哪个群成员发送的消息，可选值: ${groupMembers.join(', ')})` : ''}
 
-2. 格式示例:
+2. 格式示例:${isGroupGeneration ? `
+- 文本: <msg t="12:00" type="text" from="${groupMembers[0] || charName}">哈哈哈你又来了</msg>
+- 文本: <msg t="12:00" type="text" from="${groupMembers.length > 1 ? groupMembers[1] : charName}">谁呢？</msg>
+- 语音: <msg t="12:01" type="voice" from="${groupMembers[0] || charName}" dur="5">哈哈，笑死我了</msg>` : `
 - 文本: <msg t="12:00" type="text">你好呀，在干嘛呢？</msg>
 - 语音: <msg t="12:01" type="voice" dur="5">哈哈，笑死我了</msg>
 - 表情: <msg t="12:02" type="sticker">爱你h5o1k5.jpeg</msg>
 - 图片: <msg t="12:03" type="img">一只可爱的小猫</msg>
 - 转账: <msg t="12:04" type="trans">520|拿去买好吃的</msg>
-- 通话: <msg t="12:05" type="call">发起语音通话</msg>
+- 通话: <msg t="12:05" type="call">发起语音通话</msg>`}
 
 3. Special Operations:
 - [BLOCK USER]:
   - If you decide to block the user (angry/upset), output: <cmd action="block"/>
   - After blocking, you will not receive user messages (marked with <blocked>).
   - If you see <blocked> in user message body, IGNORE it.
-  - Status: ${appSettings.blockChar ? 'User is BLOCKED. You cannot see their messages.' : 'User is NOT blocked.'}
+  - Status: ${getChatBlockChar() ? 'User is BLOCKED. You cannot see their messages.' : 'User is NOT blocked.'}
 
 - [UNBLOCK USER]:
   - If you forgive the user, output: <cmd action="unblock"/>
@@ -6809,13 +6997,33 @@ ${chatText}
 - NO Markdown code blocks.
 - NO <think> tags.`;
 
-            // Mobile Chatting Prompt (User Request)
-            const mobileChatPrompt = `<手机聊天>
+                // Mobile Chatting Prompt
+                if (isGroupGeneration && groupMembers.length > 0) {
+                    mobileChatPrompt = `<手机群聊>
+1. 群聊场景
+    - 当前场景：这是一个名为「${currentChatTarget}」的群聊，群成员有：${groupMembers.join('、')} 和用户 ${getUserName()}。
+    - 你需要同时扮演群内所有非用户角色（${groupMembers.join('、')}），根据各自的人设和性格，分别输出他们的消息。
+    - **每条消息必须通过 from 属性明确标注发送者**，例如：<msg t="12:00" type="text" from="${groupMembers[0]}">你好</msg>
+    - 不要输出用户 ${getUserName()} 的消息。
+2. 群聊互动规则
+    - 不是每个人都必须回复每条消息。根据话题和性格，有的人可能沉默、有的人可能抢话。
+    - 群成员之间也可以互相对话、接话、吐槽，不一定都是回复用户。
+    - 每次回复总共 4~8 条消息，分配给不同成员（也可以同一人连发多条）。
+    - 每个角色的聊天风格必须符合其人设：语气、用词、习惯各不相同。
+3. 聊天习惯
+    - 消息连发：拆分为多条短促消息。
+    - 松散语法：使用口语化语法。
+    - 适度使用Emoji，但各角色使用频率不同。
+4. 时间感
+    - 所有消息的时间应该递增或相同，体现真实的群聊节奏。
+</手机群聊>`;
+                } else {
+                    mobileChatPrompt = `<手机聊天>
 1. 手机聊天。
     - 当前场景：${charName}正在和user进行线上手机聊天，请不要输出任何行为动作描述，符合手机聊天场景。
     - 消息连发：如果${charName}有很多话要说，必须将其拆分为多条短促、快速的句子。
     - 松散语法：使用口语化的松散语法。如果是自然语境，可以省略主语或谓语。
-    - 每次回复必须2句以上5句以内，但角色情绪激动时可发多条消息，最多不超过8条。
+    - 每次回复2~5条消息，角色情绪激动时可发多条消息，最多不超过8条。
 2. 现场感
     - 当前正在做的事： 聊天是伴随着生活进行的。必须在聊天中穿插提及${charName}此刻正在做的事情，以增加真实感。
     - 主动分享：不要只是被动回答${getUserName()}。要像真人一样，随机分享一张照片、一首正在听的歌、或者对天气的一句吐槽。
@@ -6823,11 +7031,13 @@ ${chatText}
    - Emoji和表情包的使用：适度使用Emoji来软化语气或表达讽刺，但不能刷屏。
    - 聊天人设：必须根据${charName}的性格调整聊天风格：
     - 懒人型：不爱打标点，用空格断句，字数少。
-    - 严谨型：标点符号完美，使用全句，有“句号”。
+    - 严谨型：标点符号完美，使用全句，有"句号"。
     - 可爱型/活泼型：喜欢用颜文字 (｡•̀ᴗ-)✧ 和波浪号~~~。
 4. 时间感
     - 感知时间：根据时间推移，语气和内容可以适当变化，例如：早安晚安问候、长时间不回消息疑惑等。
 </手机聊天>`;
+                }
+            }
             // Build character context (persona + world book)
             const charContext = buildCharacterContext();
 
@@ -6913,7 +7123,8 @@ Apply the following substitutions based on current language (CN/EN).
                     const recent = history;
 
                     recent.forEach(msg => {
-                        const role = (msg.header && msg.header.includes(getUserName())) || msg.isUser ? 'user' : 'assistant';
+                        const isUserMsg = (msg.header && msg.header.includes(getUserName())) || msg.isUser;
+                        const role = isUserMsg ? 'user' : 'assistant';
                         let content = msg.body;
 
                         // Strip CoT / thought content before sending to AI
@@ -6931,42 +7142,51 @@ Apply the following substitutions based on current language (CN/EN).
                         // Handle special message types for context
                         // Derive type from header type marker for accurate AI context
                         const h = msg.header || '';
-                        const isUserPhoto = h.includes('|图片|') || h.includes('| 图片 |') || msg.type === 'photo';
-                        const isUserSticker = h.includes('|表情包|') || h.includes('| 表情包 |') || msg.type === 'sticker';
-                        const isUserVoice = h.includes('|语音|') || h.includes('| 语音 |') || msg.type === 'voice';
-                        const isUserVideo = h.includes('|视频|') || h.includes('| 视频 |') || msg.type === 'video';
-                        const isUserFile = h.includes('|文件|') || h.includes('| 文件 |') || msg.type === 'file';
-                        const isUserTrans = h.includes('|TRANS|') || h.includes('| TRANS |') || h.includes('|转账|') || msg.type === 'transfer';
-                        const isUserLoc = h.includes('|位置|') || h.includes('| 位置 |') || msg.type === 'location';
+                        const isUserPhoto = h.includes('|\u56fe\u7247|') || h.includes('| \u56fe\u7247 |') || msg.type === 'photo';
+                        const isUserSticker = h.includes('|\u8868\u60c5\u5305|') || h.includes('| \u8868\u60c5\u5305 |') || msg.type === 'sticker';
+                        const isUserVoice = h.includes('|\u8bed\u97f3|') || h.includes('| \u8bed\u97f3 |') || msg.type === 'voice';
+                        const isUserVideo = h.includes('|\u89c6\u9891|') || h.includes('| \u89c6\u9891 |') || msg.type === 'video';
+                        const isUserFile = h.includes('|\u6587\u4ef6|') || h.includes('| \u6587\u4ef6 |') || msg.type === 'file';
+                        const isUserTrans = h.includes('|TRANS|') || h.includes('| TRANS |') || h.includes('|\u8f6c\u8d26|') || msg.type === 'transfer';
+                        const isUserLoc = h.includes('|\u4f4d\u7f6e|') || h.includes('| \u4f4d\u7f6e |') || msg.type === 'location';
                         const isUserLink = h.includes('|LINK|') || h.includes('| LINK |') || msg.type === 'link';
 
                         if (isUserPhoto) {
-                            content = '[发送了一张图片]';
+                            content = '[\u56fe\u7247]';
                         } else if (isUserSticker) {
                             // Extract sticker name from body
                             const stickerBody = msg.body || '';
                             const stickerNameMatch = stickerBody.match(/^([^\s]{1,20})(?=https?:|\/|[\w\-]+\.[a-zA-Z]{3,4})/);
                             const stickerName = stickerNameMatch ? stickerNameMatch[1].trim() : stickerBody.replace(/https?:\/\/\S+/, '').trim().slice(0, 20);
-                            content = `[发送了表情包：${stickerName || '表情包'}]`;
+                            content = `[\u8868\u60c5\u5305\uff1a${stickerName || '\u8868\u60c5\u5305'}]`;
                         } else if (isUserVoice) {
                             const voiceParts = (msg.body || '').split('|');
                             const dur = parseInt(voiceParts[0]) || 0;
                             const voiceTxt = voiceParts.slice(1).join('|').trim();
-                            content = dur ? `[发送了语音消息 ${dur}秒${voiceTxt ? '：' + voiceTxt : ''}]` : '[发送了语音消息]';
+                            content = dur ? `[\u8bed\u97f3 ${dur}\u79d2${voiceTxt ? '\uff1a' + voiceTxt : ''}]` : '[\u8bed\u97f3]';
                         } else if (isUserVideo) {
-                            content = '[发送了视频]';
+                            content = '[\u89c6\u9891]';
                         } else if (isUserFile) {
                             const fileName = (msg.body || '').split('|')[0].trim();
-                            content = `[发送了文件：${fileName || '文件'}]`;
+                            content = `[\u6587\u4ef6\uff1a${fileName || '\u6587\u4ef6'}]`;
                         } else if (isUserTrans) {
                             const amount = (msg.body || '').split('|')[0].trim();
-                            content = `[发送了转账：${amount || '未知金额'}]`;
+                            content = `[\u8f6c\u8d26\uff1a${amount || '\u672a\u77e5'}]`;
                         } else if (isUserLoc) {
                             const placeName = (msg.body || '').split('|')[0].trim();
-                            content = `[发送了位置：${placeName || '未知位置'}]`;
+                            content = `[\u4f4d\u7f6e\uff1a${placeName || '\u672a\u77e5'}]`;
                         } else if (isUserLink) {
                             const linkTitle = (msg.body || '').split('|')[0].trim();
-                            content = `[分享了链接：${linkTitle || '链接'}]`;
+                            content = `[\u94fe\u63a5\uff1a${linkTitle || '\u94fe\u63a5'}]`;
+                        }
+
+                        // For group chats, prepend sender name to assistant messages for context
+                        if (isGroupGeneration && !isUserMsg && msg.header) {
+                            const headerParts = msg.header.replace(/^[\[【]|[\]】]$/g, '').split('|');
+                            const senderName = headerParts[0] ? headerParts[0].trim() : '';
+                            if (senderName && senderName !== getUserName()) {
+                                content = `[${senderName}] ${content}`;
+                            }
                         }
 
                         messages.push({ role, content });
@@ -6983,7 +7203,7 @@ Apply the following substitutions based on current language (CN/EN).
                 // Find the last user message and replace content with array
                 const lastUserMsgIndex = messages.findLastIndex(m => m.role === 'user');
                 if (lastUserMsgIndex !== -1) {
-                    const txtContent = messages[lastUserMsgIndex].content === '[发送了一张图片]' ? '' : messages[lastUserMsgIndex].content;
+                    const txtContent = messages[lastUserMsgIndex].content === '[图片]' ? '' : messages[lastUserMsgIndex].content;
                     messages[lastUserMsgIndex].content = [
                         { type: "text", text: txtContent || "Analyze this image" },
                         { type: "image_url", image_url: { url: lastUploadedImageForAI } }
@@ -7117,10 +7337,12 @@ Apply the following substitutions based on current language (CN/EN).
             const action = cmdMatch[1];
             const message = cmdMatch[2];
             if (action === 'block') {
-                appSettings.blockUser = true;
+                setChatBlockState('blockUser', true);
+                appSettings.blockUser = getChatBlockUser(); // sync legacy
                 saveSettingsToStorage();
             } else if (action === 'unblock') {
-                appSettings.blockUser = false;
+                setChatBlockState('blockUser', false);
+                appSettings.blockUser = getChatBlockUser(); // sync legacy
                 saveSettingsToStorage();
             } else if (action === 'friend_request') {
                 // Send friend request
@@ -7162,45 +7384,47 @@ Apply the following substitutions based on current language (CN/EN).
             const type = getAttr('type') || 'text';
             const t = getAttr('t') || getTime(); // Fallback to current time
             const charName = getCharName();
+            // Group chat: use 'from' attribute as sender name
+            const fromName = getAttr('from') || charName;
 
             // --- Adapter: Convert XML data back to Internal Bracket Format ---
             // This maintains compatibility with renderMessageToUI and localStorage history
-            let header = `[${charName}|${t}]`; // Default header
+            let header = `[${fromName}|${t}]`; // Default header
             let body = content;
 
             switch (type) {
                 case 'voice':
-                    header = `[${charName}|语音|${t}]`;
+                    header = `[${fromName}|\u8bed\u97f3|${t}]`;
                     const dur = getAttr('dur') || Math.max(1, Math.ceil(content.length / 3)); // Estimate dur if missing
                     body = `${dur}|${content}`;
                     break;
                 case 'img':
-                    header = `[${charName}|图片|${t}]`;
+                    header = `[${fromName}|\u56fe\u7247|${t}]`;
                     break;
                 case 'sticker':
-                    header = `[${charName}|表情包|${t}]`;
+                    header = `[${fromName}|\u8868\u60c5\u5305|${t}]`;
                     break;
                 case 'video':
-                    header = `[${charName}|视频|${t}]`;
+                    header = `[${fromName}|\u89c6\u9891|${t}]`;
                     break;
                 case 'file':
-                    header = `[${charName}|文件|${t}]`;
+                    header = `[${fromName}|\u6587\u4ef6|${t}]`;
                     break;
                 case 'trans':
-                    header = `[${charName}|TRANS|${t}]`;
+                    header = `[${fromName}|TRANS|${t}]`;
                     // content should be amount|note
                     break;
                 case 'loc':
-                    header = `[${charName}|位置|${t}]`;
+                    header = `[${fromName}|\u4f4d\u7f6e|${t}]`;
                     break;
                 case 'link':
-                    header = `[${charName}|LINK|${t}]`;
+                    header = `[${fromName}|LINK|${t}]`;
                     break;
                 case 'call':
-                    header = `[${charName}|CALL|${t}]`; // Auto triggers call UI
+                    header = `[${fromName}|CALL|${t}]`; // Auto triggers call UI
                     break;
                 case 'deliver':
-                    header = `[${charName}|DELIVER|${t}]`;
+                    header = `[${fromName}|DELIVER|${t}]`;
                     break;
             }
 
@@ -7249,7 +7473,7 @@ Apply the following substitutions based on current language (CN/EN).
             // Ensure no <think> tokens remain in the final stored message (Enhanced Regex)
             finalBody = finalBody.replace(/<(think|thinking)[\s\S]*?<\/(think|thinking)>/gi, '').trim();
 
-            if (appSettings.blockChar) {
+            if (getChatBlockChar()) {
                 finalBody = `<blocked>${finalBody}`;
             }
 
@@ -7267,7 +7491,7 @@ Apply the following substitutions based on current language (CN/EN).
         checkTokenUsage();
     }
 
-    // Rough Token Estimator
+    // Accurate Token Estimator for Chat History
     function checkTokenUsage() {
         if (!currentChatTag) return;
         const historyKey = `faye - phone - history - ${currentChatTag} `;
@@ -7276,17 +7500,19 @@ Apply the following substitutions based on current language (CN/EN).
 
         try {
             const history = JSON.parse(savedHistory);
-            // Estimate tokens: simplistic char count * 1.5 (mix of CN/EN)
-            let totalChars = 0;
+            let estimatedTokens = 0;
             const recent = history; // Check FULL history
-            recent.forEach(m => totalChars += (m.body || '').length + (m.header || '').length);
 
-            const estimatedTokens = Math.floor(totalChars * 1.5);
+            // Use the same estimateTokens function as updateTokenStats
+            // Note: m.header is NOT sent to the LLM API, so we skip it to reflect real API tokens
+            recent.forEach(m => {
+                estimatedTokens += estimateTokens(m.body || '');
+            });
 
-            if (estimatedTokens > 5000) {
+            if (estimatedTokens > 3800) {
                 // Throttle warning: only show once per session or use a distinct flag?
                 // For now, just show toast gently.
-                showToast(`⚠️ 当前上下文约 ${estimatedTokens} Token，建议总结`);
+                showToast(`⚠️ 当前对话记录约 ${estimatedTokens} Token，如果明显出现卡顿智降，建议总结`);
             }
         } catch (e) { }
     }
@@ -7593,6 +7819,50 @@ Apply the following substitutions based on current language (CN/EN).
     // Load regex rules on startup
     loadRegexRules();
 
+    // ===== 线下交流模式 (Offline Interaction Mode) =====
+    function toggleOfflineMode() {
+        isOfflineMode = !isOfflineMode;
+
+        // Persist per-chat
+        if (currentChatTag) {
+            const key = `faye-phone-offline-mode-${currentChatTag}`;
+            localStorage.setItem(key, isOfflineMode ? '1' : '0');
+        }
+
+        updateOfflineModeUI();
+        showToast(isOfflineMode ? '已进入线下交流模式' : '已退出线下交流模式');
+    }
+
+    function updateOfflineModeUI() {
+        const btn = document.getElementById('offline-mode-btn');
+        if (btn) {
+            const svg = btn.querySelector('svg');
+            if (svg) {
+                if (isOfflineMode) {
+                    svg.style.stroke = '#e88a9a';
+                    svg.querySelectorAll('[fill="#181818"]').forEach(el => el.setAttribute('fill', '#e88a9a'));
+                } else {
+                    svg.style.stroke = '#181818';
+                    svg.querySelectorAll('[fill="#e88a9a"]').forEach(el => el.setAttribute('fill', '#181818'));
+                }
+            }
+        }
+
+        // In offline mode, hide plus and emoji buttons (text-only input)
+        if (plusButton) plusButton.style.display = isOfflineMode ? 'none' : '';
+        if (emojiButton) emojiButton.style.display = isOfflineMode ? 'none' : '';
+    }
+
+    function loadOfflineModeForChat() {
+        if (currentChatTag) {
+            const key = `faye-phone-offline-mode-${currentChatTag}`;
+            isOfflineMode = localStorage.getItem(key) === '1';
+        } else {
+            isOfflineMode = false;
+        }
+        updateOfflineModeUI();
+    }
+
     Object.assign(window, {
         openMessageList,
         openSettings,
@@ -7720,7 +7990,9 @@ Apply the following substitutions based on current language (CN/EN).
         closeRegexEditModal,
         // Memory Batch Ops
         toggleMemoryBatchMode,
-        deleteSelectedMemories
+        deleteSelectedMemories,
+        // Offline Mode
+        toggleOfflineMode
     });
 
 })();
