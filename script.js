@@ -4144,10 +4144,21 @@ ${chatText}
         if (existing) existing.remove();
 
         const u = getCharName();
-        let avatarSrc = appSettings.charAvatar;
-        if (appSettings.memberAvatars && appSettings.memberAvatars[u]) {
+        let avatarSrc;
+
+        // 1. Try to find by name in NPCs (First Priority)
+        const npc = npcCharacters.find(n => n.name === u);
+        if (npc && npc.avatar) {
+            avatarSrc = npc.avatar;
+        }
+
+        // 2. Fallback to memberAvatars
+        if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[u]) {
             avatarSrc = appSettings.memberAvatars[u];
         }
+
+        // 3. Fallback to global setting
+        if (!avatarSrc) avatarSrc = appSettings.charAvatar;
 
         const row = document.createElement('div');
         row.id = 'typing-bubble';
@@ -6161,10 +6172,16 @@ ${chatText}
         const targetName = getCharName();
         if (nameEl) nameEl.textContent = targetName;
 
-        let avatarSrc = appSettings.charAvatar;
-        if (appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
+        let avatarSrc;
+        const npc = npcCharacters.find(n => n.name === targetName);
+        if (npc && npc.avatar) {
+            avatarSrc = npc.avatar;
+        }
+
+        if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
             avatarSrc = appSettings.memberAvatars[targetName];
         }
+        if (!avatarSrc) avatarSrc = appSettings.charAvatar;
         if (avatarEl) avatarEl.src = avatarSrc;
 
         // Clear Call Chat Container
@@ -6410,10 +6427,16 @@ ${getUserName()} 正在拨打你的电话。请选择接听或拒接。
         const targetName = getCharName();
         if (nameEl) nameEl.textContent = targetName;
 
-        let avatarSrc = appSettings.charAvatar;
-        if (appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
+        let avatarSrc;
+        const npc = npcCharacters.find(n => n.name === targetName);
+        if (npc && npc.avatar) {
+            avatarSrc = npc.avatar;
+        }
+
+        if (!avatarSrc && appSettings.memberAvatars && appSettings.memberAvatars[targetName]) {
             avatarSrc = appSettings.memberAvatars[targetName];
         }
+        if (!avatarSrc) avatarSrc = appSettings.charAvatar;
         if (avatarEl) avatarEl.src = avatarSrc;
 
         // Log incoming call event
