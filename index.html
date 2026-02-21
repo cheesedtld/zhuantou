@@ -180,12 +180,8 @@
                     <div class="header-btn header-btn-right" style="display: flex; gap: 0; right: 0; width: auto;">
                         <div id="offline-mode-btn" onclick="toggleOfflineMode()" title="线下交流模式"
                             style="padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
-                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#181818"
-                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M3 21V3h12l4 4v14H3z" />
-                                <path d="M9 21v-8h6v8" />
-                                <circle cx="15" cy="13" r="1" fill="#181818" stroke="none" />
-                            </svg>
+                            <img src="https://api.iconify.design/material-symbols:door-back-outline.svg?color=%23181818"
+                                width="22" height="22" alt="offline-mode" />
                         </div>
                         <div onclick="openChatSettings()"
                             style="padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
@@ -359,23 +355,6 @@
                     </svg>
                 </div>
 
-                <!-- 数据设置 -->
-                <div class="settings-nav-card" onclick="openDataSettings()">
-                    <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
-                        <div class="settings-nav-icon-img"
-                            style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:database-outline.svg'); mask-image: url('https://api.iconify.design/material-symbols:database-outline.svg'); background-color: #e88a9a;">
-                        </div>
-                    </div>
-                    <div class="settings-nav-text">
-                        <div class="settings-nav-title">数据设置</div>
-                        <div class="settings-nav-subtitle">备份 · 恢复 · 清除</div>
-                    </div>
-                    <svg class="settings-nav-arrow" viewBox="0 0 24 24">
-                        <path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round"
-                            stroke-linejoin="round"></path>
-                    </svg>
-                </div>
-
                 <!-- NAI 生图设置 -->
                 <div class="settings-nav-card" onclick="openNaiSettings()">
                     <div class="settings-nav-icon" style="background: rgba(168,130,255,0.15);">
@@ -386,6 +365,39 @@
                     <div class="settings-nav-text">
                         <div class="settings-nav-title">NAI 生图设置</div>
                         <div class="settings-nav-subtitle">NovelAI · 提示词 · 参数</div>
+                    </div>
+                    <svg class="settings-nav-arrow" viewBox="0 0 24 24">
+                        <path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round"></path>
+                    </svg>
+                </div>
+
+                <!-- MiniMax 语音设置 -->
+                <div class="settings-nav-card" onclick="openTtsSettings()">
+                    <div class="settings-nav-icon" style="background: rgba(56,189,193,0.15);">
+                        <div class="settings-nav-icon-img"
+                            style="-webkit-mask-image: url('https://api.iconify.design/icon-park-outline:voice.svg'); mask-image: url('https://api.iconify.design/icon-park-outline:voice.svg'); background-color: #38bdc1;">
+                        </div>
+                    </div>
+                    <div class="settings-nav-text">
+                        <div class="settings-nav-title">MiniMax 语音</div>
+                        <div class="settings-nav-subtitle">TTS · 音色 · 语音合成</div>
+                    </div>
+                    <svg class="settings-nav-arrow" viewBox="0 0 24 24">
+                        <path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round"></path>
+                </div>
+
+                <!-- 数据设置 -->
+                <div class="settings-nav-card" onclick="openDataSettings()">
+                    <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
+                        <div class="settings-nav-icon-img"
+                            style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:database-outline.svg'); mask-image: url('https://api.iconify.design/material-symbols:database-outline.svg'); background-color: #e88a9a;">
+                        </div>
+                    </div>
+                    <div class="settings-nav-text">
+                        <div class="settings-nav-title">数据设置</div>
+                        <div class="settings-nav-subtitle">备份 · 恢复 · 清除</div>
                     </div>
                     <svg class="settings-nav-arrow" viewBox="0 0 24 24">
                         <path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round"
@@ -514,16 +526,6 @@
                             <label>NAI API Key</label>
                             <input type="password" id="set-nai-api-key" class="setting-input" placeholder="pst-...">
                         </div>
-                        <div class="setting-row">
-                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">启用 NAI 生图</label>
-                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI发送图片时自动调用NAI生成</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="set-nai-enabled">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
                     </div>
                 </div>
 
@@ -589,35 +591,6 @@
                     </div>
                 </div>
 
-                <!-- 图片尺寸 -->
-                <div>
-                    <div class="settings-section-title">图片尺寸</div>
-                    <div class="setting-group">
-                        <div class="setting-row">
-                            <label>预设尺寸</label>
-                            <select id="set-nai-size-preset" class="setting-input" style="flex: 1; min-width: 0;"
-                                onchange="applyNaiSizePreset()">
-                                <option value="832x1216" selected>竖版 (832×1216)</option>
-                                <option value="1216x832">横版 (1216×832)</option>
-                                <option value="1024x1024">正方形 (1024×1024)</option>
-                                <option value="512x768">小竖版 (512×768)</option>
-                                <option value="768x512">小横版 (768×512)</option>
-                                <option value="640x640">小正方 (640×640)</option>
-                                <option value="custom">自定义</option>
-                            </select>
-                        </div>
-                        <div class="setting-row" id="nai-custom-size-row" style="display:none;">
-                            <label>宽度</label>
-                            <input type="number" id="set-nai-width" class="setting-input" value="832"
-                                style="width:70px; text-align:center;">
-                            <label style="margin:0 6px;">×</label>
-                            <label>高度</label>
-                            <input type="number" id="set-nai-height" class="setting-input" value="1216"
-                                style="width:70px; text-align:center;">
-                        </div>
-                    </div>
-                </div>
-
                 <!-- 提示词设置 -->
                 <div>
                     <div class="settings-section-title">提示词 (Prompt)</div>
@@ -643,70 +616,56 @@
                     </div>
                 </div>
 
-                <!-- AI 提示词构建格式 -->
-                <div>
-                    <div class="settings-section-title">AI 图片提示词格式</div>
-                    <div class="setting-group">
-                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-                            <label style="font-size:13px;">AI 发送图片时的提示词构建指令</label>
-                            <span style="font-size:11px; color:#aaa; line-height:1.5;">此指令会添加到系统提示词中，教导 AI 在发送
-                                type="img" 消息时，按照 NAI tag 格式描述图片内容。<br>可用变量：<code>{char_name}</code> 角色名</span>
-                            <textarea id="set-nai-prompt-instruction" class="setting-input"
-                                style="height:130px; font-size:11px; resize:vertical; font-family:monospace;"
-                                placeholder="指导AI如何构建NAI图片Tag...">When sending type="img" messages, write the content as NovelAI image generation tags (Danbooru tag format). Rules:
-1. Use comma-separated English tags, NOT natural language descriptions.
-2. Include character appearance tags: hair color, eye color, expression, pose, clothing.
-3. Include scene/background tags: location, lighting, atmosphere.
-4. Use tag weighting: {{important tag}}, [less important tag].
-5. Character name tag: {char_name}.
-6. Example: 1girl, {char_name}, silver hair, blue eyes, smile, school uniform, sitting, classroom, window, sunlight, upper body</textarea>
-                        </div>
-                    </div>
-                </div>
+            </div>
+            <div class="settings-footer" style="padding: 10px;">
+                <button class="modal-btn btn-save"
+                    style="width: 100%; padding: 8px; border-radius: 12px; font-size: 13px;"
+                    onclick="saveNaiSettings()">保存</button>
+            </div>
+        </div>
 
-                <!-- SMEA 和高级选项 -->
+        <!-- MiniMax TTS 语音设置子页面 -->
+        <div id="tts-settings-screen" class="screen">
+            <div class="app-header">
+                <div class="header-content">
+                    <div class="header-btn" onclick="closeTtsSettings()"><svg viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
+                        </svg></div>
+                    <span class="header-title">MiniMax 语音设置</span>
+                </div>
+            </div>
+            <div class="settings-body">
+                <!-- API 配置 -->
                 <div>
-                    <div class="settings-section-title">高级选项</div>
+                    <div class="settings-section-title">API 配置</div>
                     <div class="setting-group">
                         <div class="setting-row">
-                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">SMEA</label>
-                                <span style="font-size:11px; color:#aaa; line-height:1.4;">改善大尺寸图像的构图</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="set-nai-smea" checked>
-                                <span class="slider round"></span>
-                            </label>
+                            <label>API Key</label>
+                            <input type="password" id="set-tts-api-key" class="setting-input"
+                                placeholder="输入 MiniMax API Key">
+                        </div>
+                        <div class="setting-row">
+                            <label>Group ID</label>
+                            <input type="text" id="set-tts-group-id" class="setting-input" placeholder="输入 Group ID">
+                        </div>
+                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                            <label>CORS 代理地址</label>
+                            <input type="text" id="set-tts-cors-proxy" class="setting-input"
+                                placeholder="如：https://corsproxy.io/?">
+                            <span style="font-size:11px; color:#aaa; line-height:1.5;">
+                                本地文件打开时需要 CORS 代理。默认：https://corsproxy.io/?
+                                <br>留空则直接请求（需从 HTTP 服务器访问页面）。
+                            </span>
                         </div>
                         <div class="setting-row">
                             <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">Dynamic SMEA</label>
-                                <span style="font-size:11px; color:#aaa; line-height:1.4;">SMEA 的动态版本，效果更好但较慢</span>
+                                <label style="font-size:14px;">启用 TTS 语音</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI回复旁将显示播放按钮</span>
                             </div>
                             <label class="switch">
-                                <input type="checkbox" id="set-nai-dynamic">
+                                <input type="checkbox" id="set-tts-enabled">
                                 <span class="slider round"></span>
                             </label>
-                        </div>
-                        <div class="setting-row">
-                            <label>CFG Rescale</label>
-                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                                <input type="range" id="set-nai-cfg-rescale" class="setting-range" min="0" max="1"
-                                    step="0.01" value="0" style="flex: 1;"
-                                    oninput="document.getElementById('nai-cfg-rescale-display').textContent = this.value">
-                                <span id="nai-cfg-rescale-display"
-                                    style="width: 36px; text-align: right; font-size: 13px; color: #666;">0</span>
-                            </div>
-                        </div>
-                        <div class="setting-row">
-                            <label>Uncond Scale</label>
-                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
-                                <input type="range" id="set-nai-uncond-scale" class="setting-range" min="0" max="1.5"
-                                    step="0.05" value="1" style="flex: 1;"
-                                    oninput="document.getElementById('nai-uncond-scale-display').textContent = this.value">
-                                <span id="nai-uncond-scale-display"
-                                    style="width: 36px; text-align: right; font-size: 13px; color: #666;">1</span>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -715,7 +674,7 @@
             <div class="settings-footer" style="padding: 10px;">
                 <button class="modal-btn btn-save"
                     style="width: 100%; padding: 8px; border-radius: 12px; font-size: 13px;"
-                    onclick="saveNaiSettings()">保存</button>
+                    onclick="saveTtsSettings()">保存</button>
             </div>
         </div>
 
@@ -890,8 +849,8 @@
                     <div class="settings-section-title">备注</div>
                     <div class="setting-group">
                         <div class="setting-row">
-                            <label>备注名</label>
-                            <input type="text" id="set-chat-remark" class="uc-input" placeholder="设置备注名..."
+                            <label>备注</label>
+                            <input type="text" id="set-chat-remark" class="uc-input" placeholder="设置备注..."
                                 style="width: 140px; text-align: right; border: none; background: transparent; font-size: 14px; color: #333;"
                                 oninput="saveChatRemarkAuto()">
                         </div>
@@ -998,8 +957,7 @@
                         <div class="setting-row">
                             <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
                                 <label style="font-size:14px;">Mate 模式</label>
-                                <span
-                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，角色知道自己是AI角色扮演，而非真实存在</span>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，角色知道自己是AI角色扮演</span>
                             </div>
                             <label class="switch">
                                 <input type="checkbox" id="set-mate-mode" onchange="saveChatMateModeAuto()">
@@ -1010,13 +968,124 @@
                             <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
                                 <label style="font-size:14px;">心声模式</label>
                                 <span
-                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI每次回复至少两条消息末尾会附上角色内心独白</span>
+                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，每次回复至少两条消息末尾会附上角色心声</span>
                             </div>
                             <label class="switch">
                                 <input type="checkbox" id="set-inner-voice-mode"
                                     onchange="saveChatInnerVoiceModeAuto()">
                                 <span class="slider round"></span>
                             </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NAI 生图设置 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">NAI 生图</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">启用 NAI 生图</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">请先在设置中完成配置</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="chat-nai-enabled" onchange="saveChatNaiSettings()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="chat-nai-detail">
+                            <div class="setting-row">
+                                <label>图片尺寸</label>
+                                <select id="chat-nai-size" class="setting-input" style="flex:1; min-width:0;"
+                                    onchange="saveChatNaiSettings()">
+                                    <option value="832x1216">竖版 (832×1216)</option>
+                                    <option value="1216x832">横版 (1216×832)</option>
+                                    <option value="1024x1024">正方形 (1024×1024)</option>
+                                    <option value="512x768">小竖版 (512×768)</option>
+                                    <option value="768x512">小横版 (768×512)</option>
+                                    <option value="640x640">小正方 (640×640)</option>
+                                </select>
+                            </div>
+                            <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                                <label>角色描述提示词</label>
+                                <textarea id="chat-nai-char-prompt" class="setting-input"
+                                    style="height:70px; font-size:12px; resize:vertical; font-family:monospace;"
+                                    placeholder="描述角色外貌的 NAI tag，如：1girl, long silver hair, blue eyes, school uniform"
+                                    oninput="saveChatNaiSettings()"></textarea>
+                                <span style="font-size:11px; color:#aaa; line-height:1.5;">附加到正面提示词</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- MiniMax TTS 语音 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">MiniMax 语音</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">启用 TTS 语音</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">请先在设置中完成配置</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="chat-tts-enabled" onchange="saveChatTtsSettings()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="chat-tts-detail" style="display:none;">
+                            <div class="setting-row">
+                                <label>模型</label>
+                                <select id="chat-tts-model" class="setting-input" style="flex:1; min-width:0;"
+                                    onchange="saveChatTtsSettings()">
+                                    <option value="speech-02-hd">Speech-02 HD (高清)</option>
+                                    <option value="speech-02-turbo">Speech-02 Turbo (快速)</option>
+                                    <option value="speech-02">Speech-02</option>
+                                </select>
+                            </div>
+                            <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:6px;">
+                                <label>Voice ID (音色)</label>
+                                <input type="text" id="chat-tts-voice-id" class="setting-input"
+                                    placeholder="如：female-shaonv、Cute_Girl 等" oninput="saveChatTtsSettings()">
+                            </div>
+                            <div class="setting-row">
+                                <label>朗读模式</label>
+                                <select id="chat-tts-read-mode" class="setting-input" style="flex:1; min-width:0;"
+                                    onchange="saveChatTtsSettings()">
+                                    <option value="all">完整语音（读出全部）</option>
+                                    <option value="exclude_actions">忽略动作（不读星号/括号内内容）</option>
+                                    <option value="only_quotes">纯净对话（仅读出引号内内容）</option>
+                                </select>
+                            </div>
+                            <div class="setting-row">
+                                <label>语速</label>
+                                <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                                    <input type="range" id="chat-tts-speed" class="setting-range" min="0.5" max="2.0"
+                                        step="0.05" value="1.0" style="flex:1;"
+                                        oninput="document.getElementById('chat-tts-speed-val').textContent=this.value; saveChatTtsSettings()">
+                                    <span id="chat-tts-speed-val"
+                                        style="width:32px; text-align:right; font-size:13px; color:#666;">1.0</span>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <label>音量</label>
+                                <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                                    <input type="range" id="chat-tts-vol" class="setting-range" min="0.1" max="10"
+                                        step="0.1" value="1.0" style="flex:1;"
+                                        oninput="document.getElementById('chat-tts-vol-val').textContent=this.value; saveChatTtsSettings()">
+                                    <span id="chat-tts-vol-val"
+                                        style="width:32px; text-align:right; font-size:13px; color:#666;">1.0</span>
+                                </div>
+                            </div>
+                            <div class="setting-row">
+                                <label>音调</label>
+                                <div style="display:flex; align-items:center; gap:8px; flex:1;">
+                                    <input type="range" id="chat-tts-pitch" class="setting-range" min="-12" max="12"
+                                        step="1" value="0" style="flex:1;"
+                                        oninput="document.getElementById('chat-tts-pitch-val').textContent=this.value; saveChatTtsSettings()">
+                                    <span id="chat-tts-pitch-val"
+                                        style="width:32px; text-align:right; font-size:13px; color:#666;">0</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1133,9 +1202,11 @@
                     </div>
                 </div>
             </div>
-            <div class="settings-footer" style="padding: 10px;">
+            <div class="settings-footer" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
                 <button class="modal-btn btn-save" onclick="saveChatBeautifySettings()"
                     style="width: 100%; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px;">保存配置</button>
+                <button class="modal-btn" onclick="restoreDefaultBeautifySettings()"
+                    style="width: 100%; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px; background: #f5f5f5; color: #666;">恢复默认配色</button>
             </div>
         </div>
 
