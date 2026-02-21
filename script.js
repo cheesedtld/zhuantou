@@ -26,18 +26,18 @@
     }
 
     const defaultAppSettings = {
-        charBubble: '#001C77', charText: '#C2C2C2', charAvatar: '',
-        userBubble: '#016E8F', userText: '#C2C2C2', userAvatar: '',
-        chatBg: 'https://intellcs.sinosafe.com.cn/immessage/api/v1/message/attachment/download?groupName=group1&authorization=EnAfMjUzaQVz&fileName=M00/00/AB/CgND1WkthgWAKgDaAASrzx5RVa827.jpeg', chatBgIsDark: false,
-        homeBg: 'https://intellcs.sinosafe.com.cn/immessage/api/v1/message/attachment/download?groupName=group1&authorization=EnAfMjUzaQVz&fileName=M00/00/A7/CgND1WkhtDSADV5WAANPQ4JuHoI63.jpeg', homeBgIsDark: false,
-        iconBg: '#003673', iconColor: '#00885A',
-        homeTextColor: '#749594',
-        interfaceColor: '#004A88',
-        msgNameColor: '#C2C2C2',
-        msgTimeColor: '#ADADAD',
+        charBubble: '#d2b3b9d4', charText: '#5a3a42', charAvatar: '',
+        userBubble: '#f0d5dbe4', userText: '#4a3a3f', userAvatar: '',
+        chatBg: 'https://img.phey.click/43m7c8.jpeg', chatBgIsDark: false,
+        homeBg: 'https://img.phey.click/43m7c8.jpeg', homeBgIsDark: false,
+        iconBg: 'rgba(248, 205, 212, 0.45)', iconColor: '#d4778a',
+        homeTextColor: '#83696eff',
+        interfaceColor: '#f1d9dddc',
+        msgNameColor: '#c5a3a9ff',
+        msgTimeColor: '#cbadb3',
         fontSize: 14, // 默认字体大小
-        chatBtnColor: '#A7C6FF', // 按钮背景色
-        chatBtnText: '#A7C6FF', // 按钮文字/图标色
+        chatBtnColor: '#EDE5E3', // 按钮背景色
+        chatBtnText: '#C9A2A3', // 按钮文字/图标色
         customTime: '', // 格式 HH:MM，为空则使用系统时间
         timeOffset: 0, // 时间偏移量 (ms)
         blockChar: false, // User blocks Char (DEPRECATED global, use chatBlockStates)
@@ -56,7 +56,27 @@
         apiModel: 'gpt-3.5-turbo',
         apiTemperature: 1.0,
         debugMode: false, // 调试模式：显示AI原始输出
-        friendRequests: [] // 好友申请列表 [{from: 'Name', message: '留言', timestamp: Date}]
+        friendRequests: [], // 好友申请列表 [{from: 'Name', message: '留言', timestamp: Date}]
+        // NAI Image Generation Settings
+        naiEnabled: false,
+        naiApiKey: '',
+        naiModel: 'nai-diffusion-4-curated-preview',
+        naiSampler: 'k_euler_ancestral',
+        naiSchedule: 'native',
+        naiSteps: 28,
+        naiScale: 5,
+        naiSeed: -1,
+        naiWidth: 832,
+        naiHeight: 1216,
+        naiSizePreset: '832x1216',
+        naiPositivePrefix: 'best quality, amazing quality, very aesthetic, absurdres',
+        naiPositiveSuffix: '',
+        naiNegative: 'lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract]',
+        naiSmea: true,
+        naiDynamic: false,
+        naiCfgRescale: 0,
+        naiUncondScale: 1,
+        naiPromptInstruction: `When sending type="img" messages, write the content as NovelAI image generation tags (Danbooru tag format). Rules:\n1. Use comma-separated English tags, NOT natural language descriptions.\n2. Include character appearance tags: hair color, eye color, expression, pose, clothing.\n3. Include scene/background tags: location, lighting, atmosphere.\n4. Use tag weighting: {{important tag}}, [less important tag].\n5. Character name tag: {char_name}.\n6. Example: 1girl, {char_name}, silver hair, blue eyes, smile, school uniform, sitting, classroom, window, sunlight, upper body`
     };
     let appSettings = { ...defaultAppSettings };
     let userCharacters = []; // New: To store user characters
@@ -944,6 +964,14 @@
             return;
         }
 
+        const naiSettingsScreenBack = document.getElementById('nai-settings-screen');
+        if (naiSettingsScreenBack && naiSettingsScreenBack.style.display === 'flex') {
+            naiSettingsScreenBack.style.display = 'none';
+            if (settingsScreen) settingsScreen.style.display = 'flex';
+            updateStatusBar('settings');
+            return;
+        }
+
         const stickerSettingsScreenBack = document.getElementById('sticker-settings-screen');
         if (stickerSettingsScreenBack && stickerSettingsScreenBack.style.display === 'flex') {
             stickerSettingsScreenBack.style.display = 'none';
@@ -1414,7 +1442,231 @@
         closeDataSettings();
     }
 
+    // ===== NAI Image Generation Settings =====
+    function openNaiSettings() {
+        // Load current values into UI
+        document.getElementById('set-nai-api-key').value = appSettings.naiApiKey || '';
+        document.getElementById('set-nai-enabled').checked = appSettings.naiEnabled || false;
+        document.getElementById('set-nai-model').value = appSettings.naiModel || 'nai-diffusion-4-curated-preview';
+        document.getElementById('set-nai-sampler').value = appSettings.naiSampler || 'k_euler_ancestral';
+        document.getElementById('set-nai-schedule').value = appSettings.naiSchedule || 'native';
 
+        const steps = appSettings.naiSteps || 28;
+        document.getElementById('set-nai-steps').value = steps;
+        document.getElementById('nai-steps-display').textContent = steps;
+
+        const scale = appSettings.naiScale !== undefined ? appSettings.naiScale : 5;
+        document.getElementById('set-nai-scale').value = scale;
+        document.getElementById('nai-scale-display').textContent = scale;
+
+        document.getElementById('set-nai-seed').value = appSettings.naiSeed !== undefined ? appSettings.naiSeed : -1;
+
+        // Size preset
+        const preset = appSettings.naiSizePreset || '832x1216';
+        document.getElementById('set-nai-size-preset').value = preset;
+        const customRow = document.getElementById('nai-custom-size-row');
+        if (preset === 'custom') {
+            customRow.style.display = 'flex';
+        } else {
+            customRow.style.display = 'none';
+        }
+        document.getElementById('set-nai-width').value = appSettings.naiWidth || 832;
+        document.getElementById('set-nai-height').value = appSettings.naiHeight || 1216;
+
+        // Prompts
+        document.getElementById('set-nai-positive-prefix').value = appSettings.naiPositivePrefix || '';
+        document.getElementById('set-nai-positive-suffix').value = appSettings.naiPositiveSuffix || '';
+        document.getElementById('set-nai-negative').value = appSettings.naiNegative || '';
+        document.getElementById('set-nai-prompt-instruction').value = appSettings.naiPromptInstruction || '';
+
+        // Advanced
+        document.getElementById('set-nai-smea').checked = appSettings.naiSmea !== false;
+        document.getElementById('set-nai-dynamic').checked = appSettings.naiDynamic || false;
+
+        const cfgRescale = appSettings.naiCfgRescale !== undefined ? appSettings.naiCfgRescale : 0;
+        document.getElementById('set-nai-cfg-rescale').value = cfgRescale;
+        document.getElementById('nai-cfg-rescale-display').textContent = cfgRescale;
+
+        const uncondScale = appSettings.naiUncondScale !== undefined ? appSettings.naiUncondScale : 1;
+        document.getElementById('set-nai-uncond-scale').value = uncondScale;
+        document.getElementById('nai-uncond-scale-display').textContent = uncondScale;
+
+        if (settingsScreen) settingsScreen.style.display = 'none';
+        const naiScreen = document.getElementById('nai-settings-screen');
+        if (naiScreen) naiScreen.style.display = 'flex';
+        updateStatusBar('settings');
+    }
+
+    function closeNaiSettings() {
+        const naiScreen = document.getElementById('nai-settings-screen');
+        if (naiScreen) naiScreen.style.display = 'none';
+        if (settingsScreen) settingsScreen.style.display = 'flex';
+        updateStatusBar('settings');
+    }
+
+    function saveNaiSettings() {
+        appSettings.naiApiKey = document.getElementById('set-nai-api-key').value;
+        appSettings.naiEnabled = document.getElementById('set-nai-enabled').checked;
+        appSettings.naiModel = document.getElementById('set-nai-model').value;
+        appSettings.naiSampler = document.getElementById('set-nai-sampler').value;
+        appSettings.naiSchedule = document.getElementById('set-nai-schedule').value;
+        appSettings.naiSteps = parseInt(document.getElementById('set-nai-steps').value) || 28;
+        appSettings.naiScale = parseFloat(document.getElementById('set-nai-scale').value) || 5;
+        appSettings.naiSeed = parseInt(document.getElementById('set-nai-seed').value);
+        if (isNaN(appSettings.naiSeed)) appSettings.naiSeed = -1;
+
+        const preset = document.getElementById('set-nai-size-preset').value;
+        appSettings.naiSizePreset = preset;
+        if (preset === 'custom') {
+            appSettings.naiWidth = parseInt(document.getElementById('set-nai-width').value) || 832;
+            appSettings.naiHeight = parseInt(document.getElementById('set-nai-height').value) || 1216;
+        } else {
+            const [w, h] = preset.split('x').map(Number);
+            appSettings.naiWidth = w;
+            appSettings.naiHeight = h;
+        }
+
+        appSettings.naiPositivePrefix = document.getElementById('set-nai-positive-prefix').value;
+        appSettings.naiPositiveSuffix = document.getElementById('set-nai-positive-suffix').value;
+        appSettings.naiNegative = document.getElementById('set-nai-negative').value;
+        appSettings.naiPromptInstruction = document.getElementById('set-nai-prompt-instruction').value;
+
+        appSettings.naiSmea = document.getElementById('set-nai-smea').checked;
+        appSettings.naiDynamic = document.getElementById('set-nai-dynamic').checked;
+        appSettings.naiCfgRescale = parseFloat(document.getElementById('set-nai-cfg-rescale').value) || 0;
+        appSettings.naiUncondScale = parseFloat(document.getElementById('set-nai-uncond-scale').value) || 1;
+
+        saveSettingsToStorage();
+        showToast('NAI 设置已保存');
+        closeNaiSettings();
+    }
+
+    function applyNaiSizePreset() {
+        const preset = document.getElementById('set-nai-size-preset').value;
+        const customRow = document.getElementById('nai-custom-size-row');
+        if (preset === 'custom') {
+            customRow.style.display = 'flex';
+        } else {
+            customRow.style.display = 'none';
+            const [w, h] = preset.split('x').map(Number);
+            document.getElementById('set-nai-width').value = w;
+            document.getElementById('set-nai-height').value = h;
+        }
+    }
+
+    // NAI Image Generation API Call
+    async function generateNaiImage(promptTags) {
+        if (!appSettings.naiApiKey) {
+            throw new Error('NAI API Key 未配置');
+        }
+
+        // Build final prompt: prefix + AI tags + suffix
+        const parts = [];
+        if (appSettings.naiPositivePrefix) parts.push(appSettings.naiPositivePrefix.trim());
+        if (promptTags) parts.push(promptTags.trim());
+        if (appSettings.naiPositiveSuffix) parts.push(appSettings.naiPositiveSuffix.trim());
+        const finalPrompt = parts.filter(p => p).join(', ');
+
+        const negPrompt = appSettings.naiNegative || '';
+        const seed = appSettings.naiSeed === -1 ? Math.floor(Math.random() * 4294967295) : appSettings.naiSeed;
+
+        const payload = {
+            input: finalPrompt,
+            model: appSettings.naiModel || 'nai-diffusion-4-curated-preview',
+            action: 'generate',
+            parameters: {
+                params_version: 3,
+                width: appSettings.naiWidth || 832,
+                height: appSettings.naiHeight || 1216,
+                scale: appSettings.naiScale || 5,
+                sampler: appSettings.naiSampler || 'k_euler_ancestral',
+                steps: appSettings.naiSteps || 28,
+                n_samples: 1,
+                ucPreset: 0,
+                qualityToggle: true,
+                sm: appSettings.naiSmea !== false,
+                sm_dyn: appSettings.naiDynamic || false,
+                cfg_rescale: appSettings.naiCfgRescale || 0,
+                uncond_scale: appSettings.naiUncondScale !== undefined ? appSettings.naiUncondScale : 1,
+                noise_schedule: appSettings.naiSchedule || 'native',
+                seed: seed,
+                negative_prompt: negPrompt
+            }
+        };
+
+        console.log('[NAI] Generating image with prompt:', finalPrompt);
+        console.log('[NAI] Payload:', JSON.stringify(payload, null, 2));
+
+        const res = await fetch('https://image.novelai.net/ai/generate-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${appSettings.naiApiKey}`,
+                'Accept': 'application/zip'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`NAI API Error ${res.status}: ${errText}`);
+        }
+
+        // NAI returns a ZIP file containing the PNG image
+        const zipBlob = await res.blob();
+        const zipArrayBuffer = await zipBlob.arrayBuffer();
+
+        // Simple ZIP extraction: find PNG data within the ZIP
+        const zipData = new Uint8Array(zipArrayBuffer);
+
+        // Look for PNG signature: 89 50 4E 47 0D 0A 1A 0A
+        const pngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        let pngStart = -1;
+        for (let i = 0; i < zipData.length - 8; i++) {
+            let found = true;
+            for (let j = 0; j < 8; j++) {
+                if (zipData[i + j] !== pngSignature[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                pngStart = i;
+                break;
+            }
+        }
+
+        if (pngStart === -1) {
+            throw new Error('无法从NAI响应中提取图片数据');
+        }
+
+        // Find the end of PNG (IEND chunk: 00 00 00 00 49 45 4E 44 AE 42 60 82)
+        const iendSignature = [0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82];
+        let pngEnd = zipData.length;
+        for (let i = pngStart + 8; i < zipData.length - 8; i++) {
+            let found = true;
+            for (let j = 0; j < 8; j++) {
+                if (zipData[i + j] !== iendSignature[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                pngEnd = i + 8;
+                break;
+            }
+        }
+
+        const pngData = zipData.slice(pngStart, pngEnd);
+        const pngBlob = new Blob([pngData], { type: 'image/png' });
+
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error('Failed to read image data'));
+            reader.readAsDataURL(pngBlob);
+        });
+    }
 
     function exportAllData() {
         try {
@@ -1632,11 +1884,11 @@
 
         if (homeScreen) {
             if (appSettings.homeBg) homeScreen.style.backgroundImage = `url(${appSettings.homeBg})`;
-            else { homeScreen.style.backgroundImage = 'none'; homeScreen.style.backgroundColor = '#f3e5f5'; }
+            else { homeScreen.style.backgroundImage = 'none'; homeScreen.style.backgroundColor = '#fdf0f2'; }
         }
         if (chatScreen) {
-            if (appSettings.chatBg) { chatScreen.style.backgroundImage = `url(${appSettings.chatBg})`; chatScreen.style.backgroundColor = '#f9f9f9'; }
-            else { chatScreen.style.backgroundImage = 'none'; chatScreen.style.backgroundColor = '#fff'; }
+            if (appSettings.chatBg) { chatScreen.style.backgroundImage = `url(${appSettings.chatBg})`; chatScreen.style.backgroundColor = '#fdf6f7'; }
+            else { chatScreen.style.backgroundImage = 'none'; chatScreen.style.backgroundColor = '#fdf6f7'; }
         }
 
         document.querySelectorAll('.app-icon-style').forEach(el => {
@@ -1659,12 +1911,12 @@
         // 主屏和消息列表不设置 --interface-bg，保持原有色彩
 
         const rootStyle = document.documentElement.style;
-        rootStyle.setProperty('--msg-name-color', appSettings.msgNameColor || '#999999');
-        rootStyle.setProperty('--msg-time-color', appSettings.msgTimeColor || '#b0b0b0');
+        rootStyle.setProperty('--msg-name-color', appSettings.msgNameColor || '#c4969e');
+        rootStyle.setProperty('--msg-time-color', appSettings.msgTimeColor || '#cbadb3');
         rootStyle.setProperty('--msg-font-size', (appSettings.fontSize || 14) + 'px');
-        const btnRgba = hexToRgba(appSettings.chatBtnColor || '#f2b5b6', 0.6);
+        const btnRgba = hexToRgba(appSettings.chatBtnColor || '#f0b8c2', 0.6);
         rootStyle.setProperty('--chat-btn-color', btnRgba);
-        rootStyle.setProperty('--chat-btn-text', appSettings.chatBtnText || '#2ea0a0');
+        rootStyle.setProperty('--chat-btn-text', appSettings.chatBtnText || '#d4778a');
 
         // Apply Custom CSS
         let styleTag = document.getElementById('custom-css-style');
@@ -4352,7 +4604,14 @@ ${chatText}
             else { el.style.backgroundColor = appSettings.charBubble; }
         } else if (isPhoto) {
             el = document.createElement('div'); el.className = `photo-card ${msg.isUser ? 'sent' : 'received'} `;
-            el.innerHTML = `<img src="${displayBody}">`;
+            // Check if displayBody is a valid image source (URL or base64)
+            const isValidImgSrc = /^(https?:\/\/|data:image\/|blob:)/.test(displayBody);
+            if (isValidImgSrc) {
+                el.innerHTML = `<img src="${displayBody}">`;
+            } else {
+                // Text description placeholder: gray-white card with description text
+                el.innerHTML = `<div class="photo-placeholder"><div class="photo-placeholder-icon"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#aaa" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div><div class="photo-placeholder-text">${displayBody}</div></div>`;
+            }
             if (msg.isUser) { el.style.backgroundColor = appSettings.userBubble; }
             else { el.style.backgroundColor = appSettings.charBubble; }
         } else {
@@ -6159,6 +6418,11 @@ ${chatText}
     window.rejectFriendRequest = rejectFriendRequest;
     window.closeDataSettings = closeDataSettings;
     window.saveDataSettings = saveDataSettings;
+    // NAI Settings
+    window.openNaiSettings = openNaiSettings;
+    window.closeNaiSettings = closeNaiSettings;
+    window.saveNaiSettings = saveNaiSettings;
+    window.applyNaiSizePreset = applyNaiSizePreset;
     // Memory Summary System
     window.summarizeChatMemory = summarizeChatMemory;
     window.addMemoryManual = addMemoryManual;
@@ -6191,6 +6455,8 @@ ${chatText}
         const chatTimeSettingsScreen = document.getElementById('chat-time-settings-screen');
         if (chatTimeSettingsScreen) chatTimeSettingsScreen.style.display = 'none';
         if (document.getElementById('call-screen')) document.getElementById('call-screen').style.display = 'none';
+        const naiSettingsScreen = document.getElementById('nai-settings-screen');
+        if (naiSettingsScreen) naiSettingsScreen.style.display = 'none';
 
         // Show the requested screen
         const screenToShow = document.getElementById(screenId);
@@ -7111,6 +7377,12 @@ Apply the following substitutions based on current language (CN/EN).
                 systemContent += memoryContext;
             }
 
+            // NAI Image Generation: inject prompt instruction into system prompt
+            if (appSettings.naiEnabled && appSettings.naiPromptInstruction) {
+                const naiInstruction = appSettings.naiPromptInstruction.replace(/\{char_name\}/g, charName);
+                systemContent += `\n\n[NAI Image Generation - ACTIVE]\n${naiInstruction}`;
+            }
+
             systemContent += formatInstruction + mobileChatPrompt;
             messages.push({ role: 'system', content: systemContent });
 
@@ -7475,6 +7747,24 @@ Apply the following substitutions based on current language (CN/EN).
 
             if (getChatBlockChar()) {
                 finalBody = `<blocked>${finalBody}`;
+            }
+
+            // NAI Image Generation: if this is an image message and NAI is enabled, generate the image
+            const isImgMessage = finalHeader.includes('\u56fe\u7247') || finalHeader.includes('|IMG|');
+            if (isImgMessage && appSettings.naiEnabled && appSettings.naiApiKey && !getChatBlockChar()) {
+                try {
+                    console.log('[NAI] Detected AI image message, generating with tags:', finalBody);
+                    showToast('🎨 NAI 生图中...');
+                    const naiImageDataUrl = await generateNaiImage(finalBody);
+                    if (naiImageDataUrl) {
+                        finalBody = naiImageDataUrl;
+                        console.log('[NAI] Image generated successfully');
+                    }
+                } catch (naiErr) {
+                    console.error('[NAI] Image generation failed:', naiErr);
+                    showToast('NAI 生图失败: ' + naiErr.message);
+                    // Keep original tag description as fallback
+                }
             }
 
             renderMessageToUI({
@@ -7940,6 +8230,11 @@ Apply the following substitutions based on current language (CN/EN).
         saveBeautifySettings,
         saveApiSettings,
         saveDataSettings,
+        // NAI settings
+        openNaiSettings,
+        closeNaiSettings,
+        saveNaiSettings,
+        applyNaiSizePreset,
         exportAllData,
         importAllData,
         clearAllData,
