@@ -376,6 +376,23 @@
                     </svg>
                 </div>
 
+                <!-- NAI 生图设置 -->
+                <div class="settings-nav-card" onclick="openNaiSettings()">
+                    <div class="settings-nav-icon" style="background: rgba(168,130,255,0.15);">
+                        <div class="settings-nav-icon-img"
+                            style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:palette-outline.svg'); mask-image: url('https://api.iconify.design/material-symbols:palette-outline.svg'); background-color: #a882ff;">
+                        </div>
+                    </div>
+                    <div class="settings-nav-text">
+                        <div class="settings-nav-title">NAI 生图设置</div>
+                        <div class="settings-nav-subtitle">NovelAI · 提示词 · 参数</div>
+                    </div>
+                    <svg class="settings-nav-arrow" viewBox="0 0 24 24">
+                        <path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round"></path>
+                    </svg>
+                </div>
+
             </div>
         </div>
 
@@ -478,6 +495,229 @@
             </div>
         </div>
 
+        <!-- NAI 生图设置子页面 -->
+        <div id="nai-settings-screen" class="screen">
+            <div class="app-header">
+                <div class="header-content">
+                    <div class="header-btn" onclick="closeNaiSettings()"><svg viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
+                        </svg></div>
+                    <span class="header-title">NAI 生图设置</span>
+                </div>
+            </div>
+            <div class="settings-body">
+                <!-- 基本 API 配置 -->
+                <div>
+                    <div class="settings-section-title">API 配置</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <label>NAI API Key</label>
+                            <input type="password" id="set-nai-api-key" class="setting-input" placeholder="pst-...">
+                        </div>
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">启用 NAI 生图</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI发送图片时自动调用NAI生成</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-nai-enabled">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 模型与采样 -->
+                <div>
+                    <div class="settings-section-title">模型与采样</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <label>模型</label>
+                            <select id="set-nai-model" class="setting-input" style="flex: 1; min-width: 0;">
+                                <option value="nai-diffusion-4-curated-preview">NAI Diffusion 4 Curated</option>
+                                <option value="nai-diffusion-4-full-preview">NAI Diffusion 4 Full</option>
+                                <option value="nai-diffusion-3">NAI Diffusion 3 (Anime V3)</option>
+                                <option value="nai-diffusion-3-inpainting">NAI Diffusion 3 Inpainting</option>
+                                <option value="nai-diffusion-2">NAI Diffusion 2</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>采样器 (Sampler)</label>
+                            <select id="set-nai-sampler" class="setting-input" style="flex: 1; min-width: 0;">
+                                <option value="k_euler">Euler</option>
+                                <option value="k_euler_ancestral" selected>Euler Ancestral</option>
+                                <option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option>
+                                <option value="k_dpmpp_2m_sde">DPM++ 2M SDE</option>
+                                <option value="k_dpmpp_sde">DPM++ SDE</option>
+                                <option value="ddim_v3">DDIM</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>噪声调度 (Schedule)</label>
+                            <select id="set-nai-schedule" class="setting-input" style="flex: 1; min-width: 0;">
+                                <option value="native" selected>Native</option>
+                                <option value="karras">Karras</option>
+                                <option value="exponential">Exponential</option>
+                                <option value="polyexponential">Polyexponential</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>步数 (Steps)</label>
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <input type="range" id="set-nai-steps" class="setting-range" min="1" max="50" step="1"
+                                    value="28" style="flex: 1;"
+                                    oninput="document.getElementById('nai-steps-display').textContent = this.value">
+                                <span id="nai-steps-display"
+                                    style="width: 30px; text-align: right; font-size: 13px; color: #666;">28</span>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>引导强度 (Scale/CFG)</label>
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <input type="range" id="set-nai-scale" class="setting-range" min="0" max="10" step="0.1"
+                                    value="5" style="flex: 1;"
+                                    oninput="document.getElementById('nai-scale-display').textContent = this.value">
+                                <span id="nai-scale-display"
+                                    style="width: 30px; text-align: right; font-size: 13px; color: #666;">5</span>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>Seed (-1 为随机)</label>
+                            <input type="number" id="set-nai-seed" class="setting-input" value="-1"
+                                style="width:80px; text-align:center;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 图片尺寸 -->
+                <div>
+                    <div class="settings-section-title">图片尺寸</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <label>预设尺寸</label>
+                            <select id="set-nai-size-preset" class="setting-input" style="flex: 1; min-width: 0;"
+                                onchange="applyNaiSizePreset()">
+                                <option value="832x1216" selected>竖版 (832×1216)</option>
+                                <option value="1216x832">横版 (1216×832)</option>
+                                <option value="1024x1024">正方形 (1024×1024)</option>
+                                <option value="512x768">小竖版 (512×768)</option>
+                                <option value="768x512">小横版 (768×512)</option>
+                                <option value="640x640">小正方 (640×640)</option>
+                                <option value="custom">自定义</option>
+                            </select>
+                        </div>
+                        <div class="setting-row" id="nai-custom-size-row" style="display:none;">
+                            <label>宽度</label>
+                            <input type="number" id="set-nai-width" class="setting-input" value="832"
+                                style="width:70px; text-align:center;">
+                            <label style="margin:0 6px;">×</label>
+                            <label>高度</label>
+                            <input type="number" id="set-nai-height" class="setting-input" value="1216"
+                                style="width:70px; text-align:center;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 提示词设置 -->
+                <div>
+                    <div class="settings-section-title">提示词 (Prompt)</div>
+                    <div class="setting-group">
+                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                            <label>正面提示词前缀 (Quality Tags)</label>
+                            <textarea id="set-nai-positive-prefix" class="setting-input"
+                                style="height:60px; font-size:12px; resize:vertical; font-family:monospace;"
+                                placeholder="best quality, amazing quality, very aesthetic, absurdres">best quality, amazing quality, very aesthetic, absurdres</textarea>
+                        </div>
+                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                            <label>正面提示词后缀 (固定附加内容)</label>
+                            <textarea id="set-nai-positive-suffix" class="setting-input"
+                                style="height:40px; font-size:12px; resize:vertical; font-family:monospace;"
+                                placeholder="可选，如：masterpiece, 1girl"></textarea>
+                        </div>
+                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                            <label>负面提示词 (Negative Prompt)</label>
+                            <textarea id="set-nai-negative" class="setting-input"
+                                style="height:80px; font-size:12px; resize:vertical; font-family:monospace;"
+                                placeholder="lowres, {bad}, error, fewer, extra, missing, ...">lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract]</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI 提示词构建格式 -->
+                <div>
+                    <div class="settings-section-title">AI 图片提示词格式</div>
+                    <div class="setting-group">
+                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
+                            <label style="font-size:13px;">AI 发送图片时的提示词构建指令</label>
+                            <span style="font-size:11px; color:#aaa; line-height:1.5;">此指令会添加到系统提示词中，教导 AI 在发送
+                                type="img" 消息时，按照 NAI tag 格式描述图片内容。<br>可用变量：<code>{char_name}</code> 角色名</span>
+                            <textarea id="set-nai-prompt-instruction" class="setting-input"
+                                style="height:130px; font-size:11px; resize:vertical; font-family:monospace;"
+                                placeholder="指导AI如何构建NAI图片Tag...">When sending type="img" messages, write the content as NovelAI image generation tags (Danbooru tag format). Rules:
+1. Use comma-separated English tags, NOT natural language descriptions.
+2. Include character appearance tags: hair color, eye color, expression, pose, clothing.
+3. Include scene/background tags: location, lighting, atmosphere.
+4. Use tag weighting: {{important tag}}, [less important tag].
+5. Character name tag: {char_name}.
+6. Example: 1girl, {char_name}, silver hair, blue eyes, smile, school uniform, sitting, classroom, window, sunlight, upper body</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SMEA 和高级选项 -->
+                <div>
+                    <div class="settings-section-title">高级选项</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">SMEA</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">改善大尺寸图像的构图</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-nai-smea" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">Dynamic SMEA</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">SMEA 的动态版本，效果更好但较慢</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-nai-dynamic">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <label>CFG Rescale</label>
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <input type="range" id="set-nai-cfg-rescale" class="setting-range" min="0" max="1"
+                                    step="0.01" value="0" style="flex: 1;"
+                                    oninput="document.getElementById('nai-cfg-rescale-display').textContent = this.value">
+                                <span id="nai-cfg-rescale-display"
+                                    style="width: 36px; text-align: right; font-size: 13px; color: #666;">0</span>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <label>Uncond Scale</label>
+                            <div style="display: flex; align-items: center; gap: 10px; flex: 1;">
+                                <input type="range" id="set-nai-uncond-scale" class="setting-range" min="0" max="1.5"
+                                    step="0.05" value="1" style="flex: 1;"
+                                    oninput="document.getElementById('nai-uncond-scale-display').textContent = this.value">
+                                <span id="nai-uncond-scale-display"
+                                    style="width: 36px; text-align: right; font-size: 13px; color: #666;">1</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="settings-footer" style="padding: 10px;">
+                <button class="modal-btn btn-save"
+                    style="width: 100%; padding: 8px; border-radius: 12px; font-size: 13px;"
+                    onclick="saveNaiSettings()">保存</button>
+            </div>
+        </div>
 
 
         <!-- 美化设置页面 -->
