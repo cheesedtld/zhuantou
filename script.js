@@ -26,18 +26,18 @@
     }
 
     const defaultAppSettings = {
-        charBubble: '#d2b3b9d4', charText: '#5a3a42', charAvatar: '',
-        userBubble: '#f0d5dbe4', userText: '#4a3a3f', userAvatar: '',
+        charBubble: '#e8dada', charText: '#746669', charAvatar: '',
+        userBubble: '#f2ecec', userText: '#746669', userAvatar: '',
         chatBg: 'https://img.phey.click/43m7c8.jpeg', chatBgIsDark: false,
         homeBg: 'https://img.phey.click/43m7c8.jpeg', homeBgIsDark: false,
-        iconBg: 'rgba(248, 205, 212, 0.45)', iconColor: '#d4778a',
-        homeTextColor: '#83696eff',
-        interfaceColor: '#f1d9dddc',
-        msgNameColor: '#c5a3a9ff',
-        msgTimeColor: '#cbadb3',
+        iconBg: 'rgba(230, 215, 218, 0.55)', iconColor: '#c6acb1',
+        homeTextColor: '#a5979a',
+        interfaceColor: '#f1e8e9',
+        msgNameColor: '#ad9a9e',
+        msgTimeColor: '#c5b8ba',
         fontSize: 14, // 默认字体大小
-        chatBtnColor: '#EDE5E3', // 按钮背景色
-        chatBtnText: '#C9A2A3', // 按钮文字/图标色
+        chatBtnColor: '#f0e8e9', // 按钮背景色
+        chatBtnText: '#bcaaae', // 按钮文字/图标色
         customTime: '', // 格式 HH:MM，为空则使用系统时间
         timeOffset: 0, // 时间偏移量 (ms)
         blockChar: false, // User blocks Char (DEPRECATED global, use chatBlockStates)
@@ -972,6 +972,14 @@
             return;
         }
 
+        const ttsSettingsScreenBack = document.getElementById('tts-settings-screen');
+        if (ttsSettingsScreenBack && ttsSettingsScreenBack.style.display === 'flex') {
+            ttsSettingsScreenBack.style.display = 'none';
+            if (settingsScreen) settingsScreen.style.display = 'flex';
+            updateStatusBar('settings');
+            return;
+        }
+
         const stickerSettingsScreenBack = document.getElementById('sticker-settings-screen');
         if (stickerSettingsScreenBack && stickerSettingsScreenBack.style.display === 'flex') {
             stickerSettingsScreenBack.style.display = 'none';
@@ -1446,7 +1454,7 @@
     function openNaiSettings() {
         // Load current values into UI
         document.getElementById('set-nai-api-key').value = appSettings.naiApiKey || '';
-        document.getElementById('set-nai-enabled').checked = appSettings.naiEnabled || false;
+        if (document.getElementById('set-nai-enabled')) document.getElementById('set-nai-enabled').checked = appSettings.naiEnabled || false;
         document.getElementById('set-nai-model').value = appSettings.naiModel || 'nai-diffusion-4-curated-preview';
         document.getElementById('set-nai-sampler').value = appSettings.naiSampler || 'k_euler_ancestral';
         document.getElementById('set-nai-schedule').value = appSettings.naiSchedule || 'native';
@@ -1463,33 +1471,37 @@
 
         // Size preset
         const preset = appSettings.naiSizePreset || '832x1216';
-        document.getElementById('set-nai-size-preset').value = preset;
-        const customRow = document.getElementById('nai-custom-size-row');
-        if (preset === 'custom') {
-            customRow.style.display = 'flex';
-        } else {
-            customRow.style.display = 'none';
+        if (document.getElementById('set-nai-size-preset')) {
+            document.getElementById('set-nai-size-preset').value = preset;
         }
-        document.getElementById('set-nai-width').value = appSettings.naiWidth || 832;
-        document.getElementById('set-nai-height').value = appSettings.naiHeight || 1216;
+        const customRow = document.getElementById('nai-custom-size-row');
+        if (customRow) {
+            if (preset === 'custom') {
+                customRow.style.display = 'flex';
+            } else {
+                customRow.style.display = 'none';
+            }
+        }
+        if (document.getElementById('set-nai-width')) document.getElementById('set-nai-width').value = appSettings.naiWidth || 832;
+        if (document.getElementById('set-nai-height')) document.getElementById('set-nai-height').value = appSettings.naiHeight || 1216;
 
         // Prompts
         document.getElementById('set-nai-positive-prefix').value = appSettings.naiPositivePrefix || '';
         document.getElementById('set-nai-positive-suffix').value = appSettings.naiPositiveSuffix || '';
         document.getElementById('set-nai-negative').value = appSettings.naiNegative || '';
-        document.getElementById('set-nai-prompt-instruction').value = appSettings.naiPromptInstruction || '';
+        if (document.getElementById('set-nai-prompt-instruction')) document.getElementById('set-nai-prompt-instruction').value = appSettings.naiPromptInstruction || '';
 
         // Advanced
-        document.getElementById('set-nai-smea').checked = appSettings.naiSmea !== false;
-        document.getElementById('set-nai-dynamic').checked = appSettings.naiDynamic || false;
+        if (document.getElementById('set-nai-smea')) document.getElementById('set-nai-smea').checked = appSettings.naiSmea !== false;
+        if (document.getElementById('set-nai-dynamic')) document.getElementById('set-nai-dynamic').checked = appSettings.naiDynamic || false;
 
         const cfgRescale = appSettings.naiCfgRescale !== undefined ? appSettings.naiCfgRescale : 0;
-        document.getElementById('set-nai-cfg-rescale').value = cfgRescale;
-        document.getElementById('nai-cfg-rescale-display').textContent = cfgRescale;
+        if (document.getElementById('set-nai-cfg-rescale')) document.getElementById('set-nai-cfg-rescale').value = cfgRescale;
+        if (document.getElementById('nai-cfg-rescale-display')) document.getElementById('nai-cfg-rescale-display').textContent = cfgRescale;
 
         const uncondScale = appSettings.naiUncondScale !== undefined ? appSettings.naiUncondScale : 1;
-        document.getElementById('set-nai-uncond-scale').value = uncondScale;
-        document.getElementById('nai-uncond-scale-display').textContent = uncondScale;
+        if (document.getElementById('set-nai-uncond-scale')) document.getElementById('set-nai-uncond-scale').value = uncondScale;
+        if (document.getElementById('nai-uncond-scale-display')) document.getElementById('nai-uncond-scale-display').textContent = uncondScale;
 
         if (settingsScreen) settingsScreen.style.display = 'none';
         const naiScreen = document.getElementById('nai-settings-screen');
@@ -1506,7 +1518,9 @@
 
     function saveNaiSettings() {
         appSettings.naiApiKey = document.getElementById('set-nai-api-key').value;
-        appSettings.naiEnabled = document.getElementById('set-nai-enabled').checked;
+        // naiEnabled is now per-chat; this global flag is only a fallback
+        const enabledEl = document.getElementById('set-nai-enabled');
+        if (enabledEl) appSettings.naiEnabled = enabledEl.checked;
         appSettings.naiModel = document.getElementById('set-nai-model').value;
         appSettings.naiSampler = document.getElementById('set-nai-sampler').value;
         appSettings.naiSchedule = document.getElementById('set-nai-schedule').value;
@@ -1515,26 +1529,35 @@
         appSettings.naiSeed = parseInt(document.getElementById('set-nai-seed').value);
         if (isNaN(appSettings.naiSeed)) appSettings.naiSeed = -1;
 
-        const preset = document.getElementById('set-nai-size-preset').value;
-        appSettings.naiSizePreset = preset;
-        if (preset === 'custom') {
-            appSettings.naiWidth = parseInt(document.getElementById('set-nai-width').value) || 832;
-            appSettings.naiHeight = parseInt(document.getElementById('set-nai-height').value) || 1216;
-        } else {
-            const [w, h] = preset.split('x').map(Number);
-            appSettings.naiWidth = w;
-            appSettings.naiHeight = h;
+        // Size is now per-chat; global size stays as default fallback
+        const sizePresetEl = document.getElementById('set-nai-size-preset');
+        if (sizePresetEl) {
+            const preset = sizePresetEl.value;
+            appSettings.naiSizePreset = preset;
+            if (preset === 'custom') {
+                appSettings.naiWidth = parseInt(document.getElementById('set-nai-width').value) || 832;
+                appSettings.naiHeight = parseInt(document.getElementById('set-nai-height').value) || 1216;
+            } else {
+                const [w, h] = preset.split('x').map(Number);
+                appSettings.naiWidth = w;
+                appSettings.naiHeight = h;
+            }
         }
 
         appSettings.naiPositivePrefix = document.getElementById('set-nai-positive-prefix').value;
         appSettings.naiPositiveSuffix = document.getElementById('set-nai-positive-suffix').value;
         appSettings.naiNegative = document.getElementById('set-nai-negative').value;
-        appSettings.naiPromptInstruction = document.getElementById('set-nai-prompt-instruction').value;
+        const promptInstructionEl = document.getElementById('set-nai-prompt-instruction');
+        if (promptInstructionEl) appSettings.naiPromptInstruction = promptInstructionEl.value;
 
-        appSettings.naiSmea = document.getElementById('set-nai-smea').checked;
-        appSettings.naiDynamic = document.getElementById('set-nai-dynamic').checked;
-        appSettings.naiCfgRescale = parseFloat(document.getElementById('set-nai-cfg-rescale').value) || 0;
-        appSettings.naiUncondScale = parseFloat(document.getElementById('set-nai-uncond-scale').value) || 1;
+        const smeaEl = document.getElementById('set-nai-smea');
+        if (smeaEl) appSettings.naiSmea = smeaEl.checked;
+        const dynEl = document.getElementById('set-nai-dynamic');
+        if (dynEl) appSettings.naiDynamic = dynEl.checked;
+        const cfgEl = document.getElementById('set-nai-cfg-rescale');
+        if (cfgEl) appSettings.naiCfgRescale = parseFloat(cfgEl.value) || 0;
+        const uncondEl = document.getElementById('set-nai-uncond-scale');
+        if (uncondEl) appSettings.naiUncondScale = parseFloat(uncondEl.value) || 1;
 
         saveSettingsToStorage();
         showToast('NAI 设置已保存');
@@ -1554,15 +1577,322 @@
         }
     }
 
+    // ===== MiniMax TTS Settings =====
+    let _ttsAudioPlayer = null; // Global audio player for TTS
+
+    function openTtsSettings() {
+        // Load current values safely
+        if (document.getElementById('set-tts-api-key')) document.getElementById('set-tts-api-key').value = appSettings.ttsApiKey || '';
+        if (document.getElementById('set-tts-group-id')) document.getElementById('set-tts-group-id').value = appSettings.ttsGroupId || '';
+
+        // Some elements may have been moved entirely to chat settings, so we use optional chaining/ifs
+        const enabledEl = document.getElementById('set-tts-enabled');
+        if (enabledEl) enabledEl.checked = appSettings.ttsEnabled || false;
+
+        if (document.getElementById('set-tts-model')) document.getElementById('set-tts-model').value = appSettings.ttsModel || 'speech-02-hd';
+        if (document.getElementById('set-tts-voice-id')) document.getElementById('set-tts-voice-id').value = appSettings.ttsVoiceId || 'female-shaonv';
+
+        const speed = appSettings.ttsSpeed !== undefined ? appSettings.ttsSpeed : 1.0;
+        if (document.getElementById('set-tts-speed')) document.getElementById('set-tts-speed').value = speed;
+        if (document.getElementById('tts-speed-display')) document.getElementById('tts-speed-display').textContent = speed;
+
+        const vol = appSettings.ttsVol !== undefined ? appSettings.ttsVol : 1.0;
+        if (document.getElementById('set-tts-vol')) document.getElementById('set-tts-vol').value = vol;
+        if (document.getElementById('tts-vol-display')) document.getElementById('tts-vol-display').textContent = vol;
+
+        const pitch = appSettings.ttsPitch !== undefined ? appSettings.ttsPitch : 0;
+        if (document.getElementById('set-tts-pitch')) document.getElementById('set-tts-pitch').value = pitch;
+        if (document.getElementById('tts-pitch-display')) document.getElementById('tts-pitch-display').textContent = pitch;
+
+        if (document.getElementById('set-tts-format')) document.getElementById('set-tts-format').value = appSettings.ttsFormat || 'mp3';
+        if (document.getElementById('set-tts-sample-rate')) document.getElementById('set-tts-sample-rate').value = appSettings.ttsSampleRate || '24000';
+        if (document.getElementById('set-tts-auto-play')) document.getElementById('set-tts-auto-play').checked = appSettings.ttsAutoPlay || false;
+        if (document.getElementById('set-tts-emotion')) document.getElementById('set-tts-emotion').value = appSettings.ttsEmotion || '';
+        if (document.getElementById('set-tts-cors-proxy')) document.getElementById('set-tts-cors-proxy').value = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : 'https://corsproxy.io/?';
+
+        if (settingsScreen) settingsScreen.style.display = 'none';
+        const ttsScreen = document.getElementById('tts-settings-screen');
+        if (ttsScreen) ttsScreen.style.display = 'flex';
+        updateStatusBar('settings');
+    }
+
+    function closeTtsSettings() {
+        const ttsScreen = document.getElementById('tts-settings-screen');
+        if (ttsScreen) ttsScreen.style.display = 'none';
+        if (settingsScreen) settingsScreen.style.display = 'flex';
+        updateStatusBar('settings');
+    }
+
+    function saveTtsSettings() {
+        if (document.getElementById('set-tts-api-key')) appSettings.ttsApiKey = document.getElementById('set-tts-api-key').value;
+        if (document.getElementById('set-tts-group-id')) appSettings.ttsGroupId = document.getElementById('set-tts-group-id').value;
+
+        const enabledEl = document.getElementById('set-tts-enabled');
+        if (enabledEl) appSettings.ttsEnabled = enabledEl.checked;
+
+        if (document.getElementById('set-tts-model')) appSettings.ttsModel = document.getElementById('set-tts-model').value;
+        if (document.getElementById('set-tts-voice-id')) appSettings.ttsVoiceId = document.getElementById('set-tts-voice-id').value;
+        if (document.getElementById('set-tts-speed')) appSettings.ttsSpeed = parseFloat(document.getElementById('set-tts-speed').value) || 1.0;
+        if (document.getElementById('set-tts-vol')) appSettings.ttsVol = parseFloat(document.getElementById('set-tts-vol').value) || 1.0;
+        if (document.getElementById('set-tts-pitch')) appSettings.ttsPitch = parseInt(document.getElementById('set-tts-pitch').value) || 0;
+        if (document.getElementById('set-tts-format')) appSettings.ttsFormat = document.getElementById('set-tts-format').value;
+        if (document.getElementById('set-tts-sample-rate')) appSettings.ttsSampleRate = document.getElementById('set-tts-sample-rate').value;
+        if (document.getElementById('set-tts-auto-play')) appSettings.ttsAutoPlay = document.getElementById('set-tts-auto-play').checked;
+        if (document.getElementById('set-tts-emotion')) appSettings.ttsEmotion = document.getElementById('set-tts-emotion').value;
+        if (document.getElementById('set-tts-cors-proxy')) appSettings.ttsCorsProxy = document.getElementById('set-tts-cors-proxy').value.trim();
+
+        saveSettingsToStorage();
+        showToast('MiniMax TTS 设置已保存');
+        closeTtsSettings();
+    }
+
+    // MiniMax TTS API Call
+    async function generateTtsAudio(text) {
+        if (!appSettings.ttsApiKey) {
+            throw new Error('MiniMax API Key 未配置');
+        }
+        if (!appSettings.ttsGroupId) {
+            throw new Error('MiniMax Group ID 未配置');
+        }
+
+        // Text Read Mode Filtering
+        let cleanText = text;
+        const readMode = appSettings.ttsReadMode || 'all';
+
+        if (readMode === 'exclude_actions') {
+            // Remove text inside asterisks and brackets/parentheses
+            cleanText = cleanText
+                .replace(/\*(.*?)\*/g, '')
+                .replace(/（.*?）/g, '')
+                .replace(/\(.*?\)/g, '')
+                .replace(/【.*?】/g, '')
+                .replace(/\[.*?\]/g, '');
+        } else if (readMode === 'only_quotes') {
+            // Extract ONLY text inside quotation marks
+            const matches = [...cleanText.matchAll(/(?:["'“‘「『])([^"'”’」』]*)(?:["'”’」』])/g)];
+            if (matches && matches.length > 0) {
+                cleanText = matches.map(m => m[1] || '').join('、');
+            } else {
+                cleanText = ''; // Nothing to read
+            }
+        }
+
+        // Strip remaining markdown, HTML, and special formatting from text
+        cleanText = cleanText
+            .replace(/\*\*(.*?)\*\*/g, '$1')     // bold
+            .replace(/\*(.*?)\*/g, '$1')           // italic
+            .replace(/~~(.*?)~~/g, '$1')           // strikethrough
+            .replace(/`(.*?)`/g, '$1')             // code
+            .replace(/<[^>]+>/g, '')              // HTML tags
+            .replace(/\[.*?\|.*?\]/g, '')         // custom media tags
+            .replace(/「`回复.*?`」/g, '')          // quote markers
+            .trim();
+
+        if (!cleanText) {
+            throw new Error('无有效文本可合成语音');
+        }
+
+        // Truncate to 10000 chars (API limit)
+        if (cleanText.length > 10000) {
+            cleanText = cleanText.substring(0, 10000);
+        }
+
+        const voiceId = appSettings.ttsVoiceId || 'female-shaonv';
+        const model = appSettings.ttsModel || 'speech-02-hd';
+        const format = appSettings.ttsFormat || 'mp3';
+        const sampleRate = parseInt(appSettings.ttsSampleRate) || 24000;
+
+        const payload = {
+            model: model,
+            text: cleanText,
+            stream: false,
+            voice_setting: {
+                voice_id: voiceId,
+                speed: appSettings.ttsSpeed !== undefined ? appSettings.ttsSpeed : 1.0,
+                vol: appSettings.ttsVol !== undefined ? appSettings.ttsVol : 1.0,
+                pitch: appSettings.ttsPitch !== undefined ? appSettings.ttsPitch : 0
+            },
+            audio_setting: {
+                sample_rate: sampleRate,
+                format: format
+            }
+        };
+
+        // Add emotion prompt if set
+        if (appSettings.ttsEmotion && appSettings.ttsEmotion.trim()) {
+            payload.timber_weights = [{
+                voice_id: voiceId,
+                weight: 1
+            }];
+        }
+
+        console.log('[MiniMax TTS] Generating speech for:', cleanText.substring(0, 100) + '...');
+
+        const rawUrl = `https://api.minimax.chat/v1/t2a_v2?GroupId=${appSettings.ttsGroupId}`;
+        // Apply CORS proxy if configured (needed for file:// origin)
+        const corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : 'https://corsproxy.io/?';
+        const url = corsProxy ? corsProxy + encodeURIComponent(rawUrl) : rawUrl;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${appSettings.ttsApiKey}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            throw new Error(`MiniMax TTS API Error ${res.status}: ${errText}`);
+        }
+
+        const data = await res.json();
+
+        if (data.base_resp && data.base_resp.status_code !== 0) {
+            throw new Error(`MiniMax TTS Error: ${data.base_resp.status_msg || 'Unknown error'}`);
+        }
+
+        // The response contains audio data as a hex string
+        const audioHex = data.data && data.data.audio;
+        if (!audioHex) {
+            throw new Error('MiniMax TTS 返回的数据中未包含音频');
+        }
+
+        // Convert hex string to Uint8Array
+        const mimeMap = { mp3: 'audio/mpeg', pcm: 'audio/pcm', flac: 'audio/flac', wav: 'audio/wav' };
+        const mimeType = mimeMap[format] || 'audio/mpeg';
+
+        // Check if it's base64 or hex by looking at the first 4 chars.
+        // Hex for mp3 (ID3 or FFFB) or WAV (RIFF) usually starts with numbers/a-f.
+        let uint8Array;
+        // If it looks like base64, decode it
+        if (/^[a-zA-Z0-9\+/]+={0,2}$/.test(audioHex) && !/^[0-9a-fA-F]+$/.test(audioHex)) {
+            const byteString = atob(audioHex);
+            uint8Array = new Uint8Array(byteString.length);
+            for (let i = 0; i < byteString.length; i++) {
+                uint8Array[i] = byteString.charCodeAt(i);
+            }
+        } else {
+            // It's a Hex String (MiniMax standard for v2)
+            uint8Array = new Uint8Array(audioHex.length / 2);
+            for (let i = 0; i < audioHex.length; i += 2) {
+                uint8Array[i / 2] = parseInt(audioHex.substring(i, i + 2), 16);
+            }
+        }
+
+        const blob = new Blob([uint8Array], { type: mimeType });
+        const blobUrl = URL.createObjectURL(blob);
+
+        console.log('[MiniMax TTS] Audio generated successfully');
+        return blobUrl;
+    }
+
+    // Play TTS audio
+    function playTtsAudio(audioUrl) {
+        // Stop any existing playback
+        stopTtsAudio();
+
+        _ttsAudioPlayer = new Audio(audioUrl);
+        _ttsAudioPlayer.play().catch(err => {
+            console.error('[MiniMax TTS] Playback error:', err);
+            showToast('语音播放失败');
+        });
+
+        _ttsAudioPlayer.onended = () => {
+            _ttsAudioPlayer = null;
+            // Update any playing UI indicators
+            document.querySelectorAll('.tts-play-btn.playing').forEach(btn => {
+                btn.classList.remove('playing');
+                btn.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+            });
+        };
+    }
+
+    function stopTtsAudio() {
+        if (_ttsAudioPlayer) {
+            _ttsAudioPlayer.pause();
+            _ttsAudioPlayer.currentTime = 0;
+            _ttsAudioPlayer = null;
+        }
+        document.querySelectorAll('.tts-play-btn.playing').forEach(btn => {
+            btn.classList.remove('playing');
+            btn.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+        });
+    }
+
+    // Handle TTS play for a specific message element
+    async function handleTtsPlay(bubbleEl, btnEl) {
+        // If already playing, stop
+        if (btnEl.classList.contains('playing')) {
+            stopTtsAudio();
+            return;
+        }
+
+        // Get text content - try multiple sources
+        let text = '';
+
+        // 1. From button's dataset (set during render)
+        if (btnEl.dataset.ttsText) {
+            text = btnEl.dataset.ttsText;
+        }
+
+        // 2. From bubble's text elements
+        if (!text) {
+            const msgTextEl = bubbleEl.querySelector('.msg-text');
+            if (msgTextEl) {
+                text = msgTextEl.textContent || msgTextEl.innerText;
+            }
+        }
+
+        // 3. From voice text bubble
+        if (!text) {
+            const voiceTextEl = bubbleEl.querySelector('.voice-text-bubble');
+            if (voiceTextEl) {
+                text = voiceTextEl.textContent || voiceTextEl.innerText;
+            }
+        }
+
+        // 4. Direct textContent fallback
+        if (!text) {
+            text = bubbleEl.textContent || bubbleEl.innerText || '';
+        }
+
+        text = text.trim();
+        if (!text) {
+            showToast('消息为空，无法合成语音');
+            return;
+        }
+
+        // Show loading
+        stopTtsAudio();
+        btnEl.classList.add('playing');
+        btnEl.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" class="tts-loading-spinner"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>';
+
+        try {
+            const audioUrl = await generateTtsAudio(text);
+            // Update button to stop icon
+            btnEl.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+            playTtsAudio(audioUrl);
+        } catch (err) {
+            console.error('[MiniMax TTS] Error:', err);
+            showToast('语音合成失败: ' + err.message);
+            btnEl.classList.remove('playing');
+            btnEl.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+        }
+    }
+
     // NAI Image Generation API Call
     async function generateNaiImage(promptTags) {
         if (!appSettings.naiApiKey) {
             throw new Error('NAI API Key 未配置');
         }
 
-        // Build final prompt: prefix + AI tags + suffix
+        // Build final prompt: prefix + char prompt + AI tags + suffix
         const parts = [];
         if (appSettings.naiPositivePrefix) parts.push(appSettings.naiPositivePrefix.trim());
+        const charPrompt = getChatNaiCharPrompt ? getChatNaiCharPrompt() : '';
+        if (charPrompt) parts.push(charPrompt.trim());
         if (promptTags) parts.push(promptTags.trim());
         if (appSettings.naiPositiveSuffix) parts.push(appSettings.naiPositiveSuffix.trim());
         const finalPrompt = parts.filter(p => p).join(', ');
@@ -1570,14 +1900,18 @@
         const negPrompt = appSettings.naiNegative || '';
         const seed = appSettings.naiSeed === -1 ? Math.floor(Math.random() * 4294967295) : appSettings.naiSeed;
 
+        // Use per-chat size, fall back to global
+        const chatSize = getChatNaiSize ? getChatNaiSize() : (appSettings.naiSizePreset || '832x1216');
+        const [chatW, chatH] = chatSize.split('x').map(Number);
+
         const payload = {
             input: finalPrompt,
             model: appSettings.naiModel || 'nai-diffusion-4-curated-preview',
             action: 'generate',
             parameters: {
                 params_version: 3,
-                width: appSettings.naiWidth || 832,
-                height: appSettings.naiHeight || 1216,
+                width: chatW || appSettings.naiWidth || 832,
+                height: chatH || appSettings.naiHeight || 1216,
                 scale: appSettings.naiScale || 5,
                 sampler: appSettings.naiSampler || 'k_euler_ancestral',
                 steps: appSettings.naiSteps || 28,
@@ -2180,8 +2514,137 @@
         // Load remark setting
         loadChatRemarkUI();
 
+        // Load per-chat NAI settings
+        loadChatNaiUI();
+
+        // Load per-chat TTS settings
+        loadChatTtsUI();
+
         if (chatSettingsScreen) chatSettingsScreen.style.display = 'flex';
         updateStatusBar('settings');
+    }
+
+    function getChatSettings() {
+        if (!currentChatTag) return {};
+        const key = `faye-phone-chatsettings-${currentChatTag}`;
+        try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { return {}; }
+    }
+
+    function saveChatSettingsObj(obj) {
+        if (!currentChatTag) return;
+        const key = `faye-phone-chatsettings-${currentChatTag}`;
+        localStorage.setItem(key, JSON.stringify(obj));
+    }
+
+    // ===== Per-chat NAI settings =====
+    function loadChatNaiUI() {
+        const s = getChatSettings();
+        const enabled = s.naiEnabled !== undefined ? s.naiEnabled : appSettings.naiEnabled || false;
+        const size = s.naiSize || appSettings.naiSizePreset || '832x1216';
+        const charPrompt = s.naiCharPrompt || '';
+
+        const el = document.getElementById('chat-nai-enabled');
+        if (el) el.checked = enabled;
+        const sizeEl = document.getElementById('chat-nai-size');
+        if (sizeEl) sizeEl.value = size;
+        const promptEl = document.getElementById('chat-nai-char-prompt');
+        if (promptEl) promptEl.value = charPrompt;
+
+        const detail = document.getElementById('chat-nai-detail');
+        if (detail) detail.style.display = enabled ? 'block' : 'none';
+    }
+
+    function saveChatNaiSettings() {
+        const s = getChatSettings();
+        const enabledEl = document.getElementById('chat-nai-enabled');
+        const sizeEl = document.getElementById('chat-nai-size');
+        const promptEl = document.getElementById('chat-nai-char-prompt');
+        s.naiEnabled = enabledEl ? enabledEl.checked : false;
+        s.naiSize = sizeEl ? sizeEl.value : '832x1216';
+        s.naiCharPrompt = promptEl ? promptEl.value : '';
+        saveChatSettingsObj(s);
+        // Also sync global naiEnabled for rendering logic
+        appSettings.naiEnabled = s.naiEnabled;
+        saveSettingsToStorage();
+
+        const detail = document.getElementById('chat-nai-detail');
+        if (detail) detail.style.display = s.naiEnabled ? 'block' : 'none';
+    }
+
+    function getChatNaiEnabled() {
+        const s = getChatSettings();
+        return s.naiEnabled !== undefined ? s.naiEnabled : (appSettings.naiEnabled || false);
+    }
+
+    function getChatNaiSize() {
+        const s = getChatSettings();
+        return s.naiSize || appSettings.naiSizePreset || '832x1216';
+    }
+
+    function getChatNaiCharPrompt() {
+        const s = getChatSettings();
+        return s.naiCharPrompt || '';
+    }
+
+    // ===== Per-chat TTS settings =====
+    function loadChatTtsUI() {
+        const s = getChatSettings();
+        const enabled = s.ttsEnabled !== undefined ? s.ttsEnabled : (appSettings.ttsEnabled || false);
+        const model = s.ttsModel || appSettings.ttsModel || 'speech-02-hd';
+        const voiceId = s.ttsVoiceId || appSettings.ttsVoiceId || 'female-shaonv';
+        const speed = s.ttsSpeed !== undefined ? s.ttsSpeed : (appSettings.ttsSpeed || 1.0);
+        const vol = s.ttsVol !== undefined ? s.ttsVol : (appSettings.ttsVol || 1.0);
+        const pitch = s.ttsPitch !== undefined ? s.ttsPitch : (appSettings.ttsPitch || 0);
+        const readMode = s.ttsReadMode || appSettings.ttsReadMode || 'all';
+
+        const el = document.getElementById('chat-tts-enabled');
+        if (el) el.checked = enabled;
+        const modelEl = document.getElementById('chat-tts-model');
+        if (modelEl) modelEl.value = model;
+        const voiceEl = document.getElementById('chat-tts-voice-id');
+        if (voiceEl) voiceEl.value = voiceId;
+        const speedEl = document.getElementById('chat-tts-speed');
+        if (speedEl) { speedEl.value = speed; document.getElementById('chat-tts-speed-val').textContent = speed; }
+        const volEl = document.getElementById('chat-tts-vol');
+        if (volEl) { volEl.value = vol; document.getElementById('chat-tts-vol-val').textContent = vol; }
+        const pitchEl = document.getElementById('chat-tts-pitch');
+        if (pitchEl) { pitchEl.value = pitch; document.getElementById('chat-tts-pitch-val').textContent = pitch; }
+        const readModeEl = document.getElementById('chat-tts-read-mode');
+        if (readModeEl) readModeEl.value = readMode;
+
+        // Show/hide detail panel
+        const detail = document.getElementById('chat-tts-detail');
+        if (detail) detail.style.display = enabled ? 'block' : 'none';
+    }
+
+    function saveChatTtsSettings() {
+        const s = getChatSettings();
+        const enabledEl = document.getElementById('chat-tts-enabled');
+        s.ttsEnabled = enabledEl ? enabledEl.checked : false;
+        s.ttsModel = (document.getElementById('chat-tts-model') || {}).value || 'speech-02-hd';
+        s.ttsVoiceId = (document.getElementById('chat-tts-voice-id') || {}).value || 'female-shaonv';
+        s.ttsSpeed = parseFloat((document.getElementById('chat-tts-speed') || {}).value) || 1.0;
+        s.ttsVol = parseFloat((document.getElementById('chat-tts-vol') || {}).value) || 1.0;
+        s.ttsPitch = parseInt((document.getElementById('chat-tts-pitch') || {}).value) || 0;
+        s.ttsReadMode = (document.getElementById('chat-tts-read-mode') || {}).value || 'all';
+        saveChatSettingsObj(s);
+        // Sync to global appSettings for rendering
+        appSettings.ttsEnabled = s.ttsEnabled;
+        appSettings.ttsModel = s.ttsModel;
+        appSettings.ttsVoiceId = s.ttsVoiceId;
+        appSettings.ttsSpeed = s.ttsSpeed;
+        appSettings.ttsVol = s.ttsVol;
+        appSettings.ttsPitch = s.ttsPitch;
+        appSettings.ttsReadMode = s.ttsReadMode;
+        saveSettingsToStorage();
+        // Toggle detail visibility
+        const detail = document.getElementById('chat-tts-detail');
+        if (detail) detail.style.display = s.ttsEnabled ? 'block' : 'none';
+    }
+
+    function getChatTtsEnabled() {
+        const s = getChatSettings();
+        return s.ttsEnabled !== undefined ? s.ttsEnabled : (appSettings.ttsEnabled || false);
     }
 
     function closeChatSettings() {
@@ -2860,6 +3323,39 @@ ${chatText}
         applySettings();
         closeChatBeautifySettings();
         showToast('美化设置已保存');
+    }
+
+    // Assign to global
+    window.restoreDefaultBeautifySettings = function () {
+        if (!confirm('确定要恢复默认美化配置吗？此操作会重置气泡、文字、界面等所有美化配色。')) return;
+
+        appSettings.charBubble = '#e8dada';
+        appSettings.charText = '#746669';
+        appSettings.userBubble = '#f2ecec';
+        appSettings.userText = '#746669';
+        appSettings.interfaceColor = '#f1e8e9';
+        appSettings.msgNameColor = '#ad9a9e';
+        appSettings.msgTimeColor = '#c5b8ba';
+        appSettings.fontSize = 14;
+        appSettings.chatBtnText = '#bcaaae';
+        appSettings.chatBg = 'https://img.phey.click/43m7c8.jpeg';
+        appSettings.chatBgIsDark = false;
+
+        document.getElementById('set-char-bubble').value = '#e8dada';
+        document.getElementById('set-char-text').value = '#746669';
+        document.getElementById('set-user-bubble').value = '#f2ecec';
+        document.getElementById('set-user-text').value = '#746669';
+        document.getElementById('set-interface-color').value = '#f1e8e9';
+        document.getElementById('set-msg-name-color').value = '#ad9a9e';
+        document.getElementById('set-msg-time-color').value = '#c5b8ba';
+        document.getElementById('set-font-size').value = 14;
+        document.getElementById('set-chat-btn-text').value = '#bcaaae';
+        document.getElementById('preview-chat-bg').src = 'https://img.phey.click/43m7c8.jpeg';
+
+        saveSettingsToStorage();
+        applySettings();
+        closeChatBeautifySettings();
+        showToast('已恢复默认美化配色');
     }
 
     async function saveMainChatSettings() {
@@ -4669,7 +5165,34 @@ ${chatText}
         metaContainer.appendChild(timeEl);
 
         addLongPressHandler(el);
-        wrapper.appendChild(el); wrapper.appendChild(metaContainer); container.appendChild(wrapper);
+        wrapper.appendChild(el);
+
+        // TTS Play Button — only for simulated voice bubbles
+        if (!msg.isUser && getChatTtsEnabled && getChatTtsEnabled() && isVoice && !displayBody.startsWith('http')) {
+            const voiceParts = (rawBodyForHistory || displayBody).split('|');
+            const ttsText = voiceParts.slice(1).join('|').replace(/\*[^*]+\*\s*$/, '').trim();
+            if (ttsText) {
+                const voiceBarEl = el.querySelector('.voice-bar');
+                const ttsBtn = document.createElement('span');
+                ttsBtn.className = 'tts-play-btn';
+                ttsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+                ttsBtn.title = '播放语音';
+                ttsBtn.dataset.ttsText = ttsText;
+                // Style: match bubble text color at 50% opacity, inline
+                ttsBtn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(128,128,128,0.12);color:inherit;opacity:0.5;cursor:pointer;vertical-align:middle;margin-left:6px;flex-shrink:0;border:none;outline:none;transition:opacity 0.2s;';
+                ttsBtn.addEventListener('mouseenter', () => ttsBtn.style.opacity = '1');
+                ttsBtn.addEventListener('mouseleave', () => { if (!ttsBtn.classList.contains('playing')) ttsBtn.style.opacity = '0.5'; });
+                ttsBtn.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    handleTtsPlay(el, ttsBtn);
+                });
+                if (voiceBarEl) {
+                    voiceBarEl.appendChild(ttsBtn);
+                }
+            }
+        }
+
+        wrapper.appendChild(metaContainer); container.appendChild(wrapper);
 
         if (displayThought) {
             const thoughtEl = document.createElement('div'); thoughtEl.className = 'msg-thought';
@@ -5072,6 +5595,31 @@ ${chatText}
             btnRegen.innerHTML = '<img src="https://api.iconify.design/system-uicons:reset-alt.svg" class="msg-action-icon">';
             btnRegen.onclick = (e) => { e.stopPropagation(); executeRegenerate(el); closeMsgMenu(); };
             menu.appendChild(btnRegen);
+        }
+
+        // TTS Play (Only for AI messages when TTS is enabled)
+        if (isAi && appSettings.ttsEnabled) {
+            const btnTts = document.createElement('div');
+            btnTts.className = 'msg-action-item';
+            btnTts.innerHTML = '<img src="https://api.iconify.design/icon-park-outline:voice.svg" class="msg-action-icon">';
+            btnTts.onclick = (e) => {
+                e.stopPropagation();
+                closeMsgMenu();
+                // Find or create the TTS button and trigger play
+                const bubble = el;
+                const row = el.closest('.message-row');
+                let ttsBtn = row.querySelector('.tts-play-btn');
+                if (!ttsBtn) {
+                    // Create a temporary button
+                    ttsBtn = document.createElement('div');
+                    ttsBtn.className = 'tts-play-btn';
+                    ttsBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+                    const bubbleWrapper = row.querySelector('.chat-bubble-wrapper') || row;
+                    bubbleWrapper.appendChild(ttsBtn);
+                }
+                handleTtsPlay(bubble, ttsBtn);
+            };
+            menu.appendChild(btnTts);
         }
 
         // Multi-select
@@ -7751,7 +8299,7 @@ Apply the following substitutions based on current language (CN/EN).
 
             // NAI Image Generation: if this is an image message and NAI is enabled, generate the image
             const isImgMessage = finalHeader.includes('\u56fe\u7247') || finalHeader.includes('|IMG|');
-            if (isImgMessage && appSettings.naiEnabled && appSettings.naiApiKey && !getChatBlockChar()) {
+            if (isImgMessage && getChatNaiEnabled() && appSettings.naiApiKey && !getChatBlockChar()) {
                 try {
                     console.log('[NAI] Detected AI image message, generating with tags:', finalBody);
                     showToast('🎨 NAI 生图中...');
@@ -8126,14 +8674,12 @@ Apply the following substitutions based on current language (CN/EN).
     function updateOfflineModeUI() {
         const btn = document.getElementById('offline-mode-btn');
         if (btn) {
-            const svg = btn.querySelector('svg');
-            if (svg) {
+            const img = btn.querySelector('img');
+            if (img) {
                 if (isOfflineMode) {
-                    svg.style.stroke = '#e88a9a';
-                    svg.querySelectorAll('[fill="#181818"]').forEach(el => el.setAttribute('fill', '#e88a9a'));
+                    img.src = 'https://api.iconify.design/lucide:door-open.svg?color=%23e88a9a';
                 } else {
-                    svg.style.stroke = '#181818';
-                    svg.querySelectorAll('[fill="#e88a9a"]').forEach(el => el.setAttribute('fill', '#181818'));
+                    img.src = 'https://api.iconify.design/material-symbols:door-back-outline.svg?color=%23181818';
                 }
             }
         }
@@ -8287,7 +8833,16 @@ Apply the following substitutions based on current language (CN/EN).
         toggleMemoryBatchMode,
         deleteSelectedMemories,
         // Offline Mode
-        toggleOfflineMode
+        toggleOfflineMode,
+        // MiniMax TTS
+        openTtsSettings,
+        closeTtsSettings,
+        saveTtsSettings,
+        handleTtsPlay,
+        stopTtsAudio,
+        // Per-chat NAI/TTS
+        saveChatNaiSettings,
+        saveChatTtsSettings
     });
 
 })();
