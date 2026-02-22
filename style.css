@@ -310,15 +310,35 @@ body {
     max-width: 58px;
     aspect-ratio: 1/1;
     height: auto;
-    border-radius: 22%;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(248, 205, 212, 0.45);
-    transition: background 0.3s;
-    box-shadow: 0 2px 8px rgba(232, 160, 173, 0.12);
-    opacity: 0.85;
-    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+    box-shadow: inset 2px 2px 8px rgba(255, 255, 255, 0.7), inset -2px -3px 6px rgba(0, 0, 0, 0.03), 0 5px 15px rgba(0, 0, 0, 0.05);
+    opacity: 0.9;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+}
+
+/* 一组莫奈风格色块与不规则鹅卵石形状交替 */
+.app-item:nth-child(4n+1) .app-icon-box {
+    border-radius: 61% 39% 45% 55% / 54% 53% 47% 46%;
+    background-color: rgba(255, 250, 240, 0.6);
+}
+
+.app-item:nth-child(4n+2) .app-icon-box {
+    border-radius: 42% 58% 36% 64% / 54% 43% 57% 46%;
+    background-color: rgba(230, 210, 215, 0.6);
+}
+
+.app-item:nth-child(4n+3) .app-icon-box {
+    border-radius: 53% 47% 55% 45% / 44% 53% 47% 56%;
+    background-color: rgba(200, 215, 205, 0.6);
+}
+
+.app-item:nth-child(4n+4) .app-icon-box {
+    border-radius: 45% 55% 42% 58% / 56% 41% 59% 44%;
+    background-color: rgba(215, 220, 235, 0.6);
 }
 
 .app-icon-box svg {
@@ -5997,4 +6017,157 @@ textarea.setting-input {
 
 .interactor-confirm-btn:hover {
     background: #06ae56;
+}
+
+/* ================================
+   Lock Screen Styles
+   ================================ */
+
+.lock-key {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    width: 68px;
+    height: 68px;
+    margin: 0 auto;
+    font-size: 28px;
+    font-weight: 300;
+    color: var(--pink-600);
+    background-color: rgba(255, 255, 255, 0.25);
+    box-shadow: inset 1px 1px 2px rgba(255, 255, 255, 0.4), 0 2px 10px rgba(0, 0, 0, 0.03);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: transform 0.1s cubic-bezier(0.2, 0.8, 0.2, 1), background-color 0.1s;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: pointer;
+}
+
+.lock-key:active {
+    transform: scale(0.85);
+    background-color: rgba(255, 255, 255, 0.5);
+}
+
+.lock-key-empty {
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    cursor: default;
+}
+
+.lock-delete {
+    background-color: transparent;
+    box-shadow: none;
+}
+
+.lock-delete:active {
+    background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.lock-delete svg {
+    width: 32px;
+    height: 32px;
+    stroke: var(--pink-600);
+}
+
+.lock-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid var(--pink-600);
+    background-color: transparent;
+    transition: background-color 0.15s, transform 0.15s;
+    box-shadow: inset 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+.lock-dot.filled {
+    background-color: var(--pink-600);
+    transform: scale(1.1);
+}
+
+@keyframes lockPulse {
+    0% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+
+    50% {
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+}
+
+@keyframes keypadSlideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* ================================
+   Home Screen Edit Mode & Drag Drop
+   ================================ */
+
+@keyframes jiggle {
+    0% {
+        transform: rotate(-1.5deg);
+    }
+
+    50% {
+        transform: rotate(1.5deg);
+    }
+
+    100% {
+        transform: rotate(-1.5deg);
+    }
+}
+
+body.edit-mode .app-draggable {
+    animation: jiggle 0.25s infinite;
+    cursor: grab;
+    z-index: 5;
+}
+
+body.edit-mode .app-draggable:active {
+    cursor: grabbing;
+    animation: none;
+    transform: scale(1.1);
+}
+
+.grid-slot {
+    border-radius: 20px;
+    background: transparent;
+    z-index: 1;
+    pointer-events: none;
+    /* Ignore initially */
+}
+
+body.edit-mode .grid-slot {
+    pointer-events: auto;
+    /* Allow hitting slots only in edit mode */
+}
+
+.grid-slot.drag-over {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+
+.app-draggable.drag-over {
+    opacity: 0.5;
+}
+
+.dragging-ghost .app-name {
+    display: none;
+    /* Hide name when moving for cleaner look */
 }
