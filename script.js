@@ -301,13 +301,25 @@
         const userDateObj = window.getSimulatedDate();
         const charDateObj = new Date(userDateObj.getTime() + tzOffsetHours * 3600000);
         const userDateStr = `${userDateObj.getFullYear()}年${userDateObj.getMonth() + 1}月${userDateObj.getDate()}日`;
-        const charDateStr = `${charDateObj.getFullYear()}年${charDateObj.getMonth() + 1}月${charDateObj.getDate()}日`;
+
+        const charEraVal = localStorage.getItem('faye-custom-char-era');
+        const charDateStr = (charEraVal && charEraVal.trim() !== '') ? charEraVal.trim() : `${charDateObj.getFullYear()}年${charDateObj.getMonth() + 1}月${charDateObj.getDate()}日`;
+
         const userTimeStr = getTime(true);
         const charTimeStr = getTime(false);
 
         context += `\n[日期与时间信息]\n`;
         const charName2 = getCharName();
-        if (tzOffsetHours !== 0) {
+        if (charEraVal && charEraVal.trim() !== '') {
+            context += `用户当前实际系统时间: ${userDateStr} ${userTimeStr}\n`;
+            context += `${charName2}身处特定的时期/纪元，其当前设定为：${charDateStr}，具体时分：${charTimeStr}。\n`;
+            if (tzOffsetHours !== 0) {
+                const absOffset = Math.abs(tzOffsetHours);
+                const direction = tzOffsetHours > 0 ? '快' : '慢';
+                context += `${charName2}所在时区与用户系统存在相对时差：当地时分比用户${direction}${absOffset}小时。\n`;
+            }
+            context += `请在对话中自然地体现出${charName2}特有的时代和背景设定（如科幻、修真、过去、异界），不要受用户现实世界日期的限制。\n`;
+        } else if (tzOffsetHours !== 0) {
             const absOffset = Math.abs(tzOffsetHours);
             const direction = tzOffsetHours > 0 ? '快' : '慢';
             context += `${charName2}所在时区与用户存在时差：${charName2}的时间比用户${direction}${absOffset}小时。\n`;
@@ -2576,9 +2588,7 @@
     function openChatSettings() {
         // Init Main Settings (per-chat isolated block states)
         const blockChar = document.getElementById('set-block-char');
-        const blockUser = document.getElementById('set-block-user');
         if (blockChar) blockChar.checked = getChatBlockChar();
-        if (blockUser) blockUser.checked = getChatBlockUser();
 
         // Render Avatar Settings (Moved back to main)
         const userSelector = document.getElementById('user-selector');
@@ -2621,6 +2631,9 @@
         // Load per-chat TTS settings
         loadChatTtsUI();
 
+        // Load per-chat Auto Interactions
+        loadChatAutoInteractionsUI();
+
         if (chatSettingsScreen) chatSettingsScreen.style.display = 'flex';
         updateStatusBar('settings');
     }
@@ -2631,10 +2644,312 @@
         try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { return {}; }
     }
 
+    function getChatSettingsFor(tag) {
+        if (!tag) return {};
+        const key = `faye-phone-chatsettings-${tag}`;
+        try { return JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { return {}; }
+    }
+
     function saveChatSettingsObj(obj) {
         if (!currentChatTag) return;
         const key = `faye-phone-chatsettings-${currentChatTag}`;
         localStorage.setItem(key, JSON.stringify(obj));
+    }
+
+    // ===== Per-chat Auto Interactions =====
+    function loadChatAutoInteractionsUI() {
+        const s = getChatSettings();
+        const autoMomentEnabled = s.autoMomentEnabled || false;
+        const autoMomentInterval = s.autoMomentInterval || 60;
+        const autoMessageEnabled = s.autoMessageEnabled || false;
+        const autoMessageInterval = s.autoMessageInterval || 60;
+
+        const amE = document.getElementById('chat-auto-moment-enabled');
+        if (amE) amE.checked = autoMomentEnabled;
+        const amI = document.getElementById('chat-auto-moment-interval');
+        if (amI) amI.value = autoMomentInterval;
+        const amD = document.getElementById('chat-auto-moment-detail');
+        if (amD) amD.style.display = autoMomentEnabled ? 'block' : 'none';
+
+        const amsgE = document.getElementById('chat-auto-message-enabled');
+        if (amsgE) amsgE.checked = autoMessageEnabled;
+        const amsgI = document.getElementById('chat-auto-message-interval');
+        if (amsgI) amsgI.value = autoMessageInterval;
+        const amsgD = document.getElementById('chat-auto-message-detail');
+        if (amsgD) amsgD.style.display = autoMessageEnabled ? 'block' : 'none';
+    }
+
+    function saveChatAutoInteractions() {
+        const s = getChatSettings();
+        const amE = document.getElementById('chat-auto-moment-enabled');
+        const amI = document.getElementById('chat-auto-moment-interval');
+        const amsgE = document.getElementById('chat-auto-message-enabled');
+        const amsgI = document.getElementById('chat-auto-message-interval');
+
+        s.autoMomentEnabled = amE ? amE.checked : false;
+        s.autoMomentInterval = amI ? (parseInt(amI.value) || 60) : 60;
+        s.autoMessageEnabled = amsgE ? amsgE.checked : false;
+        s.autoMessageInterval = amsgI ? (parseInt(amsgI.value) || 60) : 60;
+
+        const now = Date.now();
+        if (s.autoMomentEnabled && !s.autoMomentLastTrigger) {
+            s.autoMomentLastTrigger = now;
+        }
+        if (s.autoMessageEnabled && !s.autoMessageLastTrigger) {
+            s.autoMessageLastTrigger = now;
+        }
+
+        saveChatSettingsObj(s);
+
+        const amD = document.getElementById('chat-auto-moment-detail');
+        if (amD) amD.style.display = s.autoMomentEnabled ? 'block' : 'none';
+        const amsgD = document.getElementById('chat-auto-message-detail');
+        if (amsgD) amsgD.style.display = s.autoMessageEnabled ? 'block' : 'none';
+    }
+
+    let isCheckingAutoInteractions = false;
+    async function checkAutoInteractions() {
+        if (isCheckingAutoInteractions) return;
+        isCheckingAutoInteractions = true;
+        try {
+            const now = Date.now();
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('faye-phone-chatsettings-')) {
+                    const tag = key.replace('faye-phone-chatsettings-', '');
+                    let s;
+                    try { s = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
+
+                    if (s && s.autoMomentEnabled) {
+                        const intervalMs = (s.autoMomentInterval || 60) * 60000;
+                        const last = s.autoMomentLastTrigger || now;
+                        if (now - last >= intervalMs) {
+                            s.autoMomentLastTrigger = now;
+                            localStorage.setItem(key, JSON.stringify(s));
+                            await triggerAIAutoMoment(tag);
+                        }
+                    }
+
+                    if (s && s.autoMessageEnabled) {
+                        const intervalMs = (s.autoMessageInterval || 60) * 60000;
+                        const last = s.autoMessageLastTrigger || now;
+                        if (now - last >= intervalMs) {
+                            s.autoMessageLastTrigger = now;
+                            localStorage.setItem(key, JSON.stringify(s));
+                            await triggerAIAutoMessage(tag);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        isCheckingAutoInteractions = false;
+    }
+
+    // Check every minute
+    setInterval(checkAutoInteractions, 60 * 1000);
+
+    async function triggerAIAutoMoment(tag) {
+        const isGroup = tag.startsWith('group_');
+        const npcName = isGroup ? null : tag;
+        if (!npcName) return;
+        const npc = npcCharacters.find(n => n.name === npcName);
+        if (!npc) return;
+
+        try {
+            const userId = getChatSettingsFor(tag).currentUserId !== undefined ? getChatSettingsFor(tag).currentUserId : appSettings.currentUserId;
+            const currentUserName = (userId !== undefined && userCharacters[userId]) ? userCharacters[userId].name : 'User';
+
+            let chatContext = '';
+            const chatKey = `chat-history-chat:${npcName}`;
+            try {
+                const historyStr = localStorage.getItem(chatKey);
+                if (historyStr) {
+                    const history = JSON.parse(historyStr);
+                    const recentMsgs = history.slice(-10);
+                    chatContext = recentMsgs.map(m => {
+                        const sender = m.isUser ? currentUserName : npc.name;
+                        return `${sender}: ${m.body || ''}`;
+                    }).join('\n');
+                }
+            } catch (e) { }
+
+            const persona = npc.persona || npc.desc || '';
+            const systemPrompt = `你是${npc.name}，正在发朋友圈动态。
+角色设定：${persona}
+${chatContext ? '最近和' + currentUserName + '的聊天记录：\n' + chatContext + '\n' : ''}
+请用${npc.name}的语气和性格，写一条朋友圈动态。要求：
+1. 必须完全以角色身份说话，风格自然、生活化
+2. 可以参考最近的事情，或者只是简单分享感悟或记录生活
+3. 30-80字，不要太长
+4. 如果你想配一张或多张图片，请在文中加入 [图片：照片的详细描述]
+5. 只输出正文和图片标签，不要加引号、标签或前缀`;
+
+            const messages = [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: '请发一条朋友圈动态' }
+            ];
+
+            const stream = await callLLM(messages);
+            let momentText = '';
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6).trim();
+                        if (data === '[DONE]') break;
+                        try {
+                            const json = JSON.parse(data);
+                            const content = json.choices?.[0]?.delta?.content;
+                            if (content) momentText += content;
+                        } catch (e) { }
+                    }
+                }
+            }
+
+            momentText = momentText.replace(/^["「『]|["」』]$/g, '').trim();
+            let extractedImages = [];
+            const imgRegex = /\[图片[：:](.*?)\]/g;
+            let matchReg;
+            while ((matchReg = imgRegex.exec(momentText)) !== null) {
+                extractedImages.push('txt:' + matchReg[1].trim());
+            }
+            momentText = momentText.replace(imgRegex, '').trim();
+
+            if (momentText || extractedImages.length > 0) {
+                loadMomentsData();
+                const post = {
+                    id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+                    author: npc.name,
+                    text: momentText,
+                    images: extractedImages,
+                    likes: [],
+                    comments: [],
+                    timestamp: Date.now()
+                };
+                momentsPosts.unshift(post);
+                saveMomentsData();
+                if (typeof renderMoments === 'function') renderMoments();
+            }
+        } catch (e) { console.error('Auto moment error', e); }
+    }
+
+    async function triggerAIAutoMessage(tag) {
+        const isGroup = tag.startsWith('group_');
+        const npcName = isGroup ? null : tag;
+        if (!npcName && !isGroup) return;
+
+        try {
+            let systemPrompt = '';
+            let targetGroup = null;
+            let currentUserName = '';
+            let chatHistoryKey = '';
+            let mappedNpcName = '';
+
+            if (!isGroup) {
+                const npc = npcCharacters.find(n => n.name === npcName);
+                if (!npc) return;
+                mappedNpcName = npc.name;
+                const userId = getChatSettingsFor(tag).currentUserId !== undefined ? getChatSettingsFor(tag).currentUserId : appSettings.currentUserId;
+                currentUserName = (userId !== undefined && userCharacters[userId]) ? userCharacters[userId].name : 'User';
+                const persona = npc.persona || npc.desc || '';
+                systemPrompt = `你是${npc.name}。
+设定：${persona}
+你现在突然想起来要主动给 ${currentUserName} 发一条消息，可能是早晚安、分享日常、或者找话题聊天。
+请直接输出你想发送的内容。符合你的角色口吻和设定。不要带说明换行等，直接输出你的话。`;
+                chatHistoryKey = `chat-history-chat:${npcName}`;
+            } else {
+                targetGroup = appSettings.groups.find(g => g.id === tag);
+                if (!targetGroup) return;
+                const userId = getChatSettingsFor(tag).currentUserId !== undefined ? getChatSettingsFor(tag).currentUserId : appSettings.currentUserId;
+                currentUserName = (userId !== undefined && userCharacters[userId]) ? userCharacters[userId].name : 'User';
+                const npcNames = targetGroup.members.filter(m => npcCharacters.find(n => n.name === m));
+                if (npcNames.length === 0) return;
+                mappedNpcName = npcNames[Math.floor(Math.random() * npcNames.length)];
+                const npc = npcCharacters.find(n => n.name === mappedNpcName);
+                if (!npc) return;
+                systemPrompt = `你现在在群聊"${targetGroup.name}"中。群里的其他成员可能没说话。你是${npc.name}。
+群内有${currentUserName}。
+设定：${npc.persona || npc.desc}
+你想主动在群里发一条消息，开启新话题或者打招呼。
+直接输出你想发送的消息内容，不要带名字前缀。`;
+                chatHistoryKey = `chat-history-group_${targetGroup.id}`;
+            }
+
+            let chatContext = '';
+            try {
+                const historyStr = localStorage.getItem(chatHistoryKey);
+                if (historyStr) {
+                    const h = JSON.parse(historyStr);
+                    const recent = h.slice(-10);
+                    chatContext = "最近的聊天记录：\n" + recent.map(m => `[${m.header || (m.isUser ? 'User' : m.charName)}]: ${m.body}`).join('\n');
+                }
+            } catch (e) { }
+
+            const messages = [
+                { role: 'system', content: systemPrompt + (chatContext ? '\n' + chatContext : '') },
+                { role: 'user', content: '请主动发一条消息。' }
+            ];
+
+            const stream = await callLLM(messages);
+            let responseText = '';
+            const reader = stream.getReader();
+            const decoder = new TextDecoder();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6).trim();
+                        if (data === '[DONE]') break;
+                        try {
+                            const json = JSON.parse(data);
+                            const content = json.choices?.[0]?.delta?.content;
+                            if (content) responseText += content;
+                        } catch (e) { }
+                    }
+                }
+            }
+
+            responseText = responseText.replace(/^["「『]|["」』]$/g, '').trim();
+            if (!responseText) return;
+
+            let history = [];
+            try {
+                const hstr = localStorage.getItem(chatHistoryKey);
+                if (hstr) history = JSON.parse(hstr);
+            } catch (e) { }
+
+            const nowTime = new Date();
+            const timeStr = `${nowTime.getHours().toString().padStart(2, '0')}:${nowTime.getMinutes().toString().padStart(2, '0')}`;
+
+            history.push({
+                header: `[${mappedNpcName}| ${timeStr}]`,
+                body: responseText,
+                isUser: false,
+                charName: mappedNpcName,
+                timestamp: Date.now()
+            });
+            localStorage.setItem(chatHistoryKey, JSON.stringify(history));
+
+            if (currentChatTag !== tag) {
+                const currentUnread = parseInt(localStorage.getItem(`unread-${tag}`) || '0');
+                localStorage.setItem(`unread-${tag}`, (currentUnread + 1).toString());
+                if (typeof updateUnreadBadge === 'function') updateUnreadBadge();
+            } else {
+                if (typeof renderChatHistory === 'function') renderChatHistory();
+            }
+            if (typeof renderMessageList === 'function') renderMessageList();
+
+        } catch (e) { console.error('Auto message error', e); }
     }
 
     // ===== Per-chat NAI settings =====
@@ -2782,6 +3097,80 @@
         if (chatBeautifyScreen) {
             chatBeautifyScreen.style.transform = 'translateX(100%)';
             setTimeout(() => chatBeautifyScreen.style.display = 'none', 300);
+        }
+    }
+
+    async function saveChatBeautifySettings() {
+        appSettings.charBubble = document.getElementById('set-char-bubble').value;
+        appSettings.charText = document.getElementById('set-char-text').value;
+        appSettings.userBubble = document.getElementById('set-user-bubble').value;
+        appSettings.userText = document.getElementById('set-user-text').value;
+        appSettings.interfaceColor = document.getElementById('set-interface-color').value;
+        appSettings.msgNameColor = document.getElementById('set-msg-name-color').value;
+        appSettings.msgTimeColor = document.getElementById('set-msg-time-color').value;
+        appSettings.fontSize = parseInt(document.getElementById('set-font-size').value) || 14;
+        appSettings.chatBtnText = document.getElementById('set-chat-btn-text').value;
+
+        applySettings();
+
+        const chatBgUrl = document.getElementById('preview-chat-bg').src;
+        if (chatBgUrl && chatBgUrl !== window.location.href) {
+            appSettings.chatBg = chatBgUrl;
+            try {
+                const brightnessPromise = analyzeImageBrightness(appSettings.chatBg);
+                const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 1000));
+                const result = await Promise.race([brightnessPromise, timeoutPromise]);
+                if (result !== null) {
+                    appSettings.chatBgIsDark = result;
+                }
+            } catch (e) { console.error('Image analysis failed', e); }
+        } else {
+            delete appSettings.chatBg;
+            delete appSettings.chatBgIsDark;
+        }
+
+        saveSettingsToStorage();
+        if (typeof loadInitialChat === 'function') loadInitialChat();
+        showToast('✅ 美化配置已保存');
+        closeChatBeautifySettings();
+    }
+
+    function restoreDefaultBeautifySettings() {
+        if (confirm('确定要恢复默认聊天界面配色吗？(包括背景图也会被清除)')) {
+            delete appSettings.charBubble;
+            delete appSettings.charText;
+            delete appSettings.userBubble;
+            delete appSettings.userText;
+            delete appSettings.chatBg;
+            delete appSettings.chatBgIsDark;
+            delete appSettings.interfaceColor;
+            delete appSettings.msgNameColor;
+            delete appSettings.msgTimeColor;
+            delete appSettings.fontSize;
+            delete appSettings.chatBtnText;
+
+            saveSettingsToStorage();
+            applySettings();
+            openChatBeautifySettings(); // re-populate inputs with defaults
+            if (typeof loadInitialChat === 'function') loadInitialChat();
+            showToast('✅ 已恢复默认配置');
+        }
+    }
+
+    function openChatInteractionSettings() {
+        const screen = document.getElementById('chat-interaction-screen');
+        if (screen) {
+            screen.style.display = 'flex';
+            screen.style.transform = 'translateX(100%)';
+            setTimeout(() => screen.style.transform = 'translateX(0)', 10);
+        }
+    }
+
+    function closeChatInteractionSettings() {
+        const screen = document.getElementById('chat-interaction-screen');
+        if (screen) {
+            screen.style.transform = 'translateX(100%)';
+            setTimeout(() => screen.style.display = 'none', 300);
         }
     }
 
@@ -3502,11 +3891,11 @@ ${chatText}
 
     // Per-chat block settings auto-save (called by onchange in HTML toggles)
     function saveChatBlockSettings() {
-        setChatBlockState('blockChar', document.getElementById('set-block-char').checked);
-        setChatBlockState('blockUser', document.getElementById('set-block-user').checked);
-        // Keep legacy global in sync
-        appSettings.blockChar = getChatBlockChar();
-        appSettings.blockUser = getChatBlockUser();
+        const blockCharCheckbox = document.getElementById('set-block-char');
+        if (blockCharCheckbox) {
+            setChatBlockState('blockChar', blockCharCheckbox.checked);
+            appSettings.blockChar = getChatBlockChar();
+        }
         saveSettingsToStorage();
     }
 
@@ -4442,6 +4831,10 @@ ${chatText}
         const d = window.getSimulatedDate();
         currentCalendarViewDate = new Date(d);
         currentCalendarSelectedDate = new Date(d);
+        const charEraEl = document.getElementById('calendar-char-era');
+        if (charEraEl) {
+            charEraEl.value = localStorage.getItem('faye-custom-char-era') || '';
+        }
         window.renderCalendarGrid();
     };
 
@@ -4551,27 +4944,47 @@ ${chatText}
     };
 
     window.saveCalendarDate = function () {
-        const picker = document.getElementById('calendar-date-picker');
-        if (!picker) return;
-        const val = picker.value;
-        if (val) {
-            localStorage.setItem('faye-custom-date', val);
-            showToast('已设定系统日期: ' + val);
-            if (window.renderHomeGrid) window.renderHomeGrid();
-            closeCalendarApp();
+        let isUpdated = false;
 
+        const charEraEl = document.getElementById('calendar-char-era');
+        if (charEraEl) {
+            const eraVal = charEraEl.value.trim();
+            if (eraVal !== (localStorage.getItem('faye-custom-char-era') || '')) {
+                if (eraVal) {
+                    localStorage.setItem('faye-custom-char-era', eraVal);
+                } else {
+                    localStorage.removeItem('faye-custom-char-era');
+                }
+                isUpdated = true;
+            }
+        }
+
+        const picker = document.getElementById('calendar-date-picker');
+        if (picker && picker.value) {
+            const val = picker.value;
+            if (val !== localStorage.getItem('faye-custom-date')) {
+                localStorage.setItem('faye-custom-date', val);
+                isUpdated = true;
+                if (window.renderHomeGrid) window.renderHomeGrid();
+            }
+        }
+
+        if (isUpdated) {
+            showToast('已设定系统日期信息');
             // Sync to trigger chat update implicitly if needed
             if (typeof saveCharTimezoneSettings === 'function') {
                 saveCharTimezoneSettings();
             }
-        } else {
-            showToast('请选择有效的日期');
         }
+        closeCalendarApp();
     };
 
     window.resetCalendarDate = function () {
         localStorage.removeItem('faye-custom-date');
-        showToast('已恢复现实系统日期');
+        localStorage.removeItem('faye-custom-char-era');
+        const charEraEl = document.getElementById('calendar-char-era');
+        if (charEraEl) charEraEl.value = '';
+        showToast('已恢复系统默认设置');
         if (window.renderHomeGrid) window.renderHomeGrid();
         closeCalendarApp();
         if (typeof saveCharTimezoneSettings === 'function') {
@@ -9010,7 +9423,16 @@ Apply the following substitutions based on current language (CN/EN).
     let momentsPosts = [];
     let composeImages = []; // base64 images for composing
     let commentingPostId = null; // which post is being commented on
+    let commentingReplyTo = null; // new: which user to reply to
     let momentsInteractors = {}; // { postId: [npcName1, npcName2, ...] } — selected characters for interaction
+
+    document.addEventListener('click', (e) => {
+        const popup = e.target.closest('.moment-action-popup');
+        const btn = e.target.closest('.moment-action-btn');
+        if (!popup && !btn && typeof closeMomentPopups === 'function') {
+            closeMomentPopups();
+        }
+    });
 
     function loadMomentsData() {
         const stored = localStorage.getItem('faye-phone-moments');
@@ -9145,7 +9567,13 @@ Apply the following substitutions based on current language (CN/EN).
                     const gridClass = `grid-${Math.min(post.images.length, 9)}`;
                     html += `<div class="moment-images ${gridClass}">`;
                     post.images.forEach(imgSrc => {
-                        html += `<img class="moment-img" src="${imgSrc}" onclick="viewMomentImage(this.src)" onerror="this.style.display='none'">`;
+                        if (imgSrc.startsWith('txt:')) {
+                            const desc = imgSrc.substring(4);
+                            const escapedDesc = escapeHtml(desc);
+                            html += `<div class="moment-img-text" onclick="alert('${escapedDesc.replace(/'/g, "\\'")}')">${escapedDesc}</div>`;
+                        } else {
+                            html += `<img class="moment-img" src="${imgSrc}" onclick="viewMomentImage(this.src)" onerror="this.style.display='none'">`;
+                        }
                     });
                     html += '</div>';
                 }
@@ -9197,7 +9625,7 @@ Apply the following substitutions based on current language (CN/EN).
                 if (post.comments && post.comments.length > 0) {
                     html += '<div class="moment-comments">';
                     post.comments.forEach(c => {
-                        html += '<div class="moment-comment-item">';
+                        html += `<div class="moment-comment-item" onclick="startMomentReply('${post.id}', '${c.author}')">`;
                         html += `<span class="moment-comment-name">${c.author}</span>`;
                         if (c.replyTo) {
                             html += `<span class="moment-comment-reply-target">回复</span>`;
@@ -9297,6 +9725,7 @@ Apply the following substitutions based on current language (CN/EN).
 
     function startMomentComment(postId) {
         commentingPostId = postId;
+        commentingReplyTo = null; // general comment
         closeMomentPopups();
         const bar = document.getElementById('moment-comment-bar');
         const input = document.getElementById('moment-comment-input');
@@ -9307,6 +9736,23 @@ Apply the following substitutions based on current language (CN/EN).
             setTimeout(() => input.focus(), 100);
         }
     }
+
+    // Export to strictly global if needed, or keep local since it's just triggered by onclick which evaluates in global... Wait, all functions are inside a wrapper? No, it's just in a massive scope.
+    // If it's a global onclick, we just need to ensure it's on window or in the same scope. 
+    function startMomentReply(postId, author) {
+        commentingPostId = postId;
+        commentingReplyTo = author;
+        closeMomentPopups();
+        const bar = document.getElementById('moment-comment-bar');
+        const input = document.getElementById('moment-comment-input');
+        if (bar) bar.classList.add('show');
+        if (input) {
+            input.placeholder = `回复 ${author}...`;
+            setTimeout(() => input.focus(), 100);
+        }
+    }
+    // expose to window if necessary
+    window.startMomentReply = startMomentReply;
 
     function sendMomentComment() {
         if (!commentingPostId) return;
@@ -9321,11 +9767,14 @@ Apply the following substitutions based on current language (CN/EN).
         post.comments.push({
             author: currentUserName,
             text: input.value.trim(),
+            replyTo: commentingReplyTo,
             timestamp: Date.now()
         });
 
         saveMomentsData();
         commentingPostId = null;
+        commentingReplyTo = null;
+        if (input) input.value = '';
         const bar = document.getElementById('moment-comment-bar');
         if (bar) bar.classList.remove('show');
         renderMoments();
@@ -9422,7 +9871,17 @@ Apply the following substitutions based on current language (CN/EN).
         const textArea = document.getElementById('compose-text');
         const text = textArea ? textArea.value.trim() : '';
 
-        if (!text && composeImages.length === 0) {
+        // Extract [图片：xxx] or [图片: xxx]
+        let finalText = text;
+        let newImages = [];
+        const imgRegex = /\[图片[：:](.*?)\]/g;
+        let match;
+        while ((match = imgRegex.exec(finalText)) !== null) {
+            newImages.push('txt:' + match[1].trim());
+        }
+        finalText = finalText.replace(imgRegex, '').trim();
+
+        if (!finalText && composeImages.length === 0 && newImages.length === 0) {
             showToast('请输入内容或添加图片');
             return;
         }
@@ -9432,8 +9891,8 @@ Apply the following substitutions based on current language (CN/EN).
         const post = {
             id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
             author: currentUserName,
-            text: text,
-            images: [...composeImages],
+            text: finalText,
+            images: [...composeImages, ...newImages],
             likes: [],
             comments: [],
             timestamp: Date.now()
@@ -9548,7 +10007,8 @@ ${memoryContext ? memoryContext + '\n' : ''}${chatContext ? '最近和' + curren
 2. 可以参考聊天记录中的事件或话题，增加沉浸感
 3. 内容可以是日常感悟、分享心情、记录生活等
 4. 30-80字，不要太长
-5. 只输出动态正文，不要加引号、标签或前缀`;
+5. 如果你想配一张或多张图片，请在文中加入 [图片：照片的详细描述]
+6. 只输出正文和图片标签，不要加引号、标签或前缀`;
 
                 const messages = [
                     { role: 'system', content: systemPrompt },
@@ -9580,12 +10040,20 @@ ${memoryContext ? memoryContext + '\n' : ''}${chatContext ? '最近和' + curren
 
                 momentText = momentText.replace(/^["「『]|["」』]$/g, '').trim();
 
-                if (momentText) {
+                let extractedImages = [];
+                const imgRegex = /\[图片[：:](.*?)\]/g;
+                let matchReg;
+                while ((matchReg = imgRegex.exec(momentText)) !== null) {
+                    extractedImages.push('txt:' + matchReg[1].trim());
+                }
+                momentText = momentText.replace(imgRegex, '').trim();
+
+                if (momentText || extractedImages.length > 0) {
                     const post = {
                         id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
                         author: npc.name,
                         text: momentText,
-                        images: [],
+                        images: extractedImages,
                         likes: [],
                         comments: [],
                         timestamp: Date.now() - Math.floor(Math.random() * 3600000)
@@ -10086,8 +10554,11 @@ ${isAuthorReply ? '你是这条动态的作者，有人评论了你的朋友圈�
         openChatBeautifySettings,
         closeChatBeautifySettings,
         saveChatBeautifySettings,
+        restoreDefaultBeautifySettings,
         openChatMemorySettings,
         closeChatMemorySettings,
+        openChatInteractionSettings,
+        closeChatInteractionSettings,
         saveChatBlockSettings,
         exportCurrentChat,
         summarizeChatMemory,
@@ -10141,6 +10612,7 @@ ${isAuthorReply ? '你是这条动态的作者，有人评论了你的朋友圈�
         // Per-chat NAI/TTS
         saveChatNaiSettings,
         saveChatTtsSettings,
+        saveChatAutoInteractions,
         // Moments / 朋友圈
         renderMoments,
         openMomentsCompose,
@@ -10504,6 +10976,54 @@ ${isAuthorReply ? '你是这条动态的作者，有人评论了你的朋友圈�
     function saveAndRenderGrid() {
         localStorage.setItem('faye-phone-grid', JSON.stringify(currentGridLayout));
         renderHomeGrid();
+    }
+    function initColorPickers() {
+        document.querySelectorAll('input.color-picker').forEach(picker => {
+            if (picker.parentNode.classList.contains('color-picker-wrapper')) return; // Already wrapped
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'color-picker-wrapper';
+            picker.parentNode.insertBefore(wrapper, picker);
+            wrapper.appendChild(picker);
+
+            const textInput = document.createElement('input');
+            textInput.type = 'text';
+            textInput.className = 'color-hex-input';
+            textInput.maxLength = 7;
+            textInput.placeholder = '#000000';
+            wrapper.appendChild(textInput);
+
+            picker.addEventListener('input', () => { textInput.value = picker.value.toUpperCase(); });
+
+            textInput.addEventListener('input', () => {
+                let val = textInput.value;
+                if (!val.startsWith('#') && val.length > 0) val = '#' + val;
+                textInput.value = val;
+                if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                    picker.value = val;
+                }
+            });
+
+            const originalSet = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+            Object.defineProperty(picker, 'value', {
+                set(val) {
+                    originalSet.call(this, val || '#000000');
+                    textInput.value = this.value.toUpperCase();
+                },
+                get() {
+                    return Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get.call(this);
+                }
+            });
+
+            // Initial sync
+            textInput.value = picker.value.toUpperCase();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initColorPickers);
+    } else {
+        initColorPickers();
     }
 
 })();
