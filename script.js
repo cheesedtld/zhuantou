@@ -777,6 +777,12 @@
         if (momentsBody) momentsBody.style.display = 'none';
         if (meBody) meBody.style.display = 'none';
 
+        // Header visibility: hide for moments
+        const appHeader = document.querySelector('#message-list-screen > .app-header');
+        if (appHeader) {
+            appHeader.style.display = (tab === 'moments') ? 'none' : '';
+        }
+
         // Show selected body
         if (tab === 'message') {
             if (messageListBody) messageListBody.style.display = 'block';
@@ -786,7 +792,7 @@
             renderContacts();
         } else if (tab === 'moments') {
             if (momentsBody) momentsBody.style.display = 'block';
-            // renderMoments(); // Not implemented yet
+            renderMoments();
         } else if (tab === 'me') {
             if (meBody) meBody.style.display = 'block';
             // renderMe(); // Not implemented yet
@@ -1796,7 +1802,7 @@
         _ttsAudioPlayer = new Audio(audioUrl);
         _ttsAudioPlayer.play().catch(err => {
             console.error('[MiniMax TTS] Playback error:', err);
-            showToast('语音播放失败');
+            showToast('语音播放失败: ' + (err.message || err.name || JSON.stringify(err)));
         });
 
         _ttsAudioPlayer.onended = () => {
@@ -5857,11 +5863,13 @@ ${chatText}
             }
 
             let aspectRatio = 1;
-            // 壁纸使用手机比例，头像使用 1:1
+            // 壁纸使用手机比例，头像使用 1:1, 朋友圈封面使用 16:9
             if (currentSettingsUploadType === 'home-bg' || currentSettingsUploadType === 'chat-bg') {
                 const w = window.innerWidth;
                 const h = window.innerHeight;
                 aspectRatio = w / h;
+            } else if (currentSettingsUploadType === 'moments-cover') {
+                aspectRatio = 16 / 9;
             }
 
             cropper = new Cropper(image, {
@@ -5954,6 +5962,10 @@ ${chatText}
                     const preview = document.getElementById('preview-home-bg');
                     if (preview) preview.src = url;
                     saveSettingsToStorage();
+                } else if (currentSettingsUploadType === 'moments-cover') {
+                    setMomentsCoverBg(url);
+                    renderMoments();
+                    showToast('封面已更新');
                 } else if (currentSettingsUploadType === 'group-avatar') {
                     if (!appSettings.groupAvatars) appSettings.groupAvatars = {};
                     appSettings.groupAvatars[currentChatTag] = url;
@@ -8699,7 +8711,994 @@ Apply the following substitutions based on current language (CN/EN).
         updateOfflineModeUI();
     }
 
+    //==============================
+    // 朋友圈 / Moments Feature (Enhanced)
+    //==============================
+    let momentsPosts = [];
+    let composeImages = []; // base64 images for composing
+    let commentingPostId = null; // which post is being commented on
+    let momentsInteractors = {}; // { postId: [npcName1, npcName2, ...] } — selected characters for interaction
+
+    function loadMomentsData() {
+        const stored = localStorage.getItem('faye-phone-moments');
+        if (stored) {
+            try { momentsPosts = JSON.parse(stored); } catch (e) { momentsPosts = []; }
+        }
+    }
+
+    function saveMomentsData() {
+        localStorage.setItem('faye-phone-moments', JSON.stringify(momentsPosts));
+    }
+
+    function getMomentsCoverBg() {
+        return localStorage.getItem('faye-phone-moments-cover') || '';
+    }
+
+    function setMomentsCoverBg(url) {
+        localStorage.setItem('faye-phone-moments-cover', url);
+    }
+
+    function getMomentAvatar(name) {
+        const placeholder = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+        const npc = npcCharacters.find(n => n.name === name);
+        if (npc && npc.avatar) return npc.avatar;
+        const user = userCharacters.find(u => u.name === name);
+        if (user && user.avatar) return user.avatar;
+        return placeholder;
+    }
+
+    function formatMomentTime(timestamp) {
+        const now = Date.now();
+        const diff = now - timestamp;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+
+        if (minutes < 1) return '刚刚';
+        if (minutes < 60) return `${minutes}分钟前`;
+        if (hours < 24) return `${hours}小时前`;
+        if (days < 7) return `${days}天前`;
+
+        const d = new Date(timestamp);
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
+        return `${month}月${day}日`;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function getCurrentUserNameForMoments() {
+        const userId = getCurrentUserId();
+        return (userId !== undefined && userCharacters[userId]) ? userCharacters[userId].name : 'User';
+    }
+
+    function getCurrentUserAvatarForMoments() {
+        const userId = getCurrentUserId();
+        const currentUser = (userId !== undefined) ? userCharacters[userId] : null;
+        return currentUser && currentUser.avatar ? currentUser.avatar :
+            "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23d1d1d6'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
+    }
+
+    function renderMoments() {
+        const momentsBody = document.getElementById('moments-body');
+        if (!momentsBody) return;
+
+        loadMomentsData();
+
+        const currentUserName = getCurrentUserNameForMoments();
+        const currentUserAvatar = getCurrentUserAvatarForMoments();
+
+        let html = '';
+
+        // Cover / Banner — tappable to change background
+        const coverBg = getMomentsCoverBg() || appSettings.homeBg || '';
+        const coverStyle = coverBg ? `background-image: url(${coverBg}); background-size: cover; background-position: center;` : '';
+        html += `
+        <div class="moments-cover" style="${coverStyle}" onclick="openMomentsCoverUpload()">
+            <button class="moments-back-btn" onclick="event.stopPropagation(); switchNavTab('message')" title="返回">
+                <svg viewBox="0 0 24 24">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+            </button>
+            <div class="moments-top-actions">
+                <button class="moments-compose-btn" onclick="event.stopPropagation(); triggerAIMoments()" title="AI 生成动态">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+                        <path d="M12 2l2.09 6.26L20.18 9.27l-5.09 3.89L17.09 19.5 12 15.77 6.91 19.5l2-6.34L3.82 9.27l6.09-1.01z" fill="rgba(255,255,255,0.9)"></path>
+                    </svg>
+                </button>
+                <button class="moments-compose-btn" onclick="event.stopPropagation(); openMomentsCompose()" title="发表动态">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                        <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                </button>
+            </div>
+            <div class="moments-cover-user">
+                <span class="moments-cover-name">${currentUserName}</span>
+                <img class="moments-cover-avatar" src="${currentUserAvatar}">
+            </div>
+        </div>`;
+
+        // Posts Feed
+        html += '<div class="moments-feed">';
+
+        if (momentsPosts.length === 0) {
+            html += `
+            <div class="moments-empty">
+                <div class="moments-empty-icon">📷</div>
+                <div>还没有动态，快来发一条吧~</div>
+            </div>`;
+        } else {
+            momentsPosts.forEach((post, index) => {
+                const avatar = getMomentAvatar(post.author);
+                const timeStr = formatMomentTime(post.timestamp);
+                const isMyPost = post.author === currentUserName;
+                const hasLiked = post.likes.includes(currentUserName);
+
+                html += `<div class="moment-post" data-post-id="${post.id}">`;
+                html += `<img class="moment-avatar" src="${avatar}" onerror="this.src='data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27 fill=%27%23d1d1d6%27%3E%3Cpath d=%27M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z%27/%3E%3C/svg%3E'">`;
+                html += '<div class="moment-content">';
+                html += `<div class="moment-author">${post.author}</div>`;
+
+                if (post.text) {
+                    html += `<div class="moment-text">${escapeHtml(post.text)}</div>`;
+                }
+
+                // Images
+                if (post.images && post.images.length > 0) {
+                    const gridClass = `grid-${Math.min(post.images.length, 9)}`;
+                    html += `<div class="moment-images ${gridClass}">`;
+                    post.images.forEach(imgSrc => {
+                        html += `<img class="moment-img" src="${imgSrc}" onclick="viewMomentImage(this.src)" onerror="this.style.display='none'">`;
+                    });
+                    html += '</div>';
+                }
+
+                // Footer: time + action button
+                html += '<div class="moment-footer">';
+                html += `<span class="moment-time">${timeStr}`;
+                if (isMyPost) {
+                    html += `<span class="moment-delete-btn" onclick="deleteMoment('${post.id}')">删除</span>`;
+                }
+                html += '</span>';
+                html += `<div class="moment-action-area">
+                    <div class="moment-action-popup" id="popup-${post.id}">
+                        <button class="moment-popup-btn" onclick="toggleMomentLike('${post.id}')">
+                            <svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                            ${hasLiked ? '取消' : '赞'}
+                        </button>
+                        <button class="moment-popup-btn" onclick="startMomentComment('${post.id}')">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                            评论
+                        </button>
+                        <button class="moment-popup-btn" onclick="triggerAICommentOnPost('${post.id}')">
+                            <svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26L20.18 9.27l-5.09 3.89L17.09 19.5 12 15.77 6.91 19.5l2-6.34L3.82 9.27l6.09-1.01z" fill="rgba(255,255,255,0.9)"></path></svg>
+                            AI回复${momentsInteractors[post.id] && momentsInteractors[post.id].length > 0 ? '<span class="interactor-badge">' + momentsInteractors[post.id].length + '</span>' : ''}
+                        </button>
+                        <button class="moment-popup-btn" onclick="openInteractorPicker('${post.id}')">
+                            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-width="1.5"></path><circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87" fill="none" stroke="currentColor" stroke-width="1.5"></path><path d="M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="currentColor" stroke-width="1.5"></path></svg>
+                            互动
+                        </button>
+                    </div>
+                    <button class="moment-action-btn" onclick="toggleMomentPopup('${post.id}')">
+                        <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.8" fill="#999"></circle><circle cx="12" cy="12" r="1.8" fill="#999"></circle><circle cx="18" cy="12" r="1.8" fill="#999"></circle></svg>
+                    </button>
+                </div>`;
+                html += '</div>'; // .moment-footer
+
+                // Likes
+                if (post.likes && post.likes.length > 0) {
+                    html += '<div class="moment-likes">';
+                    html += '<svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>';
+                    html += '<div class="moment-likes-names">';
+                    post.likes.forEach(name => {
+                        html += `<span>${name}</span>`;
+                    });
+                    html += '</div></div>';
+                }
+
+                // Comments
+                if (post.comments && post.comments.length > 0) {
+                    html += '<div class="moment-comments">';
+                    post.comments.forEach(c => {
+                        html += '<div class="moment-comment-item">';
+                        html += `<span class="moment-comment-name">${c.author}</span>`;
+                        if (c.replyTo) {
+                            html += `<span class="moment-comment-reply-target">回复</span>`;
+                            html += `<span class="moment-comment-name">${c.replyTo}</span>`;
+                        }
+                        html += `<span class="moment-comment-text">：${escapeHtml(c.text)}</span>`;
+                        html += '</div>';
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>'; // .moment-content
+                html += '</div>'; // .moment-post
+            });
+        }
+
+        html += '</div>'; // .moments-feed
+
+        // Comment input bar
+        html += `<div class="moment-comment-input-bar" id="moment-comment-bar">
+            <input type="text" id="moment-comment-input" placeholder="评论...">
+            <button class="moment-comment-send-btn" onclick="sendMomentComment()">发送</button>
+        </div>`;
+
+        momentsBody.innerHTML = html;
+
+        // Enter key for comment
+        const commentInput = document.getElementById('moment-comment-input');
+        if (commentInput) {
+            commentInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    sendMomentComment();
+                }
+            });
+        }
+    }
+
+    // ===== Cover Photo Upload =====
+    function openMomentsCoverUpload() {
+        const overlay = document.getElementById('moments-cover-upload-overlay');
+        if (overlay) overlay.classList.add('show');
+    }
+
+    function closeMomentsCoverUpload() {
+        const overlay = document.getElementById('moments-cover-upload-overlay');
+        if (overlay) overlay.classList.remove('show');
+    }
+
+    function momentsCoverUrlUpload() {
+        closeMomentsCoverUpload();
+        const url = prompt('请输入图片 URL:');
+        if (url && url.trim()) {
+            setMomentsCoverBg(url.trim());
+            renderMoments();
+            showToast('封面已更新');
+        }
+    }
+
+    function momentsCoverLocalUpload() {
+        closeMomentsCoverUpload();
+        // Reuse the settings cropper system
+        currentSettingsUploadType = 'moments-cover';
+        const input = document.getElementById('settings-file-input');
+        if (input) input.click();
+    }
+
+    // ===== Interaction Functions =====
+    function toggleMomentPopup(postId) {
+        document.querySelectorAll('.moment-action-popup').forEach(popup => {
+            if (popup.id !== `popup-${postId}`) popup.classList.remove('show');
+        });
+        const popup = document.getElementById(`popup-${postId}`);
+        if (popup) popup.classList.toggle('show');
+    }
+
+    function closeMomentPopups() {
+        document.querySelectorAll('.moment-action-popup').forEach(p => p.classList.remove('show'));
+    }
+
+    function toggleMomentLike(postId) {
+        const currentUserName = getCurrentUserNameForMoments();
+        const post = momentsPosts.find(p => p.id === postId);
+        if (!post) return;
+
+        const likeIndex = post.likes.indexOf(currentUserName);
+        if (likeIndex >= 0) {
+            post.likes.splice(likeIndex, 1);
+        } else {
+            post.likes.push(currentUserName);
+        }
+
+        saveMomentsData();
+        closeMomentPopups();
+        renderMoments();
+    }
+
+    function startMomentComment(postId) {
+        commentingPostId = postId;
+        closeMomentPopups();
+        const bar = document.getElementById('moment-comment-bar');
+        const input = document.getElementById('moment-comment-input');
+        if (bar) bar.classList.add('show');
+        if (input) {
+            const post = momentsPosts.find(p => p.id === postId);
+            input.placeholder = post ? `评论 ${post.author}...` : '评论...';
+            setTimeout(() => input.focus(), 100);
+        }
+    }
+
+    function sendMomentComment() {
+        if (!commentingPostId) return;
+        const input = document.getElementById('moment-comment-input');
+        if (!input || !input.value.trim()) return;
+
+        const currentUserName = getCurrentUserNameForMoments();
+        const post = momentsPosts.find(p => p.id === commentingPostId);
+        if (!post) return;
+
+        if (!post.comments) post.comments = [];
+        post.comments.push({
+            author: currentUserName,
+            text: input.value.trim(),
+            timestamp: Date.now()
+        });
+
+        saveMomentsData();
+        commentingPostId = null;
+        const bar = document.getElementById('moment-comment-bar');
+        if (bar) bar.classList.remove('show');
+        renderMoments();
+    }
+
+    function deleteMoment(postId) {
+        if (!confirm('确定删除这条动态吗？')) return;
+        momentsPosts = momentsPosts.filter(p => p.id !== postId);
+        saveMomentsData();
+        renderMoments();
+        showToast('动态已删除');
+    }
+
+    // ===== Compose =====
+    function openMomentsCompose() {
+        composeImages = [];
+        const overlay = document.getElementById('moments-compose-overlay');
+        const textArea = document.getElementById('compose-text');
+        if (overlay) overlay.classList.add('show');
+        if (textArea) textArea.value = '';
+        renderComposeImages();
+
+        const fileInput = document.getElementById('moment-image-input');
+        if (fileInput) {
+            fileInput.value = '';
+            fileInput.onchange = handleMomentImageSelect;
+        }
+    }
+
+    function closeMomentsCompose() {
+        const overlay = document.getElementById('moments-compose-overlay');
+        if (overlay) overlay.classList.remove('show');
+        composeImages = [];
+    }
+
+    function triggerMomentImageUpload() {
+        const fileInput = document.getElementById('moment-image-input');
+        if (fileInput) fileInput.click();
+    }
+
+    function handleMomentImageSelect(e) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const remaining = 9 - composeImages.length;
+        const toProcess = Math.min(files.length, remaining);
+
+        for (let i = 0; i < toProcess; i++) {
+            const file = files[i];
+            if (!file.type.startsWith('image/')) continue;
+
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                composeImages.push(ev.target.result);
+                renderComposeImages();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        if (files.length > remaining) {
+            showToast('最多选择9张图片');
+        }
+    }
+
+    function renderComposeImages() {
+        const grid = document.getElementById('compose-image-grid');
+        if (!grid) return;
+
+        let html = '';
+        composeImages.forEach((img, index) => {
+            html += `<div class="compose-image-item">
+                <img src="${img}">
+                <button class="compose-image-remove" onclick="removeComposeImage(${index})">×</button>
+            </div>`;
+        });
+
+        if (composeImages.length < 9) {
+            html += `<div class="compose-add-image" onclick="triggerMomentImageUpload()">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 5v14M5 12h14" stroke-linecap="round"></path>
+                </svg>
+            </div>`;
+        }
+
+        grid.innerHTML = html;
+    }
+
+    function removeComposeImage(index) {
+        composeImages.splice(index, 1);
+        renderComposeImages();
+    }
+
+    function publishMoment() {
+        const textArea = document.getElementById('compose-text');
+        const text = textArea ? textArea.value.trim() : '';
+
+        if (!text && composeImages.length === 0) {
+            showToast('请输入内容或添加图片');
+            return;
+        }
+
+        const currentUserName = getCurrentUserNameForMoments();
+
+        const post = {
+            id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            author: currentUserName,
+            text: text,
+            images: [...composeImages],
+            likes: [],
+            comments: [],
+            timestamp: Date.now()
+        };
+
+        momentsPosts.unshift(post);
+        saveMomentsData();
+        closeMomentsCompose();
+        renderMoments();
+        showToast('动态已发表');
+    }
+
+    // ===== Image Viewer =====
+    function viewMomentImage(src) {
+        const viewer = document.getElementById('moment-image-viewer');
+        const img = document.getElementById('moment-viewer-img');
+        if (viewer && img) {
+            img.src = src;
+            viewer.classList.add('show');
+        }
+    }
+
+    function closeMomentImageViewer() {
+        const viewer = document.getElementById('moment-image-viewer');
+        if (viewer) viewer.classList.remove('show');
+    }
+
+    // ===== AI Generate Moments (Magic Wand) =====
+    async function triggerAIMoments() {
+        const endpoint = appSettings.apiEndpoint;
+        const key = appSettings.apiKey;
+        if (!endpoint) {
+            showToast('请先在设置中配置 API');
+            return;
+        }
+
+        // Gather all NPC contacts
+        const contacts = [];
+        if (appSettings.privateChats && Array.isArray(appSettings.privateChats)) {
+            appSettings.privateChats.forEach(name => {
+                const npc = npcCharacters.find(n => n.name === name);
+                if (npc) contacts.push(npc);
+            });
+        }
+        // Also include group chat members
+        if (appSettings.groups && Array.isArray(appSettings.groups)) {
+            appSettings.groups.forEach(g => {
+                if (g.members) {
+                    g.members.forEach(name => {
+                        const npc = npcCharacters.find(n => n.name === name);
+                        if (npc && !contacts.find(c => c.name === npc.name)) {
+                            contacts.push(npc);
+                        }
+                    });
+                }
+            });
+        }
+
+        if (contacts.length === 0) {
+            showToast('没有可用的角色来发布动态');
+            return;
+        }
+
+        showToast('✨ AI 正在生成动态...');
+
+        // Pick characters to post (at least 2 if available)
+        const postCount = Math.min(contacts.length, Math.max(2, Math.min(contacts.length, 3)));
+        const shuffled = [...contacts].sort(() => Math.random() - 0.5);
+        const selectedChars = shuffled.slice(0, postCount);
+
+        // Gather chat memories for each character
+        const currentUserName = getCurrentUserNameForMoments();
+
+        for (const npc of selectedChars) {
+            try {
+                // Build context with chat history
+                let chatContext = '';
+                const chatKey = `chat:${npc.name}`;
+                const historyStr = localStorage.getItem(`chat-history-${chatKey}`);
+                if (historyStr) {
+                    try {
+                        const history = JSON.parse(historyStr);
+                        // Get last 20 messages for context
+                        const recentMsgs = history.slice(-20);
+                        chatContext = recentMsgs.map(m => {
+                            const sender = m.isUser ? currentUserName : npc.name;
+                            return `${sender}: ${m.body || ''}`;
+                        }).join('\n');
+                    } catch (e) { /* ignore */ }
+                }
+
+                // Also get memory summaries
+                let memoryContext = '';
+                const memKey = `chat-memories-${chatKey}`;
+                const memStr = localStorage.getItem(memKey);
+                if (memStr) {
+                    try {
+                        const mems = JSON.parse(memStr);
+                        const enabledMems = mems.filter(m => m.enabled !== false);
+                        if (enabledMems.length > 0) {
+                            memoryContext = '记忆摘要：\n' + enabledMems.map(m => m.content).join('\n');
+                        }
+                    } catch (e) { /* ignore */ }
+                }
+
+                const persona = npc.persona || npc.desc || '';
+                const systemPrompt = `你是${npc.name}，正在发朋友圈动态。
+角色设定：${persona}
+${memoryContext ? memoryContext + '\n' : ''}${chatContext ? '最近和' + currentUserName + '的聊天记录：\n' + chatContext + '\n' : ''}
+请用${npc.name}的语气和性格，写一条朋友圈动态。要求：
+1. 必须完全以角色身份说话，风格自然、生活化
+2. 可以参考聊天记录中的事件或话题，增加沉浸感
+3. 内容可以是日常感悟、分享心情、记录生活等
+4. 30-80字，不要太长
+5. 只输出动态正文，不要加引号、标签或前缀`;
+
+                const messages = [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: '请发一条朋友圈动态' }
+                ];
+
+                const stream = await callLLM(messages);
+                let momentText = '';
+                const reader = stream.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6).trim();
+                            if (data === '[DONE]') break;
+                            try {
+                                const json = JSON.parse(data);
+                                const content = json.choices?.[0]?.delta?.content;
+                                if (content) momentText += content;
+                            } catch (e) { /* skip */ }
+                        }
+                    }
+                }
+
+                momentText = momentText.replace(/^["「『]|["」』]$/g, '').trim();
+
+                if (momentText) {
+                    const post = {
+                        id: `moment_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+                        author: npc.name,
+                        text: momentText,
+                        images: [],
+                        likes: [],
+                        comments: [],
+                        timestamp: Date.now() - Math.floor(Math.random() * 3600000)
+                    };
+                    momentsPosts.unshift(post);
+                }
+
+                // Small delay between AI calls
+                await new Promise(r => setTimeout(r, 300));
+
+            } catch (err) {
+                console.error(`AI moment generation failed for ${npc.name}:`, err);
+            }
+        }
+
+        // Generate cross-comments between the characters if multiple posts
+        if (selectedChars.length >= 2) {
+            try {
+                await generateAICrossComments(selectedChars, currentUserName);
+            } catch (e) {
+                console.error('Cross-comment generation failed:', e);
+            }
+        }
+
+        momentsPosts.sort((a, b) => b.timestamp - a.timestamp);
+        saveMomentsData();
+        renderMoments();
+        showToast('✨ AI 动态已生成');
+    }
+
+    async function generateAICrossComments(characters, currentUserName) {
+        // Each character comments on at least one other character's post
+        const recentAIPosts = momentsPosts.filter(p =>
+            characters.some(c => c.name === p.author) && p.author !== currentUserName
+        );
+
+        if (recentAIPosts.length < 2) return;
+
+        for (const post of recentAIPosts) {
+            // Pick 1-2 random commenters (not the post author)
+            const otherChars = characters.filter(c => c.name !== post.author);
+            const commentCount = Math.min(otherChars.length, 1 + Math.floor(Math.random() * 2));
+            const commenters = [...otherChars].sort(() => Math.random() - 0.5).slice(0, commentCount);
+
+            for (const commenter of commenters) {
+                try {
+                    const persona = commenter.persona || commenter.desc || '';
+                    const systemPrompt = `你是${commenter.name}。${persona ? '角色设定：' + persona : ''}
+${post.author}发了一条朋友圈："${post.text}"
+请用${commenter.name}的语气写一条评论。要求：
+1. 完全以角色身份评论，自然亲切
+2. 10-30字，简短有趣
+3. 只输出评论内容`;
+
+                    const messages = [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: '请评论这条朋友圈' }
+                    ];
+
+                    const stream = await callLLM(messages);
+                    let commentText = '';
+                    const reader = stream.getReader();
+                    const decoder = new TextDecoder();
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(6).trim();
+                                if (data === '[DONE]') break;
+                                try {
+                                    const json = JSON.parse(data);
+                                    const content = json.choices?.[0]?.delta?.content;
+                                    if (content) commentText += content;
+                                } catch (e) { /* skip */ }
+                            }
+                        }
+                    }
+
+                    commentText = commentText.replace(/^["「『]|["」』]$/g, '').trim();
+
+                    if (commentText && !post.comments) post.comments = [];
+                    if (commentText) {
+                        post.comments.push({
+                            author: commenter.name,
+                            text: commentText,
+                            timestamp: Date.now()
+                        });
+                    }
+
+                    await new Promise(r => setTimeout(r, 200));
+                } catch (e) {
+                    console.error(`Comment generation failed:`, e);
+                }
+            }
+        }
+    }
+
+    // ===== Interactor Picker for Moments =====
+    function getAvailableInteractors(postId) {
+        const post = momentsPosts.find(p => p.id === postId);
+        if (!post) return [];
+
+        const currentUserName = getCurrentUserNameForMoments();
+        const interactorMap = {};
+
+        // 1. All private chat NPCs
+        if (appSettings.privateChats && Array.isArray(appSettings.privateChats)) {
+            appSettings.privateChats.forEach(name => {
+                const npc = npcCharacters.find(n => n.name === name);
+                if (npc) interactorMap[npc.name] = npc;
+            });
+        }
+
+        // 2. All group chat members
+        if (appSettings.groupChats && Array.isArray(appSettings.groupChats)) {
+            appSettings.groupChats.forEach(tag => {
+                const settings = JSON.parse(localStorage.getItem(`chat-settings-${tag}`) || '{}');
+                const members = settings.members || settings.groupMembers || [];
+                members.forEach(name => {
+                    const npc = npcCharacters.find(n => n.name === name);
+                    if (npc) interactorMap[npc.name] = npc;
+                });
+            });
+        }
+
+        // 3. Sub-NPCs of the post author (associated characters)
+        const authorNpc = npcCharacters.find(n => n.name === post.author);
+        if (authorNpc && authorNpc.npcs && authorNpc.npcs.length > 0) {
+            authorNpc.npcs.forEach(sub => {
+                // Sub-NPCs may not be full npcCharacters, create a lightweight entry
+                if (!interactorMap[sub.name]) {
+                    interactorMap[sub.name] = {
+                        name: sub.name,
+                        persona: sub.desc || '',
+                        avatar: sub.avatar || null,
+                        isSubNpc: true
+                    };
+                }
+            });
+        }
+
+        // 4. Also include the post author NPC itself (so they can reply to comments)
+        if (authorNpc && !interactorMap[authorNpc.name]) {
+            interactorMap[authorNpc.name] = authorNpc;
+        }
+
+        // Remove the current user from interactors
+        delete interactorMap[currentUserName];
+
+        return Object.values(interactorMap);
+    }
+
+    function openInteractorPicker(postId) {
+        closeMomentPopups();
+
+        const available = getAvailableInteractors(postId);
+        if (available.length === 0) {
+            showToast('没有可用的互动角色');
+            return;
+        }
+
+        const currentSelected = momentsInteractors[postId] || [];
+
+        let html = '<div class="interactor-picker-overlay" id="interactor-picker-overlay" onclick="closeInteractorPicker()">';
+        html += '<div class="interactor-picker-panel" onclick="event.stopPropagation()">';
+        html += '<div class="interactor-picker-title">选择互动角色</div>';
+        html += '<div class="interactor-picker-list">';
+
+        available.forEach(npc => {
+            const checked = currentSelected.includes(npc.name);
+            const avatar = getMomentAvatar(npc.name);
+            const label = npc.isSubNpc ? `${npc.name} <span class="interactor-sub-tag">关联角色</span>` : npc.name;
+            html += `<label class="interactor-item${checked ? ' selected' : ''}">
+                <input type="checkbox" value="${npc.name}" ${checked ? 'checked' : ''} onchange="toggleInteractor('${postId}', '${npc.name}', this.checked)">
+                <img class="interactor-avatar" src="${avatar}" onerror="this.style.display='none'">
+                <span class="interactor-name">${label}</span>
+            </label>`;
+        });
+
+        html += '</div>';
+        html += `<div class="interactor-picker-actions">
+            <button class="interactor-select-all-btn" onclick="selectAllInteractors('${postId}')">全选</button>
+            <button class="interactor-confirm-btn" onclick="closeInteractorPicker()">确定</button>
+        </div>`;
+        html += '</div></div>';
+
+        // Insert into DOM
+        let container = document.getElementById('interactor-picker-overlay');
+        if (container) container.remove();
+
+        document.body.insertAdjacentHTML('beforeend', html);
+    }
+
+    function toggleInteractor(postId, name, checked) {
+        if (!momentsInteractors[postId]) momentsInteractors[postId] = [];
+
+        if (checked) {
+            if (!momentsInteractors[postId].includes(name)) {
+                momentsInteractors[postId].push(name);
+            }
+        } else {
+            momentsInteractors[postId] = momentsInteractors[postId].filter(n => n !== name);
+        }
+
+        // Update the label's selected class
+        const overlay = document.getElementById('interactor-picker-overlay');
+        if (overlay) {
+            const labels = overlay.querySelectorAll('.interactor-item');
+            labels.forEach(label => {
+                const input = label.querySelector('input');
+                if (input) {
+                    label.classList.toggle('selected', input.checked);
+                }
+            });
+        }
+    }
+
+    function selectAllInteractors(postId) {
+        const available = getAvailableInteractors(postId);
+        momentsInteractors[postId] = available.map(n => n.name);
+
+        const overlay = document.getElementById('interactor-picker-overlay');
+        if (overlay) {
+            const inputs = overlay.querySelectorAll('input[type=checkbox]');
+            inputs.forEach(input => {
+                input.checked = true;
+                input.closest('.interactor-item')?.classList.add('selected');
+            });
+        }
+    }
+
+    function closeInteractorPicker() {
+        const overlay = document.getElementById('interactor-picker-overlay');
+        if (overlay) overlay.remove();
+        renderMoments(); // Refresh to update badge counts
+    }
+
+    // ===== AI Comment on a Specific Post (triggered by user) =====
+    async function triggerAICommentOnPost(postId) {
+        const endpoint = appSettings.apiEndpoint;
+        if (!endpoint) {
+            showToast('请先在设置中配置 API');
+            return;
+        }
+
+        const post = momentsPosts.find(p => p.id === postId);
+        if (!post) return;
+
+        closeMomentPopups();
+
+        // Use selected interactors, or auto-pick if none selected
+        let selected = [];
+        if (momentsInteractors[postId] && momentsInteractors[postId].length > 0) {
+            // User has explicitly selected interactors
+            momentsInteractors[postId].forEach(name => {
+                const npc = npcCharacters.find(n => n.name === name);
+                if (npc) {
+                    selected.push(npc);
+                } else {
+                    // May be a sub-NPC, find from the author's sub-NPCs
+                    const authorNpc = npcCharacters.find(n => n.name === post.author);
+                    if (authorNpc && authorNpc.npcs) {
+                        const sub = authorNpc.npcs.find(s => s.name === name);
+                        if (sub) {
+                            selected.push({ name: sub.name, persona: sub.desc || '', isSubNpc: true });
+                        }
+                    }
+                }
+            });
+        } else {
+            // Fallback: auto-pick from available commenters
+            const commenters = getAvailableInteractors(postId);
+            if (commenters.length === 0) {
+                showToast('没有可用的角色来评论');
+                return;
+            }
+            const count = Math.min(commenters.length, 1 + Math.floor(Math.random() * 2));
+            selected = [...commenters].sort(() => Math.random() - 0.5).slice(0, count);
+        }
+
+        if (selected.length === 0) {
+            showToast('请先选择互动角色');
+            return;
+        }
+
+        const currentUserName = getCurrentUserNameForMoments();
+
+        showToast(`✨ AI 正在回复 (${selected.length}个角色)...`);
+
+        // Build existing comments context
+        const existingComments = (post.comments || []).map(c =>
+            `${c.author}：${c.text}`
+        ).join('\n');
+
+        for (const npc of selected) {
+            try {
+                const persona = npc.persona || npc.desc || '';
+
+                // Get chat history for context
+                let chatContext = '';
+                const chatKey = `chat:${npc.name}`;
+                const historyStr = localStorage.getItem(`chat-history-${chatKey}`);
+                if (historyStr) {
+                    try {
+                        const history = JSON.parse(historyStr);
+                        const recentMsgs = history.slice(-10);
+                        chatContext = recentMsgs.map(m => {
+                            const sender = m.isUser ? currentUserName : npc.name;
+                            return `${sender}: ${m.body || ''}`;
+                        }).join('\n');
+                    } catch (e) { /* ignore */ }
+                }
+
+                const isAuthorReply = npc.name === post.author;
+                const systemPrompt = `你是${npc.name}。${persona ? '角色设定：' + persona : ''}
+${chatContext ? '你和' + currentUserName + '的聊天记录：\n' + chatContext + '\n' : ''}
+${post.author}发了一条朋友圈："${post.text}"
+${existingComments ? '已有评论：\n' + existingComments + '\n' : ''}
+${isAuthorReply ? '你是这条动态的作者，有人评论了你的朋友圈，请回复最新一条评论。' : '请用' + npc.name + '的语气写一条评论或回复已有评论。'}
+要求：
+1. 完全以角色身份说话
+2. 自然、有趣，10-30字
+3. 只输出评论内容，不要加引号或前缀`;
+
+                const messages = [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: isAuthorReply ? '请回复评论' : '请评论这条朋友圈' }
+                ];
+
+                const stream = await callLLM(messages);
+                let commentText = '';
+                const reader = stream.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6).trim();
+                            if (data === '[DONE]') break;
+                            try {
+                                const json = JSON.parse(data);
+                                const content = json.choices?.[0]?.delta?.content;
+                                if (content) commentText += content;
+                            } catch (e) { /* skip */ }
+                        }
+                    }
+                }
+
+                commentText = commentText.replace(/^["「『]|["」』]$/g, '').trim();
+
+                if (commentText) {
+                    if (!post.comments) post.comments = [];
+
+                    // If replying to a specific comment, add replyTo
+                    const lastComment = post.comments[post.comments.length - 1];
+                    const commentObj = {
+                        author: npc.name,
+                        text: commentText,
+                        timestamp: Date.now()
+                    };
+
+                    if (isAuthorReply && lastComment) {
+                        commentObj.replyTo = lastComment.author;
+                    }
+
+                    post.comments.push(commentObj);
+                }
+
+                await new Promise(r => setTimeout(r, 200));
+            } catch (err) {
+                console.error(`AI comment failed for ${npc.name}:`, err);
+            }
+        }
+
+        saveMomentsData();
+        renderMoments();
+        showToast('✨ AI 评论已生成');
+    }
+
+    // 网页控制台 (vConsole)
+    function loadVConsole() {
+        if (window.vConsoleLoaded) return;
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js';
+        script.onload = () => {
+            window.vConsole = new window.VConsole();
+            showToast('vConsole 控制台已开启，随时可查看错误日志');
+            window.vConsoleLoaded = true;
+        };
+        script.onerror = () => {
+            showToast('加载 vConsole 失败，请检查网络');
+        };
+        document.head.appendChild(script);
+    }
+
     Object.assign(window, {
+        loadVConsole,
         openMessageList,
         openSettings,
         goBack,
@@ -8842,7 +9841,31 @@ Apply the following substitutions based on current language (CN/EN).
         stopTtsAudio,
         // Per-chat NAI/TTS
         saveChatNaiSettings,
-        saveChatTtsSettings
+        saveChatTtsSettings,
+        // Moments / 朋友圈
+        renderMoments,
+        openMomentsCompose,
+        closeMomentsCompose,
+        publishMoment,
+        triggerMomentImageUpload,
+        removeComposeImage,
+        toggleMomentPopup,
+        toggleMomentLike,
+        startMomentComment,
+        sendMomentComment,
+        deleteMoment,
+        viewMomentImage,
+        closeMomentImageViewer,
+        triggerAIMoments,
+        triggerAICommentOnPost,
+        openMomentsCoverUpload,
+        closeMomentsCoverUpload,
+        momentsCoverUrlUpload,
+        momentsCoverLocalUpload,
+        openInteractorPicker,
+        toggleInteractor,
+        selectAllInteractors,
+        closeInteractorPicker
     });
 
 })();
