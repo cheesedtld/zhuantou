@@ -657,10 +657,10 @@
                         <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
                             <label>CORS 代理地址</label>
                             <input type="text" id="set-tts-cors-proxy" class="setting-input"
-                                placeholder="如：https://corsproxy.io/?">
+                                placeholder="留空则使用内置代理：/proxy/">
                             <span style="font-size:11px; color:#aaa; line-height:1.5;">
-                                本地文件打开时需要 CORS 代理。默认：https://corsproxy.io/?
-                                <br>留空则直接请求（需从 HTTP 服务器访问页面）。
+                                默认使用内置代理：/proxy/ (需重新部署到 Pages 生效)
+                                <br>如果不填，则默认自带转发不报跨域错误。
                             </span>
                         </div>
                         <div class="setting-row">
