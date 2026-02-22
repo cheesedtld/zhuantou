@@ -1,0 +1,12 @@
+{
+  "name": "砖头机",
+  "short_name": "砖头机",
+  "icons": [
+    { "src": "icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#c8d8a0",
+  "theme_color": "#c8d8a0"
+}
