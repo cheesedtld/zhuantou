@@ -74,7 +74,7 @@
 
             <div id="lock-keypad-container"
                 style="display:none; align-items:center; justify-content:center; flex-direction:column; width:100%; height:100%; background:rgba(255,255,255,0.4); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);">
-                <div style="font-size:20px; color:var(--pink-600); margin-bottom:20px; margin-top:-100px;">输入密码</div>
+                <div style="font-size:20px; color:var(--pink-600); margin-bottom:20px; margin-top:-30px;">输入密码</div>
                 <div id="lock-pwd-dots" style="display:flex; gap:15px; margin-bottom:60px; height:20px;">
                     <div class="lock-dot"></div>
                     <div class="lock-dot"></div>
@@ -250,9 +250,19 @@
                 <!-- Customization Panel -->
                 <div
                     style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); text-align: center;">
-                    <h3 style="color: #333; margin-top: 0; margin-bottom: 20px; font-size: 15px;">自定义系统日期</h3>
+                    <h3 style="color: #333; margin-top: 0; margin-bottom: 20px; font-size: 15px;">自定义日期与时间线</h3>
                     <input type="date" id="calendar-date-picker" onchange="syncPickerToCalendar()"
-                        style="font-size: 16px; padding: 10px 15px; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; text-align: center; color: var(--pink-600); background: #fdfafb; outline: none; margin-bottom: 10px;">
+                        style="font-size: 16px; padding: 10px 15px; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; text-align: center; color: var(--pink-600); background: #fdfafb; outline: none; margin-bottom: 15px;">
+
+                    <div style="margin-bottom: 10px; text-align: left;">
+                        <span style="font-size: 14px; color: #333; font-weight: bold;">角色时期设定 (选填)</span>
+                    </div>
+                    <input type="text" id="calendar-char-era" placeholder="例如: 未来2077年 / 星历3024年"
+                        style="font-size: 14px; padding: 10px 15px; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; text-align: center; color: var(--pink-600); background: #fdfafb; outline: none; margin-bottom: 5px;">
+                    <p
+                        style="font-size: 11px; color: #aaa; text-align: left; line-height: 1.4; margin-top: 4px; padding-left: 2px; margin-bottom: 10px;">
+                        为空即和您的系统统一时期。填写如未来、过去等设定，则NPC的时期背景以此为准。
+                    </p>
 
                     <div style="margin-top: 25px;">
                         <button class="interactor-confirm-btn" onclick="saveCalendarDate()"
@@ -998,88 +1008,32 @@
                     </svg>
                 </div>
 
-                <!-- 时区设置 -->
-                <div style="margin-top: 10px;">
-                    <div class="settings-section-title">时区设置</div>
-                    <div class="setting-group">
-                        <div class="setting-row">
-                            <label>同一时区</label>
-                            <label class="switch">
-                                <input type="checkbox" id="set-char-same-tz" checked onchange="toggleCharTimezone()">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <div id="char-tz-detail" style="display: none;">
-                            <div class="setting-row">
-                                <label>时差</label>
-                                <div style="display: flex; align-items: center; gap: 6px;">
-                                    <select id="set-char-tz-offset" class="setting-input-sm"
-                                        style="width: 120px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 4px 6px; font-size: 13px;"
-                                        onchange="updateCharTimePreview()">
-                                    </select>
-                                </div>
-                            </div>
-                            <div
-                                style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0;">
-                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                                    <span style="font-size: 12px; color: #999;">我的时间：</span>
-                                    <span id="preview-user-tz-time"
-                                        style="font-size: 13px; color: #333; font-weight: 500;">--:--</span>
-                                </div>
-                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                                    <span style="font-size: 12px; color: #999;">对方时间：</span>
-                                    <span id="preview-char-tz-time"
-                                        style="font-size: 13px; color: #e88a9a; font-weight: 600;">--:--</span>
-                                </div>
-                            </div>
+                <!-- 互动设置 -->
+                <div class="settings-nav-card"
+                    onclick="if(typeof openChatInteractionSettings === 'function') { openChatInteractionSettings(); } else { const s = document.getElementById('chat-interaction-screen'); if(s) { s.style.display = 'flex'; s.style.zIndex = '100'; setTimeout(()=>s.style.transform='translateX(0)',10); } }">
+                    <div class="settings-nav-icon" style="background: rgba(255,154,158,0.15);">
+                        <div class="settings-nav-icon-img"
+                            style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:forum-outline.svg'); mask-image: url('https://api.iconify.design/material-symbols:forum-outline.svg'); background-color: #e88a9a;">
                         </div>
                     </div>
+                    <div class="settings-nav-text">
+                        <div class="settings-nav-title">互动设置</div>
+                        <div class="settings-nav-subtitle">时区 · 角色扮演 · 主动互动</div>
+                    </div>
+                    <svg class="settings-nav-arrow" viewBox="0 0 24 24">
+                        <path d="M10 6l6 6-6 6" stroke="#ccc" stroke-width="2" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round"></path>
+                    </svg>
                 </div>
 
-                <!-- 拉黑设置 -->
+                <!-- 隐私与安全 -->
                 <div style="margin-top: 10px;">
-                    <div class="settings-section-title">隐私与安全</div>
+                    <div class="settings-section-title">拉黑对方</div>
                     <div class="setting-group">
                         <div class="setting-row">
                             <label>拒收对方消息</label>
                             <label class="switch">
                                 <input type="checkbox" id="set-block-char" onchange="saveChatBlockSettings()">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <div class="setting-row">
-                            <label>消息被对方拒收</label>
-                            <label class="switch">
-                                <input type="checkbox" id="set-block-user" onchange="saveChatBlockSettings()">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 角色扮演设置 -->
-                <div style="margin-top: 10px;">
-                    <div class="settings-section-title">角色扮演</div>
-                    <div class="setting-group">
-                        <div class="setting-row">
-                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">Mate 模式</label>
-                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，角色知道自己是AI角色扮演</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="set-mate-mode" onchange="saveChatMateModeAuto()">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                        <div class="setting-row">
-                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">心声模式</label>
-                                <span
-                                    style="font-size:11px; color:#aaa; line-height:1.4;">开启后，每次回复至少两条消息末尾会附上角色心声</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="set-inner-voice-mode"
-                                    onchange="saveChatInnerVoiceModeAuto()">
                                 <span class="slider round"></span>
                             </label>
                         </div>
@@ -1225,6 +1179,134 @@
                                 <path
                                     d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
                             </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 互动设置子页面 -->
+        <div id="chat-interaction-screen" class="screen" style="z-index: 100;">
+            <div class="app-header">
+                <div class="header-content">
+                    <div class="header-btn"
+                        onclick="if(typeof closeChatInteractionSettings === 'function') { closeChatInteractionSettings(); } else { const s = document.getElementById('chat-interaction-screen'); if(s) { s.style.transform='translateX(100%)'; setTimeout(()=>s.style.display='none', 300); } }">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
+                        </svg>
+                    </div>
+                    <span class="header-title">互动设置</span>
+                </div>
+            </div>
+            <div class="settings-body">
+                <!-- 时区设置 -->
+                <div>
+                    <div class="settings-section-title">时区设置</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <label>同一时区</label>
+                            <label class="switch">
+                                <input type="checkbox" id="set-char-same-tz" checked onchange="toggleCharTimezone()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="char-tz-detail" style="display: none;">
+                            <div class="setting-row">
+                                <label>时差</label>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <select id="set-char-tz-offset" class="setting-input-sm"
+                                        style="width: 120px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 4px 6px; font-size: 13px;"
+                                        onchange="updateCharTimePreview()">
+                                    </select>
+                                </div>
+                            </div>
+                            <div
+                                style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0;">
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span style="font-size: 12px; color: #999;">我的时间：</span>
+                                    <span id="preview-user-tz-time"
+                                        style="font-size: 13px; color: #333; font-weight: 500;">--:--</span>
+                                </div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+                                    <span style="font-size: 12px; color: #999;">对方时间：</span>
+                                    <span id="preview-char-tz-time"
+                                        style="font-size: 13px; color: #e88a9a; font-weight: 600;">--:--</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 角色扮演设置 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">角色扮演</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">Mate 模式</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，角色知道自己是AI角色扮演</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-mate-mode" onchange="saveChatMateModeAuto()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">心声模式</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，每次回复至多两条消息末尾附上心声</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="set-inner-voice-mode"
+                                    onchange="saveChatInnerVoiceModeAuto()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 主动互动设置 -->
+                <div style="margin-top: 10px;">
+                    <div class="settings-section-title">主动互动设置</div>
+                    <div class="setting-group">
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">主动发动态</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI将按设定频率自动发朋友圈</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="chat-auto-moment-enabled"
+                                    onchange="saveChatAutoInteractions()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="chat-auto-moment-detail" style="display: none;">
+                            <div class="setting-row">
+                                <label>间隔时长 (分钟)</label>
+                                <input type="number" id="chat-auto-moment-interval" class="setting-input-sm"
+                                    style="width: 80px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 4px 6px;"
+                                    value="60" onchange="saveChatAutoInteractions()">
+                            </div>
+                        </div>
+
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">主动发消息</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI将按设定频率主动找你聊天</span>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="chat-auto-message-enabled"
+                                    onchange="saveChatAutoInteractions()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <div id="chat-auto-message-detail" style="display: none;">
+                            <div class="setting-row">
+                                <label>间隔时长 (分钟)</label>
+                                <input type="number" id="chat-auto-message-interval" class="setting-input-sm"
+                                    style="width: 80px; text-align: center; border: 1px solid #eee; border-radius: 8px; padding: 4px 6px;"
+                                    value="60" onchange="saveChatAutoInteractions()">
+                            </div>
                         </div>
                     </div>
                 </div>
