@@ -5247,6 +5247,29 @@ textarea.setting-input {
     opacity: 0.8;
 }
 
+.moment-img-text {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    box-sizing: border-box;
+    background: #f0f0f0;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    word-break: break-all;
+    white-space: pre-wrap;
+    transition: background 0.15s;
+}
+
+.moment-img-text:active {
+    background: #e4e4e4;
+}
+
 /* Post Footer (time + actions) */
 .moment-footer {
     display: flex;
@@ -6028,10 +6051,10 @@ textarea.setting-input {
     justify-content: center;
     align-items: center;
     border-radius: 50%;
-    width: 68px;
-    height: 68px;
+    width: 60px;
+    height: 60px;
     margin: 0 auto;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: 300;
     color: var(--pink-600);
     background-color: rgba(255, 255, 255, 0.25);
@@ -6060,6 +6083,8 @@ textarea.setting-input {
 .lock-delete {
     background-color: transparent;
     box-shadow: none;
+    width: 50px;
+    height: 50px;
 }
 
 .lock-delete:active {
@@ -6067,8 +6092,8 @@ textarea.setting-input {
 }
 
 .lock-delete svg {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     stroke: var(--pink-600);
 }
 
@@ -6171,3 +6196,6 @@ body.edit-mode .grid-slot {
     display: none;
     /* Hide name when moving for cleaner look */
 }
+.color-picker-wrapper { display: inline-flex; align-items: center; gap: 4px; }
+.color-hex-input { width: 55px; font-size: 11px; font-family: monospace; border: 1px solid #ddd; border-radius: 4px; padding: 2px 4px; color: #555; background: #fff; text-transform: uppercase; outline: none; }
+.color-hex-input:focus { border-color: var(--pink-400); }
