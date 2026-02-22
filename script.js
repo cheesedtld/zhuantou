@@ -1735,18 +1735,34 @@
         console.log('[MiniMax TTS] Generating speech for:', cleanText.substring(0, 100) + '...');
 
         const rawUrl = `https://api.minimax.chat/v1/t2a_v2?GroupId=${appSettings.ttsGroupId}`;
-        // Apply CORS proxy if configured (needed for file:// origin)
-        const corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : 'https://corsproxy.io/?';
-        const url = corsProxy ? corsProxy + encodeURIComponent(rawUrl) : rawUrl;
+        // Apply CORS proxy if configured (needed for file:// origin or cross-origin)
+        const corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : '/proxy/';
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${appSettings.ttsApiKey}`
-            },
-            body: JSON.stringify(payload)
-        });
+        let url = rawUrl;
+        if (corsProxy) {
+            // If proxy is an absolute URL with query like corsproxy.io/?url=, encode the URL optionally depending on proxy.
+            // But for our internal /proxy/, just append directly to path.
+            if (corsProxy === '/proxy/') {
+                url = corsProxy + rawUrl;
+            } else {
+                url = corsProxy.includes('url=') ? corsProxy + encodeURIComponent(rawUrl) : corsProxy + rawUrl;
+            }
+        }
+
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${appSettings.ttsApiKey}`
+                },
+                body: JSON.stringify(payload)
+            });
+        } catch (fetchErr) {
+            console.error('[MiniMax TTS] Network Error:', fetchErr);
+            throw new Error(`网络请求失败 (Failed to fetch)。可能是 CORS 代理 (${corsProxy || '无'}) 不稳定或被拦截。请前往 [手机设置 -> MiniMax语音] 中尝试清空 CORS 代理，或自行更换其他代理。`);
+        }
 
         if (!res.ok) {
             const errText = await res.text();
@@ -8829,7 +8845,6 @@ Apply the following substitutions based on current language (CN/EN).
         if (momentsPosts.length === 0) {
             html += `
             <div class="moments-empty">
-                <div class="moments-empty-icon">📷</div>
                 <div>还没有动态，快来发一条吧~</div>
             </div>`;
         } else {
