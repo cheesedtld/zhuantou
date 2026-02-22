@@ -4992,3 +4992,1009 @@ textarea.setting-input {
     display: none;
     /* Chrome/Safari */
 }
+
+/* ================================================================
+   朋友圈 / Moments Feature
+   ================================================================ */
+
+/* Cover / Banner Area */
+.moments-cover {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    background: linear-gradient(135deg, var(--pink-200) 0%, var(--pink-400) 100%);
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.moments-cover::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 80px;
+    background: linear-gradient(to top, var(--bg-primary), transparent);
+    pointer-events: none;
+}
+
+.moments-cover-user {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 2;
+}
+
+.moments-cover-name {
+    font-size: 17px;
+    font-weight: 700;
+    color: #fff;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.4);
+    margin-bottom: 6px;
+}
+
+.moments-cover-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    object-fit: cover;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Top Actions Container */
+.moments-top-actions {
+    position: absolute;
+    top: 42px;
+    /* Adjusted to align with typical app-header buttons */
+    right: 12px;
+    display: flex;
+    gap: 10px;
+    z-index: 3;
+}
+
+/* Back Button on Cover */
+.moments-back-btn {
+    position: absolute;
+    top: 42px;
+    /* Aligned with standard header */
+    left: 12px;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    transition: transform 0.15s;
+}
+
+.moments-back-btn:active {
+    transform: scale(0.9);
+}
+
+.moments-back-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Compose Button (camera icon on cover) */
+.moments-compose-btn {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+}
+
+.moments-compose-btn:active {
+    transform: scale(0.9);
+}
+
+.moments-compose-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: #fff;
+    stroke: #fff;
+    stroke-width: 0.5;
+}
+
+/* Post Feed Container */
+.moments-feed {
+    padding: 0 12px 80px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Individual Post */
+.moment-post {
+    display: flex;
+    gap: 10px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+    animation: momentFadeIn 0.35s ease-out;
+}
+
+@keyframes momentFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.moment-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #eee;
+    cursor: pointer;
+}
+
+.moment-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.moment-author {
+    font-size: 15px;
+    font-weight: 600;
+    color: #576b95;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
+
+.moment-text {
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.6;
+    margin-bottom: 6px;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+/* Image Grid */
+.moment-images {
+    display: grid;
+    gap: 4px;
+    margin-bottom: 8px;
+    max-width: 260px;
+}
+
+.moment-images.grid-1 {
+    grid-template-columns: 1fr;
+    max-width: 200px;
+}
+
+.moment-images.grid-2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.moment-images.grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.moment-images.grid-4 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.moment-images.grid-5,
+.moment-images.grid-6 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.moment-images.grid-7,
+.moment-images.grid-8,
+.moment-images.grid-9 {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.moment-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    background: #f0f0f0;
+}
+
+.moment-img:active {
+    opacity: 0.8;
+}
+
+/* Post Footer (time + actions) */
+.moment-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+}
+
+.moment-time {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.moment-action-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.04);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.moment-action-btn:active {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.moment-action-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: #999;
+}
+
+/* Action Popup (Like + Comment buttons) */
+.moment-action-popup {
+    display: none;
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #4c5157;
+    border-radius: 6px;
+    overflow: hidden;
+    flex-direction: row;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    animation: popupSlideIn 0.2s ease;
+    z-index: 10;
+}
+
+.moment-action-popup.show {
+    display: flex;
+}
+
+@keyframes popupSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-50%) translateX(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+    }
+}
+
+.moment-popup-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 14px;
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    border: none;
+    background: none;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.moment-popup-btn:active {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.moment-popup-btn+.moment-popup-btn {
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.moment-popup-btn svg {
+    width: 14px;
+    height: 14px;
+    fill: #fff;
+}
+
+/* Likes Section */
+.moment-likes {
+    background: #f7f7f7;
+    border-radius: 4px;
+    padding: 6px 10px;
+    margin-top: 6px;
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 13px;
+    color: #576b95;
+    line-height: 1.5;
+}
+
+.moment-likes svg {
+    width: 14px;
+    height: 14px;
+    fill: #e53935;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.moment-likes-names {
+    word-break: break-word;
+}
+
+.moment-likes-names span {
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.moment-likes-names span+span::before {
+    content: ', ';
+    color: #999;
+    font-weight: normal;
+}
+
+/* Comments Section */
+.moment-comments {
+    background: #f7f7f7;
+    border-radius: 0 0 4px 4px;
+    padding: 0 10px;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.moment-likes+.moment-comments {
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+    border-radius: 0 0 4px 4px;
+}
+
+.moment-comments:not(:empty) {
+    padding: 6px 10px;
+}
+
+.moment-comment-item {
+    margin-bottom: 3px;
+}
+
+.moment-comment-item:last-child {
+    margin-bottom: 0;
+}
+
+.moment-comment-name {
+    font-weight: 600;
+    color: #576b95;
+    cursor: pointer;
+}
+
+.moment-comment-text {
+    color: var(--text-primary);
+}
+
+.moment-comment-reply-target {
+    color: var(--text-muted);
+    margin: 0 2px;
+}
+
+/* Comment Input Area (appears at bottom when commenting) */
+.moment-comment-input-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #fff;
+    border-top: 1px solid #eee;
+    padding: 8px 12px;
+    display: none;
+    align-items: center;
+    gap: 8px;
+    z-index: 100;
+    animation: slideUpBar 0.2s ease;
+}
+
+.moment-comment-input-bar.show {
+    display: flex;
+}
+
+@keyframes slideUpBar {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.moment-comment-input-bar input {
+    flex: 1;
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    padding: 8px 14px;
+    font-size: 14px;
+    outline: none;
+    background: #f7f7f7;
+    font-family: inherit;
+}
+
+.moment-comment-input-bar input:focus {
+    border-color: var(--pink-400);
+    background: #fff;
+}
+
+.moment-comment-send-btn {
+    background: var(--accent-gradient-vivid);
+    color: #fff;
+    border: none;
+    border-radius: 20px;
+    padding: 8px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: transform 0.1s;
+}
+
+.moment-comment-send-btn:active {
+    transform: scale(0.95);
+}
+
+/* ====== Compose Moments Modal ====== */
+.moments-compose-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+}
+
+.moments-compose-overlay.show {
+    display: flex;
+}
+
+.moments-compose-panel {
+    width: 100%;
+    max-height: 85vh;
+    background: #fff;
+    border-radius: 18px 18px 0 0;
+    display: flex;
+    flex-direction: column;
+    animation: slideUpPanel 0.3s ease;
+    overflow: hidden;
+}
+
+@keyframes slideUpPanel {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.compose-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.compose-cancel {
+    font-size: 15px;
+    color: #666;
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 4px 8px;
+    font-family: inherit;
+}
+
+.compose-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.compose-publish {
+    background: var(--accent-gradient-vivid);
+    color: #fff;
+    border: none;
+    border-radius: 16px;
+    padding: 6px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s;
+    font-family: inherit;
+}
+
+.compose-publish:active {
+    transform: scale(0.95);
+}
+
+.compose-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.compose-textarea {
+    width: 100%;
+    min-height: 120px;
+    border: none;
+    outline: none;
+    font-size: 15px;
+    color: #333;
+    line-height: 1.6;
+    resize: none;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.compose-textarea::placeholder {
+    color: #bbb;
+}
+
+.compose-image-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 12px;
+}
+
+.compose-image-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #f5f5f5;
+}
+
+.compose-image-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.compose-image-remove {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.compose-add-image {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 2px dashed #ddd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: #fafafa;
+}
+
+.compose-add-image:active {
+    background: #f0f0f0;
+    border-color: #bbb;
+}
+
+.compose-add-image svg {
+    width: 28px;
+    height: 28px;
+    stroke: #ccc;
+    fill: none;
+    stroke-width: 2;
+}
+
+/* Compose footer tools */
+.compose-tools {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.compose-tool-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    border: none;
+    background: none;
+    border-radius: 6px;
+    transition: background 0.15s;
+}
+
+.compose-tool-btn:active {
+    background: #f0f0f0;
+}
+
+.compose-tool-btn svg {
+    width: 22px;
+    height: 22px;
+    fill: #999;
+    stroke: #999;
+    stroke-width: 0.5;
+}
+
+/* Delete post button */
+.moment-delete-btn {
+    font-size: 12px;
+    color: #999;
+    cursor: pointer;
+    margin-left: 12px;
+    transition: color 0.2s;
+}
+
+.moment-delete-btn:active {
+    color: #e53935;
+}
+
+/* Action area wrapper (for positioning popup) */
+.moment-action-area {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+/* Empty Moments */
+.moments-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #bbb;
+    font-size: 14px;
+}
+
+.moments-empty-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+/* Full-screen image viewer */
+.moment-image-viewer {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.moment-image-viewer.show {
+    display: flex;
+}
+
+.moment-image-viewer img {
+    max-width: 95%;
+    max-height: 90vh;
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* Moments Empty State */
+.moments-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    color: #999;
+    font-size: 14px;
+    gap: 12px;
+}
+
+.moments-empty-icon {
+    font-size: 48px;
+    opacity: 0.5;
+}
+
+/* Cover Upload Overlay */
+.moments-cover-upload-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1000;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.moments-cover-upload-overlay.show {
+    display: flex;
+}
+
+.moments-cover-upload-sheet {
+    background: #fff;
+    border-radius: 16px 16px 0 0;
+    width: 100%;
+    max-width: 500px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideUpSheet 0.25s ease;
+}
+
+@keyframes slideUpSheet {
+    from {
+        transform: translateY(100%);
+    }
+
+    to {
+        transform: translateY(0);
+    }
+}
+
+.cover-upload-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.cover-upload-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    border: none;
+    background: none;
+    font-size: 15px;
+    color: #333;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: background 0.15s;
+}
+
+.cover-upload-option:hover {
+    background: #f5f5f5;
+}
+
+.cover-upload-option svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+}
+
+.cover-upload-cancel {
+    border: none;
+    background: #f5f5f5;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 15px;
+    color: #999;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background 0.15s;
+}
+
+.cover-upload-cancel:hover {
+    background: #eee;
+}
+
+/* Comment Reply Target */
+.moment-comment-reply-target {
+    color: #999;
+    margin: 0 4px;
+    font-size: 12px;
+}
+
+/* Interactor Badge on AI Reply Button */
+.interactor-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 8px;
+    background: #07c160;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 4px;
+    line-height: 1;
+}
+
+/* Interactor Picker Overlay */
+.interactor-picker-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1100;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.interactor-picker-panel {
+    background: #fff;
+    border-radius: 16px;
+    width: 85%;
+    max-width: 360px;
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: fadeScaleIn 0.2s ease;
+}
+
+@keyframes fadeScaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.interactor-picker-title {
+    text-align: center;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    flex-shrink: 0;
+}
+
+.interactor-picker-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 12px;
+}
+
+.interactor-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+}
+
+.interactor-item:hover {
+    background: #f8f8f8;
+}
+
+.interactor-item.selected {
+    background: rgba(7, 193, 96, 0.08);
+}
+
+.interactor-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    accent-color: #07c160;
+    cursor: pointer;
+}
+
+.interactor-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: #f0f0f0;
+}
+
+.interactor-name {
+    font-size: 14px;
+    color: #333;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.interactor-sub-tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: var(--pink-200, #f5d5d5);
+    color: var(--pink-600, #c06070);
+    font-weight: 500;
+}
+
+.interactor-picker-actions {
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    border-top: 1px solid #f0f0f0;
+    flex-shrink: 0;
+}
+
+.interactor-select-all-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.interactor-select-all-btn:hover {
+    background: #f5f5f5;
+}
+
+.interactor-confirm-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: #07c160;
+    border-radius: 10px;
+    font-size: 14px;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.interactor-confirm-btn:hover {
+    background: #06ae56;
+}
