@@ -1588,6 +1588,7 @@
 
     function openTtsSettings() {
         // Load current values safely
+        if (document.getElementById('set-tts-api-endpoint')) document.getElementById('set-tts-api-endpoint').value = appSettings.ttsApiEndpoint || '';
         if (document.getElementById('set-tts-api-key')) document.getElementById('set-tts-api-key').value = appSettings.ttsApiKey || '';
         if (document.getElementById('set-tts-group-id')) document.getElementById('set-tts-group-id').value = appSettings.ttsGroupId || '';
 
@@ -1630,8 +1631,14 @@
     }
 
     function saveTtsSettings() {
-        if (document.getElementById('set-tts-api-key')) appSettings.ttsApiKey = document.getElementById('set-tts-api-key').value;
-        if (document.getElementById('set-tts-group-id')) appSettings.ttsGroupId = document.getElementById('set-tts-group-id').value;
+        if (document.getElementById('set-tts-api-endpoint')) {
+            let endpoint = document.getElementById('set-tts-api-endpoint').value.trim();
+            // 自动去掉末尾的 /
+            if (endpoint.endsWith('/')) endpoint = endpoint.slice(0, -1);
+            appSettings.ttsApiEndpoint = endpoint;
+        }
+        if (document.getElementById('set-tts-api-key')) appSettings.ttsApiKey = document.getElementById('set-tts-api-key').value.trim();
+        if (document.getElementById('set-tts-group-id')) appSettings.ttsGroupId = document.getElementById('set-tts-group-id').value.trim();
 
         const enabledEl = document.getElementById('set-tts-enabled');
         if (enabledEl) appSettings.ttsEnabled = enabledEl.checked;
@@ -1734,21 +1741,25 @@
 
         console.log('[MiniMax TTS] Generating speech for:', cleanText.substring(0, 100) + '...');
 
-        const rawUrl = `https://api.minimax.chat/v1/t2a_v2?GroupId=${appSettings.ttsGroupId}`;
-        // Apply CORS proxy if configured (needed for file:// origin or cross-origin)
-        const corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : '/proxy/';
+        const ttsEndpoint = appSettings.ttsApiEndpoint || 'https://api.minimax.chat';
+        const rawUrl = `${ttsEndpoint}/v1/t2a_v2?GroupId=${appSettings.ttsGroupId}`;
+        let corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : '/proxy/';
+        // 如果用户留空，则强制使用内置代理
+        if (!corsProxy || corsProxy.trim() === '') {
+            corsProxy = '/proxy/';
+        }
 
         let url = rawUrl;
-        if (corsProxy) {
-            // If proxy is an absolute URL with query like corsproxy.io/?url=, encode the URL optionally depending on proxy.
-            // But for our internal /proxy/, just append directly to path.
-            if (corsProxy === '/proxy/') {
+        if (corsProxy !== 'none' && corsProxy !== 'false') {
+            // 防止用户在这个框里直接填了 API 地址导致地址重复拼接
+            if (corsProxy.includes('api.minimax.chat')) {
+                url = corsProxy; // 用户直接填了完整的带代理的 API 地址
+            } else if (corsProxy === '/proxy/') {
                 url = corsProxy + rawUrl;
             } else {
                 url = corsProxy.includes('url=') ? corsProxy + encodeURIComponent(rawUrl) : corsProxy + rawUrl;
             }
         }
-
         let res;
         try {
             res = await fetch(url, {
