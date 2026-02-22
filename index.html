@@ -4,12 +4,16 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>小手机</title>
+    <title>砖头机</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.loli.net">
     <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
     <link href="https://fonts.loli.net/css2?family=Dancing+Script:wght@700&family=Ma+Shan+Zheng&display=swap"
         rel="stylesheet">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <script type="importmap">
@@ -41,73 +45,103 @@
                 </svg>
             </div>
         </div>
-        <div id="home-screen" class="screen">
-            <div id="home-clock">12:00</div>
-            <div class="app-grid">
-                <div class="app-item" onclick="openMessageList()">
-                    <div class="app-icon-box app-icon-style">
-                        <div class="app-icon-image"
-                            style="-webkit-mask-image: url('https://api.iconify.design/basil:wechat-solid.svg'); mask-image: url('https://api.iconify.design/basil:wechat-solid.svg');">
-                        </div>
-                    </div>
-                    <span class="app-name">聊天</span>
+        <div id="lock-screen" class="screen"
+            style="display:none; z-index:9999; flex-direction:column; justify-content:center; align-items:center;">
+            <div
+                style="position:absolute; top:18%; display:flex; flex-direction:column; align-items:center; width:100%;">
+                <div id="lock-clock"
+                    style="font-family:'Dancing Script', 'Ma Shan Zheng', cursive, sans-serif; font-size:72px; letter-spacing:4px; color:var(--pink-600); text-shadow:0 2px 8px rgba(212,119,138,0.15); font-weight:normal; line-height:1;">
+                    12:00
                 </div>
-                <div class="app-item">
-                    <div class="app-icon-box app-icon-style">
-                        <div class="app-icon-image"
-                            style="-webkit-mask-image: url('https://api.iconify.design/material-symbols:forum-rounded.svg'); mask-image: url('https://api.iconify.design/material-symbols:forum-rounded.svg');">
-                        </div>
-                    </div>
-                    <span class="app-name">论坛</span>
+                <div id="lock-date"
+                    style="font-size:16px; color:var(--pink-500); margin-top:10px; font-weight:500; letter-spacing:1px; text-shadow:0 1px 4px rgba(255,255,255,0.6);">
+                    --月--日 星期--
                 </div>
-                <div class="app-item">
-                    <div class="app-icon-box app-icon-style">
-                        <div class="app-icon-image"
-                            style="-webkit-mask-image: url('https://api.iconify.design/fa-brands:discord.svg'); mask-image: url('https://api.iconify.design/fa-brands:discord.svg');">
-                        </div>
-                    </div>
-                    <span class="app-name">Discord</span>
+                <div id="lock-battery-container"
+                    style="display:flex; align-items:center; justify-content:center; gap:6px; margin-top:8px; font-size:13px; color:var(--pink-500);">
+                    <svg width="20" height="10" viewBox="0 0 25 11" fill="currentColor">
+                        <rect x="0.5" y="0.5" width="20" height="10" rx="2.5" stroke="currentColor" fill="none"></rect>
+                        <path d="M23 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"></path>
+                        <rect id="lock-battery-fill" x="2.5" y="2.5" width="16" height="6" rx="1" fill="currentColor">
+                        </rect>
+                    </svg>
+                    <span id="lock-battery-text">100%</span>
                 </div>
+            </div>
+            <div id="lock-prompt"
+                style="position:absolute; bottom:80px; font-size:14px; color:var(--pink-600); animation:lockPulse 2s infinite;">
+                向上滑动解锁</div>
 
-                <div class="app-item" onclick="openUserSettings()">
+            <div id="lock-keypad-container"
+                style="display:none; align-items:center; justify-content:center; flex-direction:column; width:100%; height:100%; background:rgba(255,255,255,0.4); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);">
+                <div style="font-size:20px; color:var(--pink-600); margin-bottom:20px; margin-top:-100px;">输入密码</div>
+                <div id="lock-pwd-dots" style="display:flex; gap:15px; margin-bottom:60px; height:20px;">
+                    <div class="lock-dot"></div>
+                    <div class="lock-dot"></div>
+                    <div class="lock-dot"></div>
+                    <div class="lock-dot"></div>
+                </div>
+                <div class="lock-keypad"
+                    style="display:grid; grid-template-columns:repeat(3, 1fr); gap:20px 30px; width:80%; max-width:280px;">
+                    <div class="lock-key" onclick="lockKeyPress(1)">1</div>
+                    <div class="lock-key" onclick="lockKeyPress(2)">2</div>
+                    <div class="lock-key" onclick="lockKeyPress(3)">3</div>
+                    <div class="lock-key" onclick="lockKeyPress(4)">4</div>
+                    <div class="lock-key" onclick="lockKeyPress(5)">5</div>
+                    <div class="lock-key" onclick="lockKeyPress(6)">6</div>
+                    <div class="lock-key" onclick="lockKeyPress(7)">7</div>
+                    <div class="lock-key" onclick="lockKeyPress(8)">8</div>
+                    <div class="lock-key" onclick="lockKeyPress(9)">9</div>
+                    <div class="lock-key lock-key-empty"></div>
+                    <div class="lock-key" onclick="lockKeyPress(0)">0</div>
+                    <div class="lock-key lock-delete" onclick="lockKeyPress(-1)"><svg viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M21 4H8l-7 8 7 8h13a2 2 0 002-2V6a2 2 0 00-2-2z"></path>
+                            <line x1="18" y1="9" x2="12" y2="15"></line>
+                            <line x1="12" y1="9" x2="18" y2="15"></line>
+                        </svg></div>
+                </div>
+            </div>
+        </div>
+        <div id="home-screen" class="screen"
+            style="flex-direction: column; justify-content: space-between; overflow: hidden; position: relative;">
+            <div id="home-edit-header" style="display: none; position: absolute; top: 60px; right: 20px; z-index: 99;">
+                <button onclick="window.exitEditMode()"
+                    style="background: rgba(255,255,255,0.85); border: none; padding: 6px 16px; border-radius: 30px; color: var(--pink-600); font-size: 14px; font-weight: bold; backdrop-filter: blur(10px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.1s;">完成</button>
+            </div>
+            <div class="home-main-grid" id="home-main-grid"
+                style="display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(5, minmax(88px, auto)); gap: 15px 10px; width: 100%; flex: 1; padding: 0 15px; margin-top: auto; margin-bottom: 25px; box-sizing: border-box; align-content: end; position: relative; z-index: 2; touch-action: none;">
+                <!-- Generated by JS -->
+            </div>
+
+            <!-- Bottom Dock -->
+            <div class="home-dock"
+                style="display: flex; justify-content: space-around; align-items: center; width: calc(100% - 30px); margin: 0 15px 20px; padding: 8px 10px; background: rgba(255, 255, 255, 0.4); border-radius: 30px; backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); box-shadow: 0 4px 15px rgba(0,0,0,0.05); box-sizing: border-box; z-index: 10;">
+                <div class="app-item" onclick="openUserSettings()" style="margin: 0; min-width: 60px;">
                     <div class="app-icon-box app-icon-style">
                         <div class="app-icon-image"
                             style="-webkit-mask-image: url('https://api.iconify.design/tabler:mood-edit.svg'); mask-image: url('https://api.iconify.design/tabler:mood-edit.svg');">
                         </div>
                     </div>
-                    <span class="app-name">user设置</span>
+                    <span class="app-name" style="padding-bottom: 2px; margin-top: -4px;">我的</span>
                 </div>
-                <div class="app-item" onclick="openCharacterSetup('world')">
+                <div class="app-item" onclick="openSettings()" style="margin: 0; min-width: 60px;">
                     <div class="app-icon-box app-icon-style">
-                        <div class="app-icon-image"
-                            style="-webkit-mask-image: url('https://api.iconify.design/bxs:book-heart.svg'); mask-image: url('https://api.iconify.design/bxs:book-heart.svg');">
-                        </div>
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L3.16 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z">
+                            </path>
+                        </svg>
                     </div>
-                    <span class="app-name">世界书</span>
+                    <span class="app-name" style="padding-bottom: 2px; margin-top: -4px;">设置</span>
                 </div>
-                <div class="app-item" onclick="openNpcSettings()">
+                <div class="app-item" onclick="openNpcSettings()" style="margin: 0; min-width: 60px;">
                     <div class="app-icon-box app-icon-style">
                         <div class="app-icon-image"
                             style="-webkit-mask-image: url('https://api.iconify.design/game-icons:love-mystery.svg'); mask-image: url('https://api.iconify.design/game-icons:love-mystery.svg');">
                         </div>
                     </div>
-                    <span class="app-name">角色设置</span>
-                </div>
-                <div class="app-item" onclick="openSettings()">
-                    <div class="app-icon-box app-icon-style"><svg viewBox="0 0 24 24">
-                            <path
-                                d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L3.16 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.58 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z">
-                            </path>
-                        </svg></div>
-                    <span class="app-name">设置</span>
-                </div>
-                <div class="app-item" onclick="openRegexScreen()">
-                    <div class="app-icon-box app-icon-style">
-                        <div class="app-icon-image"
-                            style="-webkit-mask-image: url('https://api.iconify.design/tabler:regex.svg'); mask-image: url('https://api.iconify.design/tabler:regex.svg');">
-                        </div>
-                    </div>
-                    <span class="app-name">正则</span>
+                    <span class="app-name" style="padding-bottom: 2px; margin-top: -4px;">角色</span>
                 </div>
             </div>
         </div>
@@ -170,6 +204,70 @@
                 </div>
             </div>
         </div>
+
+        <!-- Calendar Full Screen App -->
+        <div id="calendar-screen" class="screen" style="display: none; background: #fdfafb;">
+            <div class="app-header" style="background: transparent; backdrop-filter: none; border-bottom: none;">
+                <div class="header-content">
+                    <div class="header-btn" onclick="closeCalendarApp()"><svg viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
+                        </svg></div>
+                    <span class="header-title" style="font-size: 16px; font-weight: normal; color: #666;">系统日历</span>
+                    <div class="header-btn header-btn-right"></div>
+                </div>
+            </div>
+            <div style="flex: 1; overflow-y: auto; padding: 10px 15px 20px;">
+                <!-- Calendar View -->
+                <div
+                    style="background: white; border-radius: 20px; padding: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 20px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px;">
+                        <button onclick="changeCalendarMonth(-1)"
+                            style="border: none; background: none; font-size: 18px; color: var(--pink-500); cursor: pointer; padding: 5px;">&lt;</button>
+                        <span id="calendar-view-title" style="font-size: 18px; font-weight: bold; color: #333;">--年
+                            --月</span>
+                        <button onclick="changeCalendarMonth(1)"
+                            style="border: none; background: none; font-size: 18px; color: var(--pink-500); cursor: pointer; padding: 5px;">&gt;</button>
+                    </div>
+
+                    <div
+                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; font-size: 12px; color: #999; margin-bottom: 10px;">
+                        <div style="color: var(--pink-400)">日</div>
+                        <div>一</div>
+                        <div>二</div>
+                        <div>三</div>
+                        <div>四</div>
+                        <div>五</div>
+                        <div style="color: var(--pink-400)">六</div>
+                    </div>
+
+                    <div id="calendar-view-grid"
+                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center;">
+                        <!-- JS generated days -->
+                    </div>
+                </div>
+
+                <!-- Customization Panel -->
+                <div
+                    style="background: white; border-radius: 20px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); text-align: center;">
+                    <h3 style="color: #333; margin-top: 0; margin-bottom: 20px; font-size: 15px;">自定义系统日期</h3>
+                    <input type="date" id="calendar-date-picker" onchange="syncPickerToCalendar()"
+                        style="font-size: 16px; padding: 10px 15px; border-radius: 12px; border: 1px solid #eee; width: 100%; box-sizing: border-box; text-align: center; color: var(--pink-600); background: #fdfafb; outline: none; margin-bottom: 10px;">
+
+                    <div style="margin-top: 25px;">
+                        <button class="interactor-confirm-btn" onclick="saveCalendarDate()"
+                            style="font-size: 15px; padding: 12px 0; width: 100%; border-radius: 25px; border: none; font-weight: bold; background: var(--pink-500); color: white;">保存并同步</button>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <button class="interactor-btn" onclick="resetCalendarDate()"
+                            style="font-size: 15px; padding: 12px 0; width: 100%; border-radius: 25px; border: 1px solid #ddd; background: white; color: #666;">恢复现实时间</button>
+                    </div>
+                    <p style="margin-top: 20px; font-size: 12px; color: #ccc; line-height: 1.5;">
+                        设定的日期会自动同步到系统时差、状态栏时间和桌面日历中。</p>
+                </div>
+            </div>
+        </div>
+
         <div id="chat-screen" class="screen">
             <div class="app-header">
                 <div class="header-content">
@@ -645,44 +743,40 @@
                 <div>
                     <div class="settings-section-title">API 配置</div>
                     <div class="setting-group">
-                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-                            <label>API 地址 (API Endpoint)</label>
-                            <input type="text" id="set-tts-api-endpoint" class="setting-input"
-                                placeholder="默认: https://api.minimax.chat">
-                            <span
-                                style="font-size:11px; color:#aaa; line-height:1.5;">如果使用国际版，请填写：https://api.minimaxi.chat</span>
+                        <div class="setting-row" style="grid-template-columns: 85px 1fr;">
+                            <label>API 地址</label>
+                            <select id="set-tts-api-endpoint-select" class="setting-input"
+                                style="width: 100%; text-align: left;" onchange="toggleTtsEndpointInput()">
+                                <option value="https://api.minimax.chat">国内版</option>
+                                <option value="https://api.minimaxi.chat">国际版</option>
+                                <option value="custom">自定义</option>
+                            </select>
                         </div>
-                        <div class="setting-row">
+                        <div class="setting-row" id="set-tts-api-endpoint-container"
+                            style="display: none; background: #fafafa; border-bottom: 2px solid #e8919f;">
+                            <input type="text" id="set-tts-api-endpoint" class="setting-input"
+                                style="width: 100%; text-align: left; background: transparent; border: none; box-shadow: none;"
+                                placeholder="输入自定义 API 地址，例如：https://api.ds.chat">
+                        </div>
+                        <div class="setting-row" style="grid-template-columns: 85px 1fr;">
                             <label>API Key</label>
-                            <input type="password" id="set-tts-api-key" class="setting-input"
+                            <input type="password" id="set-tts-api-key" class="setting-input" style="width: 100%;"
                                 placeholder="输入 MiniMax API Key">
                         </div>
-                        <div class="setting-row">
+                        <div class="setting-row" style="grid-template-columns: 85px 1fr;">
                             <label>Group ID</label>
-                            <input type="text" id="set-tts-group-id" class="setting-input" placeholder="输入 Group ID">
+                            <input type="text" id="set-tts-group-id" class="setting-input" style="width: 100%;"
+                                placeholder="输入 Group ID">
                         </div>
-                        <div class="setting-row" style="flex-direction:column; align-items:stretch; gap:8px;">
-                            <label>CORS 代理地址</label>
-                            <input type="text" id="set-tts-cors-proxy" class="setting-input"
-                                placeholder="留空则使用内置代理：/proxy/">
-                            <span style="font-size:11px; color:#aaa; line-height:1.5;">
-                                默认使用内置代理：/proxy/ (需重新部署到 Pages 生效)
-                                <br>如果不填，则默认自带转发不报跨域错误。
-                            </span>
+                        <div class="setting-row" style="grid-template-columns: 85px 1fr;">
+                            <label>CORS 代理</label>
+                            <input type="text" id="set-tts-cors-proxy" class="setting-input" style="width: 100%;"
+                                placeholder="如：https://corsproxy.io/?">
                         </div>
-                        <div class="setting-row">
-                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
-                                <label style="font-size:14px;">启用 TTS 语音</label>
-                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，AI回复旁将显示播放按钮</span>
-                            </div>
-                            <label class="switch">
-                                <input type="checkbox" id="set-tts-enabled">
-                                <span class="slider round"></span>
-                            </label>
-                        </div>
-                    </div>
-                </div>
 
+                    </div>
+
+                </div>
             </div>
             <div class="settings-footer" style="padding: 10px;">
                 <button class="modal-btn btn-save"
@@ -1215,11 +1309,11 @@
                     </div>
                 </div>
             </div>
-            <div class="settings-footer" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
-                <button class="modal-btn btn-save" onclick="saveChatBeautifySettings()"
-                    style="width: 100%; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px;">保存配置</button>
+            <div class="settings-footer" style="padding: 10px; display: flex; flex-direction: row; gap: 10px;">
                 <button class="modal-btn" onclick="restoreDefaultBeautifySettings()"
-                    style="width: 100%; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px; background: #f5f5f5; color: #666;">恢复默认配色</button>
+                    style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px; background: #f5f5f5; color: #666;">恢复默认配色</button>
+                <button class="modal-btn btn-save" onclick="saveChatBeautifySettings()"
+                    style="flex: 1; border-radius: 12px; padding: 8px 0; box-shadow: none; font-size: 13px; background: var(--pink-500); color: white;">保存配置</button>
             </div>
         </div>
 
@@ -1596,7 +1690,8 @@
                         </svg></div>
                     <span class="header-title">角色设置</span>
                     <div class="header-btn header-btn-right" onclick="openNpcCreatePage()"><svg viewBox="0 0 24 24">
-                            <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round">
+                            </path>
                         </svg></div>
                 </div>
             </div>
@@ -1698,7 +1793,8 @@
                         </svg></div>
                     <span class="header-title">世界书</span>
                     <div class="header-btn header-btn-right" onclick="openWorldbookEdit(null)"><svg viewBox="0 0 24 24">
-                            <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round">
+                            </path>
                         </svg></div>
                 </div>
             </div>
@@ -1749,7 +1845,8 @@
                         </svg></div>
                     <span class="header-title">我的角色</span>
                     <div class="header-btn header-btn-right" onclick="openUserCreatePage()"><svg viewBox="0 0 24 24">
-                            <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round"></path>
+                            <path d="M12 5v14M5 12h14" stroke="#181818" stroke-width="2" stroke-linecap="round">
+                            </path>
                         </svg></div>
                 </div>
             </div>
