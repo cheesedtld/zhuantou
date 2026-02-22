@@ -296,19 +296,27 @@
             });
         }
 
-        // 5. Timezone / Time Difference Context
+        // 5. Timezone / Time / Date Context
         const tzOffsetHours = getCharTimezoneOffset();
+        const userDateObj = window.getSimulatedDate();
+        const charDateObj = new Date(userDateObj.getTime() + tzOffsetHours * 3600000);
+        const userDateStr = `${userDateObj.getFullYear()}年${userDateObj.getMonth() + 1}月${userDateObj.getDate()}日`;
+        const charDateStr = `${charDateObj.getFullYear()}年${charDateObj.getMonth() + 1}月${charDateObj.getDate()}日`;
+        const userTimeStr = getTime(true);
+        const charTimeStr = getTime(false);
+
+        context += `\n[日期与时间信息]\n`;
+        const charName2 = getCharName();
         if (tzOffsetHours !== 0) {
-            const userTimeStr = getTime(true);
-            const charTimeStr = getTime(false);
             const absOffset = Math.abs(tzOffsetHours);
             const direction = tzOffsetHours > 0 ? '快' : '慢';
-            const charName2 = getCharName();
-            context += `\n[时区与时差信息]\n`;
             context += `${charName2}所在时区与用户存在时差：${charName2}的时间比用户${direction}${absOffset}小时。\n`;
-            context += `用户当前时间: ${userTimeStr}\n`;
-            context += `${charName2}当前时间: ${charTimeStr}\n`;
-            context += `请在对话中自然地体现出时差感，例如：对方可能在深夜/清晨/不同时段，注意根据${charName2}自己的当地时间来描述作息和环境。\n`;
+            context += `用户当前时间: ${userDateStr} ${userTimeStr}\n`;
+            context += `${charName2}当前时间: ${charDateStr} ${charTimeStr}\n`;
+            context += `请在对话中自然地体现出时差感，注意根据${charName2}自己的当地时间（包括可能跨越0点造成的日期不同）来描述作息和环境。\n`;
+        } else {
+            context += `当前系统日期为 ${userDateStr}，时间是 ${userTimeStr}。\n`;
+            context += `请在对话中参考这个时间设定相关的活动（例如节假日、特殊日期或早晚作息）。\n`;
         }
 
         return context.trim();
@@ -1586,15 +1594,43 @@
     // ===== MiniMax TTS Settings =====
     let _ttsAudioPlayer = null; // Global audio player for TTS
 
+    window.toggleTtsEndpointInput = function () {
+        const select = document.getElementById('set-tts-api-endpoint-select');
+        const inputContainer = document.getElementById('set-tts-api-endpoint-container');
+        const input = document.getElementById('set-tts-api-endpoint');
+        if (select && inputContainer && input) {
+            if (select.value === 'custom') {
+                inputContainer.style.display = 'block';
+                input.value = '';
+                input.focus();
+            } else {
+                inputContainer.style.display = 'none';
+                input.value = select.value;
+            }
+        }
+    };
+
     function openTtsSettings() {
         // Load current values safely
-        if (document.getElementById('set-tts-api-endpoint')) document.getElementById('set-tts-api-endpoint').value = appSettings.ttsApiEndpoint || '';
+        const endpoint = appSettings.ttsApiEndpoint || 'https://api.minimax.chat';
+        const endpointSelect = document.getElementById('set-tts-api-endpoint-select');
+        const endpointContainer = document.getElementById('set-tts-api-endpoint-container');
+        const endpointInput = document.getElementById('set-tts-api-endpoint');
+        if (endpointSelect && endpointContainer && endpointInput) {
+            if (endpoint === 'https://api.minimax.chat' || endpoint === 'https://api.minimaxi.chat') {
+                endpointSelect.value = endpoint;
+                endpointContainer.style.display = 'none';
+                endpointInput.value = endpoint;
+            } else {
+                endpointSelect.value = 'custom';
+                endpointContainer.style.display = 'flex';
+                endpointInput.value = endpoint;
+            }
+        }
         if (document.getElementById('set-tts-api-key')) document.getElementById('set-tts-api-key').value = appSettings.ttsApiKey || '';
         if (document.getElementById('set-tts-group-id')) document.getElementById('set-tts-group-id').value = appSettings.ttsGroupId || '';
 
         // Some elements may have been moved entirely to chat settings, so we use optional chaining/ifs
-        const enabledEl = document.getElementById('set-tts-enabled');
-        if (enabledEl) enabledEl.checked = appSettings.ttsEnabled || false;
 
         if (document.getElementById('set-tts-model')) document.getElementById('set-tts-model').value = appSettings.ttsModel || 'speech-02-hd';
         if (document.getElementById('set-tts-voice-id')) document.getElementById('set-tts-voice-id').value = appSettings.ttsVoiceId || 'female-shaonv';
@@ -1632,7 +1668,13 @@
 
     function saveTtsSettings() {
         if (document.getElementById('set-tts-api-endpoint')) {
-            let endpoint = document.getElementById('set-tts-api-endpoint').value.trim();
+            let endpoint = '';
+            const select = document.getElementById('set-tts-api-endpoint-select');
+            if (select && select.value !== 'custom') {
+                endpoint = select.value.trim();
+            } else {
+                endpoint = document.getElementById('set-tts-api-endpoint').value.trim();
+            }
             // 自动去掉末尾的 /
             if (endpoint.endsWith('/')) endpoint = endpoint.slice(0, -1);
             appSettings.ttsApiEndpoint = endpoint;
@@ -1640,8 +1682,7 @@
         if (document.getElementById('set-tts-api-key')) appSettings.ttsApiKey = document.getElementById('set-tts-api-key').value.trim();
         if (document.getElementById('set-tts-group-id')) appSettings.ttsGroupId = document.getElementById('set-tts-group-id').value.trim();
 
-        const enabledEl = document.getElementById('set-tts-enabled');
-        if (enabledEl) appSettings.ttsEnabled = enabledEl.checked;
+
 
         if (document.getElementById('set-tts-model')) appSettings.ttsModel = document.getElementById('set-tts-model').value;
         if (document.getElementById('set-tts-voice-id')) appSettings.ttsVoiceId = document.getElementById('set-tts-voice-id').value;
@@ -1743,7 +1784,7 @@
 
         const ttsEndpoint = appSettings.ttsApiEndpoint || 'https://api.minimax.chat';
         const rawUrl = `${ttsEndpoint}/v1/t2a_v2?GroupId=${appSettings.ttsGroupId}`;
-        let corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : '/proxy/';
+        let corsProxy = appSettings.ttsCorsProxy !== undefined ? appSettings.ttsCorsProxy : 'https://corsproxy.io/?';
         // 如果用户留空，则强制使用内置代理
         if (!corsProxy || corsProxy.trim() === '') {
             corsProxy = '/proxy/';
@@ -2142,17 +2183,24 @@
     }
 
     function updateClock() {
-        let timeStr;
-        const now = new Date();
-        // Use customTime+timeOffset if set, otherwise system time
-        if (appSettings.customTime && /^\d{1,2}:\d{2}$/.test(appSettings.customTime) && typeof appSettings.timeOffset === 'number') {
-            const target = new Date(now.getTime() + appSettings.timeOffset);
-            timeStr = `${target.getHours().toString().padStart(2, '0')}:${target.getMinutes().toString().padStart(2, '0')}`;
-        } else {
-            timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        // Reuse global getTime logic which handles both simulated dates and time offsets
+        const timeStr = typeof getTime === 'function' ? getTime(true) : '';
+        if (timeStr) {
+            if (clockEl) clockEl.textContent = timeStr;
+
+            const localLockClockEl = document.getElementById('lock-clock');
+            if (localLockClockEl) localLockClockEl.textContent = timeStr;
+
+            const lockDateEl = document.getElementById('lock-date');
+            if (lockDateEl && typeof window.getSimulatedDate === 'function') {
+                const d = typeof getTime === 'function' ? getTime(true, true) : window.getSimulatedDate();
+                const month = d.getMonth() + 1;
+                const date = d.getDate();
+                const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const dayOfWeek = weekDays[d.getDay()];
+                lockDateEl.textContent = `${month}月${date}日 ${dayOfWeek}`;
+            }
         }
-        if (clockEl) clockEl.textContent = timeStr;
-        if (homeClockEl) homeClockEl.textContent = timeStr;
     }
 
 
@@ -2162,13 +2210,29 @@
         navigator.getBattery().then(battery => {
             const applyLevel = () => {
                 const fill = document.getElementById('battery-fill');
-                if (!fill) return;
+                const lockFill = document.getElementById('lock-battery-fill');
+                const lockText = document.getElementById('lock-battery-text');
+
                 const level = battery.level; // 0.0 ~ 1.0
-                fill.setAttribute('width', Math.round(level * 16));
-                // Color: red < 20%, yellow < 50%, default otherwise
-                if (level <= 0.2) fill.setAttribute('fill', '#e53935');
-                else if (level <= 0.5) fill.setAttribute('fill', '#7ac976');
-                else fill.setAttribute('fill', 'currentColor');
+                const width = Math.round(level * 16);
+
+                let color = 'currentColor';
+                if (level <= 0.2) color = '#e53935';
+                else if (level <= 0.5) color = '#7ac976';
+
+                if (fill) {
+                    fill.setAttribute('width', width);
+                    fill.setAttribute('fill', color);
+                }
+
+                if (lockFill) {
+                    lockFill.setAttribute('width', width);
+                    lockFill.setAttribute('fill', color);
+                }
+
+                if (lockText) {
+                    lockText.textContent = Math.round(level * 100) + '%';
+                }
             };
             applyLevel();
             battery.addEventListener('levelchange', applyLevel);
@@ -2253,6 +2317,10 @@
             if (appSettings.homeBg) homeScreen.style.backgroundImage = `url(${appSettings.homeBg})`;
             else { homeScreen.style.backgroundImage = 'none'; homeScreen.style.backgroundColor = '#fdf0f2'; }
         }
+        if (lockScreen) {
+            if (appSettings.homeBg) lockScreen.style.backgroundImage = `url(${appSettings.homeBg})`;
+            else { lockScreen.style.backgroundImage = 'none'; lockScreen.style.backgroundColor = '#fdf0f2'; }
+        }
         if (chatScreen) {
             if (appSettings.chatBg) { chatScreen.style.backgroundImage = `url(${appSettings.chatBg})`; chatScreen.style.backgroundColor = '#fdf6f7'; }
             else { chatScreen.style.backgroundImage = 'none'; chatScreen.style.backgroundColor = '#fdf6f7'; }
@@ -2267,7 +2335,7 @@
         });
 
         if (appSettings.homeTextColor) {
-            if (homeClockEl) homeClockEl.style.color = appSettings.homeTextColor;
+            if (lockClockEl) lockClockEl.style.color = appSettings.homeTextColor;
             document.querySelectorAll('.app-name').forEach(el => el.style.color = appSettings.homeTextColor);
         }
 
@@ -3477,7 +3545,8 @@ ${chatText}
     function updateCharTimePreview() {
         const userTimeStr = getTime(true);
         const previewUser = document.getElementById('preview-user-tz-time');
-        if (previewUser) previewUser.textContent = userTimeStr;
+        const userDate = getTime(true, true); // Date object
+        if (previewUser) previewUser.textContent = `${userDate.getMonth() + 1}月${userDate.getDate()}日 ${userTimeStr}`;
 
         const tzSelect = document.getElementById('set-char-tz-offset');
         if (!tzSelect) return;
@@ -3486,12 +3555,11 @@ ${chatText}
         saveCharTimezoneSettings();
 
         // Calculate character time: user's time + timezone difference
-        const userDate = getTime(true, true); // Date object
         const charDate = new Date(userDate.getTime() + offsetHours * 3600000);
         const charTimeStr = `${charDate.getHours().toString().padStart(2, '0')}:${charDate.getMinutes().toString().padStart(2, '0')}`;
 
         const previewChar = document.getElementById('preview-char-tz-time');
-        if (previewChar) previewChar.textContent = charTimeStr;
+        if (previewChar) previewChar.textContent = `${charDate.getMonth() + 1}月${charDate.getDate()}日 ${charTimeStr}`;
     }
 
     // Initialize the timezone offset select dropdown
@@ -4354,8 +4422,165 @@ ${chatText}
         }
     }
 
+    window.getSimulatedDate = function (baseDate) {
+        let customDateStr = localStorage.getItem('faye-custom-date');
+        let d = baseDate ? new Date(baseDate) : new Date();
+        if (customDateStr && /^\d{4}-\d{2}-\d{2}$/.test(customDateStr)) {
+            const parts = customDateStr.split('-');
+            // To ensure we don't mess up hours when jumping days across daylight saving (if applicable), we just set full year
+            d.setFullYear(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        }
+        return d;
+    };
+
+    // ==== Calendar Functions ====
+    let currentCalendarViewDate = null;
+    let currentCalendarSelectedDate = null;
+
+    window.openCalendarApp = function () {
+        setScreenDisplay('calendar-screen');
+        const d = window.getSimulatedDate();
+        currentCalendarViewDate = new Date(d);
+        currentCalendarSelectedDate = new Date(d);
+        window.renderCalendarGrid();
+    };
+
+    window.changeCalendarMonth = function (delta) {
+        if (!currentCalendarViewDate) return;
+        currentCalendarViewDate.setMonth(currentCalendarViewDate.getMonth() + delta);
+        window.renderCalendarGrid();
+    };
+
+    window.syncPickerToCalendar = function () {
+        const val = document.getElementById('calendar-date-picker').value;
+        if (val) {
+            const parts = val.split('-');
+            if (!currentCalendarViewDate) currentCalendarViewDate = new Date();
+            if (!currentCalendarSelectedDate) currentCalendarSelectedDate = new Date();
+
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10) - 1;
+            const d = parseInt(parts[2], 10);
+
+            currentCalendarViewDate.setFullYear(y, m, d);
+            currentCalendarSelectedDate.setFullYear(y, m, d);
+            window.renderCalendarGrid();
+        }
+    };
+
+    window.selectCalendarDay = function (year, month, day) {
+        if (!currentCalendarSelectedDate) currentCalendarSelectedDate = new Date();
+        currentCalendarSelectedDate.setFullYear(year, month, day);
+        window.renderCalendarGrid();
+    };
+
+    window.renderCalendarGrid = function () {
+        const grid = document.getElementById('calendar-view-grid');
+        const title = document.getElementById('calendar-view-title');
+        const picker = document.getElementById('calendar-date-picker');
+        if (!grid || !title || !currentCalendarViewDate || !currentCalendarSelectedDate) return;
+
+        const year = currentCalendarViewDate.getFullYear();
+        const month = currentCalendarViewDate.getMonth();
+
+        title.textContent = `${year}年 ${month + 1}月`;
+
+        // sync picker
+        if (picker) {
+            const sy = currentCalendarSelectedDate.getFullYear();
+            const sm = (currentCalendarSelectedDate.getMonth() + 1).toString().padStart(2, '0');
+            const sd = currentCalendarSelectedDate.getDate().toString().padStart(2, '0');
+            picker.value = `${sy}-${sm}-${sd}`;
+        }
+
+        grid.innerHTML = '';
+
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startOffset = firstDay.getDay();
+        const totalDays = lastDay.getDate();
+
+        for (let i = 0; i < startOffset; i++) {
+            const dEl = document.createElement('div');
+            dEl.style.padding = '8px 0';
+            grid.appendChild(dEl);
+        }
+
+        const selY = currentCalendarSelectedDate.getFullYear();
+        const selM = currentCalendarSelectedDate.getMonth();
+        const selD = currentCalendarSelectedDate.getDate();
+
+        for (let i = 1; i <= totalDays; i++) {
+            const isSelected = (year === selY && month === selM && i === selD);
+
+            const cell = document.createElement('div');
+            cell.style.padding = '8px 0';
+            cell.style.cursor = 'pointer';
+            cell.style.display = 'flex';
+            cell.style.justifyContent = 'center';
+            cell.style.alignItems = 'center';
+
+            const inner = document.createElement('div');
+            inner.textContent = i;
+            inner.style.width = '32px';
+            inner.style.height = '32px';
+            inner.style.lineHeight = '32px';
+            inner.style.borderRadius = '50%';
+            inner.style.fontSize = '15px';
+            inner.style.fontWeight = '500';
+
+            if (isSelected) {
+                inner.style.backgroundColor = 'var(--pink-500)';
+                inner.style.color = 'white';
+                inner.style.boxShadow = '0 2px 8px rgba(232, 138, 154, 0.4)';
+            } else {
+                inner.style.color = '#333';
+            }
+
+            cell.onclick = () => {
+                window.selectCalendarDay(year, month, i);
+            };
+
+            cell.appendChild(inner);
+            grid.appendChild(cell);
+        }
+    };
+
+    window.closeCalendarApp = function () {
+        setScreenDisplay('home-screen');
+    };
+
+    window.saveCalendarDate = function () {
+        const picker = document.getElementById('calendar-date-picker');
+        if (!picker) return;
+        const val = picker.value;
+        if (val) {
+            localStorage.setItem('faye-custom-date', val);
+            showToast('已设定系统日期: ' + val);
+            if (window.renderHomeGrid) window.renderHomeGrid();
+            closeCalendarApp();
+
+            // Sync to trigger chat update implicitly if needed
+            if (typeof saveCharTimezoneSettings === 'function') {
+                saveCharTimezoneSettings();
+            }
+        } else {
+            showToast('请选择有效的日期');
+        }
+    };
+
+    window.resetCalendarDate = function () {
+        localStorage.removeItem('faye-custom-date');
+        showToast('已恢复现实系统日期');
+        if (window.renderHomeGrid) window.renderHomeGrid();
+        closeCalendarApp();
+        if (typeof saveCharTimezoneSettings === 'function') {
+            saveCharTimezoneSettings();
+        }
+    };
+
     function getTime(isUser = false, returnDate = false) {
-        const now = new Date();
+        const now = window.getSimulatedDate();
         let targetTime;
 
         // Step 1: Calculate user's time (= status bar time)
@@ -5054,7 +5279,8 @@ ${chatText}
                 // 创建语音条
                 const voiceCard = document.createElement('div');
                 voiceCard.className = `voice-card ${msg.isUser ? 'sent' : 'received'} `;
-                voiceCard.style.width = width + 'px';
+                voiceCard.style.minWidth = width + 'px';
+                voiceCard.style.width = 'fit-content';
                 voiceCard.style.cursor = 'pointer';
 
                 // 声纹3~4根
@@ -5212,7 +5438,7 @@ ${chatText}
                 ttsBtn.title = '播放语音';
                 ttsBtn.dataset.ttsText = ttsText;
                 // Style: match bubble text color at 50% opacity, inline
-                ttsBtn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:rgba(128,128,128,0.12);color:inherit;opacity:0.5;cursor:pointer;vertical-align:middle;margin-left:6px;flex-shrink:0;border:none;outline:none;transition:opacity 0.2s;';
+                ttsBtn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:rgba(128,128,128,0.12);color:inherit;opacity:0.5;cursor:pointer;vertical-align:middle;margin-left:4px;margin-right:-8px;flex-shrink:0;border:none;outline:none;transition:opacity 0.2s;';
                 ttsBtn.addEventListener('mouseenter', () => ttsBtn.style.opacity = '1');
                 ttsBtn.addEventListener('mouseleave', () => { if (!ttsBtn.classList.contains('playing')) ttsBtn.style.opacity = '0.5'; });
                 ttsBtn.addEventListener('click', function (e) {
@@ -6812,7 +7038,8 @@ ${chatText}
         chatSettingsScreen = document.getElementById('chat-settings-screen');
         headerTitle = document.getElementById('header-title');
         clockEl = document.getElementById('clock');
-        homeClockEl = document.getElementById('home-clock');
+        lockClockEl = document.getElementById('lock-clock');
+        lockScreen = document.getElementById('lock-screen');
         statusBar = document.getElementById('status-bar');
         photoInput = document.getElementById('photo-upload-input');
         // New References
@@ -6921,8 +7148,44 @@ ${chatText}
 
         loadSettings();
         loadUsers();
-        loadNpcData();
         loadWorldbooks();
+        window.loadGridLayout();
+
+        // Lock screen events
+        if (lockScreen) {
+            lockScreen.style.touchAction = 'none'; // Prevent browser default vertical scroll
+            let startY = 0;
+            let isDown = false;
+
+            const handleStart = (y, target) => {
+                if (target.closest('#lock-keypad-container')) return;
+                isDown = true;
+                startY = y;
+            };
+
+            const handleEnd = (y) => {
+                if (!isDown) return;
+                isDown = false;
+                if (startY - y > 30) { // Reduced threshold for better sensitivity
+                    showLockKeypad();
+                }
+                startY = 0;
+            };
+
+            // Touch events for mobile
+            lockScreen.addEventListener('touchstart', (e) => handleStart(e.touches[0].clientY, e.target), { passive: true });
+            lockScreen.addEventListener('touchend', (e) => handleEnd(e.changedTouches[0].clientY));
+
+            // Mouse/pointer events for desktop
+            lockScreen.addEventListener('mousedown', (e) => handleStart(e.clientY, e.target));
+            lockScreen.addEventListener('mouseup', (e) => handleEnd(e.clientY));
+
+            // Also mapping wheel for desktop usability
+            lockScreen.addEventListener('wheel', (e) => {
+                if (e.deltaY > 30) showLockKeypad();
+            });
+        }
+
         const savedStickers = localStorage.getItem('st-phone-stickers');
         myStickerList = savedStickers ? JSON.parse(savedStickers) : defaultStickerList;
         const defaultAvatar = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E";
@@ -7020,13 +7283,14 @@ ${chatText}
 
     // Initialize on Load
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => { init(); setScreenDisplay(); });
+        document.addEventListener('DOMContentLoaded', () => { init(); setScreenDisplay('lock-screen'); });
     } else {
-        init(); setScreenDisplay();
+        init(); setScreenDisplay('lock-screen');
     }
 
-    function setScreenDisplay(screenId = 'home-screen') {
+    function setScreenDisplay(screenId = 'lock-screen') {
         // Hide all screens first
+        if (lockScreen) lockScreen.style.display = 'none';
         if (homeScreen) homeScreen.style.display = 'none';
         if (chatScreen) chatScreen.style.display = 'none';
         if (settingsScreen) settingsScreen.style.display = 'none';
@@ -7041,6 +7305,8 @@ ${chatText}
         if (dataSettingsScreen) dataSettingsScreen.style.display = 'none';
         const chatTimeSettingsScreen = document.getElementById('chat-time-settings-screen');
         if (chatTimeSettingsScreen) chatTimeSettingsScreen.style.display = 'none';
+        const calendarScreen = document.getElementById('calendar-screen');
+        if (calendarScreen) calendarScreen.style.display = 'none';
         if (document.getElementById('call-screen')) document.getElementById('call-screen').style.display = 'none';
         const naiSettingsScreen = document.getElementById('nai-settings-screen');
         if (naiSettingsScreen) naiSettingsScreen.style.display = 'none';
@@ -9799,8 +10065,15 @@ ${isAuthorReply ? '你是这条动态的作者，有人评论了你的朋友圈�
 
         closeBeautifySettings,
         saveBeautifySettings,
-        saveApiSettings,
-        saveDataSettings,
+        // Calendar App
+        openCalendarApp,
+        closeCalendarApp,
+        saveCalendarDate,
+        resetCalendarDate,
+        changeCalendarMonth,
+        syncPickerToCalendar,
+        selectCalendarDay,
+        renderCalendarGrid,
         // NAI settings
         openNaiSettings,
         closeNaiSettings,
@@ -9893,5 +10166,344 @@ ${isAuthorReply ? '你是这条动态的作者，有人评论了你的朋友圈�
         selectAllInteractors,
         closeInteractorPicker
     });
+
+    // Keypad logic global methods
+    let currentLockPin = '';
+    window.showLockKeypad = function () {
+        const prompt = document.getElementById('lock-prompt');
+        const container = document.getElementById('lock-keypad-container');
+        if (prompt) prompt.style.display = 'none';
+        if (container) {
+            container.style.display = 'flex';
+            container.style.animation = 'keypadSlideUp 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards';
+        }
+    }
+
+    window.lockKeyPress = function (val) {
+        if (val === -1) {
+            currentLockPin = currentLockPin.slice(0, -1);
+        } else {
+            currentLockPin += val;
+        }
+        updateLockDots();
+
+        // Unlock condition: exactly 4 digits
+        if (currentLockPin.length >= 4) {
+            setTimeout(() => {
+                setScreenDisplay('home-screen');
+                currentLockPin = '';
+                updateLockDots();
+                const prompt = document.getElementById('lock-prompt');
+                const container = document.getElementById('lock-keypad-container');
+                if (prompt) prompt.style.display = 'block';
+                if (container) container.style.display = 'none';
+            }, 200);
+        }
+    }
+
+    function updateLockDots() {
+        const dotsContainer = document.getElementById('lock-pwd-dots');
+        if (!dotsContainer) return;
+        dotsContainer.innerHTML = '';
+        const dotCount = Math.max(4, currentLockPin.length + 1);
+        for (let i = 0; i < dotCount; i++) {
+            const dot = document.createElement('div');
+            dot.className = 'lock-dot ' + (i < currentLockPin.length ? 'filled' : '');
+            if (i >= 4 && i >= currentLockPin.length) break; // keep at max 4 empty dots or dynamic full dots
+            dotsContainer.appendChild(dot);
+        }
+    }
+
+    // ==== Desktop Layout Manager ====
+    const defaultGridLayout = [
+        { id: 'app-world', name: '世界书', icon: 'bxs:book-heart', action: () => openCharacterSetup("world"), col: 3, row: 1 },
+        { id: 'app-regex', name: '正则', icon: 'tabler:regex', action: () => openRegexScreen(), col: 4, row: 1 },
+        { id: 'app-music', name: '音乐', icon: 'fluent:music-note-2-24-filled', color: '#6886c5', col: 1, row: 1 },
+        { id: 'app-notes', name: '备忘录', icon: 'ph:notepad-fill', color: '#ffd285', col: 1, row: 2 },
+        { id: 'app-shopping', name: '购物', icon: 'mdi:shopping-outline', color: '#ff7e67', col: 2, row: 2 },
+        { id: 'app-calendar', name: '日历组件', icon: 'tabler:calendar', widget: true, action: () => openCalendarApp(), col: 3, row: 2, w: 2, h: 2 },
+        { id: 'app-chat', name: '聊天', icon: 'basil:wechat-solid', action: () => openMessageList(), col: 1, row: 3 },
+        { id: 'app-forum', name: '论坛', icon: 'material-symbols:forum-rounded', col: 2, row: 3 },
+        { id: 'app-takeout', name: '外卖', icon: 'ep:eleme', color: '#008ae6', col: 1, row: 4 }
+    ];
+
+    let currentGridLayout = [];
+    let layoutEditMode = false;
+    let gridPressTimer = null;
+
+    window.loadGridLayout = function () {
+        const saved = localStorage.getItem('faye-phone-grid');
+        if (saved) {
+            let parsed = JSON.parse(saved);
+            // remove novel from cached grid
+            parsed = parsed.filter(p => p.id !== 'app-novel');
+            // enforce new ep:eleme icon on existing cached takeout icon
+            let takeout = parsed.find(p => p.id === 'app-takeout');
+            if (takeout) {
+                takeout.icon = 'ep:eleme';
+                takeout.color = '#008ae6';
+            }
+            defaultGridLayout.forEach(def => {
+                if (!parsed.find(p => p.id === def.id)) {
+                    parsed.push(def);
+                }
+            });
+            currentGridLayout = parsed;
+        } else {
+            currentGridLayout = JSON.parse(JSON.stringify(defaultGridLayout));
+        }
+        renderHomeGrid();
+    };
+
+    window.renderHomeGrid = function () {
+        const gridEl = document.getElementById('home-main-grid');
+        if (!gridEl) return;
+        gridEl.innerHTML = '';
+
+        // Create 20 drop slots
+        for (let r = 1; r <= 5; r++) {
+            for (let c = 1; c <= 4; c++) {
+                const slot = document.createElement('div');
+                slot.className = 'grid-slot';
+                slot.style.gridColumn = c;
+                slot.style.gridRow = r;
+                slot.dataset.col = c;
+                slot.dataset.row = r;
+                gridEl.appendChild(slot);
+            }
+        }
+
+        currentGridLayout.forEach(app => {
+            const el = document.createElement('div');
+            el.className = 'app-item app-draggable' + (app.widget ? ' calendar-widget' : '');
+            el.dataset.id = app.id;
+            el.dataset.col = app.col;
+            el.dataset.row = app.row;
+
+            let w = app.w || 1;
+            let h = app.h || 1;
+            el.style.gridColumn = `${app.col} / span ${w}`;
+            el.style.gridRow = `${app.row} / span ${h}`;
+            if (app.widget) {
+                el.style.width = '100%';
+                el.style.height = '100%';
+                el.style.padding = '0 5px';
+                el.style.boxSizing = 'border-box';
+            }
+
+            const iconColor = app.color ? `background-color: ${app.color}; -webkit-mask-image: url('https://api.iconify.design/${app.icon}.svg'); mask-image: url('https://api.iconify.design/${app.icon}.svg');` : `-webkit-mask-image: url('https://api.iconify.design/${app.icon}.svg'); mask-image: url('https://api.iconify.design/${app.icon}.svg');`;
+
+            if (app.id === 'app-calendar') {
+                const simDate = window.getSimulatedDate ? window.getSimulatedDate() : new Date();
+                const day = simDate.getDate();
+                const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+                const dayOfWeek = weekDays[simDate.getDay()];
+                const monthInfo = `${simDate.getFullYear()}年${simDate.getMonth() + 1}月`;
+                el.innerHTML = `
+                    <div class="app-icon-box app-icon-style" style="max-width:none; width:100%; height:100%; border-radius:28px; flex-direction:column; justify-content:center; gap:2px; background: rgba(255,255,255,0.85); box-shadow: inset 1px 1px 2px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.05); position:relative; overflow:hidden;">
+                        <div style="color:var(--pink-500); width:100%; text-align:center; font-size:13px; font-weight:bold; text-shadow:none; margin-bottom: 2px;">
+                            ${monthInfo}
+                        </div>
+                        <div style="font-size:38px; font-weight:bold; color:#333; line-height:1.1;">
+                            ${day}
+                        </div>
+                        <div style="font-size:12px; color:#888; margin-top: 2px;">
+                            ${dayOfWeek}
+                        </div>
+                    </div>
+                `;
+            } else if (app.widget) {
+                el.innerHTML = `
+                    <div class="app-icon-box app-icon-style" style="max-width:none; width:100%; height:100%; border-radius:28px; flex-direction:column; justify-content:center; gap:8px;">
+                        <div class="app-icon-image" style="width:40px; height:40px; ${iconColor}"></div>
+                        <span class="app-name" style="color:var(--pink-600); font-size:13px; text-shadow:none; padding-bottom: 2px;">${app.name}</span>
+                    </div>
+                `;
+            } else {
+                el.innerHTML = `
+                    <div class="app-icon-box app-icon-style">
+                        <div class="app-icon-image" style="${iconColor}"></div>
+                    </div>
+                    <span class="app-name" style="padding-bottom: 2px;">${app.name}</span>
+                `;
+            }
+
+            el.addEventListener('click', (e) => {
+                if (layoutEditMode || document.body.classList.contains('edit-mode')) return;
+                const def = defaultGridLayout.find(d => d.id === app.id);
+                if (def && def.action) {
+                    def.action();
+                } else {
+                    showToast(app.name + '功能敬请期待');
+                }
+            });
+
+            gridEl.appendChild(el);
+        });
+
+        if (typeof applySettings === 'function') applySettings();
+        initGridDragAndDrop(gridEl);
+    };
+
+    window.exitEditMode = function () {
+        layoutEditMode = false;
+        document.body.classList.remove('edit-mode');
+        document.getElementById('home-edit-header').style.display = 'none';
+
+        let els = document.querySelectorAll('.app-draggable');
+        for (let i = 0; i < els.length; i++) {
+            els[i].style.transform = ''; // reset just in case
+        }
+    };
+
+    function initGridDragAndDrop(gridEl) {
+        let draggedEl = null;
+
+        const handleStart = (e, clientX, clientY, target) => {
+            if (e.button !== undefined && e.button !== 0) return;
+            if (target.closest('.home-dock') || target.closest('#home-edit-header')) return;
+            const item = target.closest('.app-draggable');
+            if (!item) {
+                if (layoutEditMode && target.closest('#home-screen')) window.exitEditMode();
+                return;
+            }
+
+            if (!layoutEditMode) {
+                if (gridPressTimer) clearTimeout(gridPressTimer);
+                gridPressTimer = setTimeout(() => {
+                    layoutEditMode = true;
+                    document.body.classList.add('edit-mode');
+                    document.getElementById('home-edit-header').style.display = 'block';
+                    if (navigator.vibrate) navigator.vibrate(50);
+                }, 400); // 400ms is a better long press threshold
+            } else {
+                draggedEl = item;
+                window.gridDragStartX = clientX;
+                window.gridDragStartY = clientY;
+            }
+        };
+
+        const handleMove = (e, clientX, clientY) => {
+            if (gridPressTimer && !layoutEditMode) {
+                clearTimeout(gridPressTimer);
+                gridPressTimer = null;
+            }
+            if (!layoutEditMode || !draggedEl) return;
+
+            if (e.cancelable) e.preventDefault();
+
+            if (!window.ghostEl) {
+                window.ghostEl = draggedEl.cloneNode(true);
+                window.ghostEl.classList.add('dragging-ghost');
+                window.ghostEl.style.position = 'fixed';
+                window.ghostEl.style.pointerEvents = 'none';
+                window.ghostEl.style.zIndex = '99999';
+                window.ghostEl.style.width = draggedEl.offsetWidth + 'px';
+                window.ghostEl.style.height = draggedEl.offsetHeight + 'px';
+                window.ghostEl.style.opacity = '0.9';
+                window.ghostEl.style.transform = 'scale(1.1)';
+                document.body.appendChild(window.ghostEl);
+                draggedEl.style.opacity = '0.2';
+            }
+
+            window.ghostEl.style.left = (clientX - window.ghostEl.offsetWidth / 2) + 'px';
+            window.ghostEl.style.top = (clientY - window.ghostEl.offsetHeight / 2) + 'px';
+
+            document.querySelectorAll('.grid-slot, .app-draggable').forEach(el => el.classList.remove('drag-over'));
+            window.ghostEl.style.display = 'none';
+            const elUnder = document.elementFromPoint(clientX, clientY);
+            window.ghostEl.style.display = 'block';
+            if (elUnder) {
+                const slot = elUnder.closest('.grid-slot');
+                const targetApp = elUnder.closest('.app-draggable');
+                if (targetApp && targetApp !== draggedEl) targetApp.classList.add('drag-over');
+                else if (slot) slot.classList.add('drag-over');
+            }
+        };
+
+        const handleEnd = (clientX, clientY) => {
+            if (gridPressTimer) { clearTimeout(gridPressTimer); gridPressTimer = null; }
+            if (!layoutEditMode || !draggedEl) return;
+
+            document.querySelectorAll('.grid-slot, .app-draggable').forEach(el => el.classList.remove('drag-over'));
+
+            if (window.ghostEl) {
+                window.ghostEl.style.display = 'none';
+                const elUnder = document.elementFromPoint(clientX, clientY);
+                window.ghostEl.remove();
+                window.ghostEl = null;
+
+                draggedEl.style.display = '';
+                draggedEl.style.opacity = '1';
+
+                const targetSlot = elUnder ? elUnder.closest('.grid-slot') : null;
+                const targetApp = elUnder ? elUnder.closest('.app-draggable') : null;
+
+                if (targetApp && targetApp !== draggedEl) {
+                    swapApps(draggedEl, targetApp);
+                } else if (targetSlot) {
+                    moveAppToSlot(draggedEl, targetSlot);
+                }
+            }
+
+            draggedEl = null;
+        };
+
+        gridEl.addEventListener('touchstart', (e) => handleStart(e, e.touches[0].clientX, e.touches[0].clientY, e.target), { passive: true });
+        gridEl.addEventListener('touchmove', (e) => handleMove(e, e.touches[0].clientX, e.touches[0].clientY), { passive: false });
+        gridEl.addEventListener('touchend', (e) => {
+            if (e.changedTouches && e.changedTouches.length > 0) {
+                handleEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+            } else {
+                handleEnd(0, 0);
+            }
+            if (gridPressTimer) { clearTimeout(gridPressTimer); gridPressTimer = null; }
+        });
+
+        // Also cancel timer when leaving touch 
+        gridEl.addEventListener('touchcancel', (e) => {
+            if (gridPressTimer) { clearTimeout(gridPressTimer); gridPressTimer = null; }
+        });
+
+        gridEl.addEventListener('mousedown', (e) => handleStart(e, e.clientX, e.clientY, e.target));
+        window.addEventListener('mousemove', (e) => handleMove(e, e.clientX, e.clientY), { passive: false });
+        window.addEventListener('mouseup', (e) => handleEnd(e.clientX, e.clientY));
+    }
+
+    function swapApps(el1, el2) {
+        const data1 = currentGridLayout.find(a => a.id === el1.dataset.id);
+        const data2 = currentGridLayout.find(a => a.id === el2.dataset.id);
+        if (data1 && data2) {
+            const tempC = data1.col; const tempR = data1.row;
+            data1.col = data2.col; data1.row = data2.row;
+            data2.col = tempC; data2.row = tempR;
+
+            // Protect bounds for 2x2 widget
+            if (data1.w === 2 && data1.col > 3) data1.col = 3;
+            if (data2.w === 2 && data2.col > 3) data2.col = 3;
+            if (data1.h === 2 && data1.row > 4) data1.row = 4;
+            if (data2.h === 2 && data2.row > 4) data2.row = 4;
+
+            saveAndRenderGrid();
+        }
+    }
+
+    function moveAppToSlot(el, slot) {
+        const data = currentGridLayout.find(a => a.id === el.dataset.id);
+        if (data) {
+            data.col = parseInt(slot.dataset.col);
+            data.row = parseInt(slot.dataset.row);
+
+            if (data.w === 2 && data.col > 3) data.col = 3;
+            if (data.h === 2 && data.row > 4) data.row = 4;
+
+            saveAndRenderGrid();
+        }
+    }
+
+    function saveAndRenderGrid() {
+        localStorage.setItem('faye-phone-grid', JSON.stringify(currentGridLayout));
+        renderHomeGrid();
+    }
 
 })();
