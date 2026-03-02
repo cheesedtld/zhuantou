@@ -16,7 +16,7 @@ export default {
 
         // 专属自建代理通道
         if (url.pathname.startsWith('/proxy/')) {
-            // 例如: /proxy/https://api.minimax.chat/...
+            // 例如: /proxy/https://api.minimaxi.chat/...
             const targetUrlStr = request.url.substring(request.url.indexOf('/proxy/') + 7);
             let targetUrl;
             try {
