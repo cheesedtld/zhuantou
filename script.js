@@ -1422,11 +1422,13 @@ async function renderMessageList() {
 
         let displayAvatar = chat.avatar;
         const unreadCount = parseInt(localStorage.getItem(`unread-${chat.tag}`) || '0');
-        const unreadBadge = unreadCount > 0 ? `<span class="unread-badge" style="position:absolute;top:8px;right:8px;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:#e53935;color:#fff;font-size:11px;text-align:center;padding:0 5px;box-sizing:border-box;">${unreadCount > 99 ? '99+' : unreadCount}</span>` : '';
+        const unreadBadge = unreadCount > 0 ? `<span style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:#e53935;color:#fff;font-size:10px;text-align:center;padding:0 4px;box-sizing:border-box;">${unreadCount > 99 ? '99+' : unreadCount}</span>` : '';
 
-        item.style.position = 'relative';
         item.innerHTML = `
-            <img class="message-list-avatar" src="${displayAvatar}">
+            <div style="position:relative;flex-shrink:0;">
+                <img class="message-list-avatar" src="${displayAvatar}">
+                ${unreadBadge}
+            </div>
             <div class="message-list-info">
                 <div class="message-list-top">
                     <span class="message-list-name">${chat.name} ${chat.isGroup ? '<span class="group-badge">群</span>' : ''}</span>
@@ -1434,7 +1436,6 @@ async function renderMessageList() {
                 </div>
                 <div class="message-list-preview">${chat.lastMsg}</div>
             </div>
-            ${unreadBadge}
         `;
 
         let pressTimer = null;
@@ -3998,8 +3999,12 @@ function renderAutoMessageSchedule(schedule) {
         el.textContent = '所有计划已完成';
         return;
     }
-    // Apply custom time offset for display
-    const offset = (appSettings.customTime && typeof appSettings.timeOffset === 'number') ? appSettings.timeOffset : 0;
+    // Use same time logic as status bar: compare getTime result with real time to get offset
+    let offset = 0;
+    if (typeof getTime === 'function') {
+        const customDate = getTime(true, true); // user time as Date object
+        offset = customDate.getTime() - Date.now();
+    }
     const timeStrs = pending.map(t => {
         const d = new Date(t + offset);
         return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
@@ -13332,10 +13337,10 @@ function showAINotification(charName, message, options = {}) {
         left: '8px',
         right: '8px',
         transform: 'translateY(-120%)',
-        background: 'rgba(245, 245, 247, 0.9)',
+        background: 'rgba(222, 222, 222, 0.88)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        padding: '12px 14px',
+        padding: '15px 14px',
         borderRadius: '14px',
         zIndex: '99999',
         boxShadow: '0 2px 20px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)',
