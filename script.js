@@ -3981,6 +3981,8 @@ function saveChatAutoInteractions(forceRecalc) {
     if (amsgD) amsgD.style.display = s.autoMessageEnabled ? 'block' : 'none';
 
     renderAutoMessageSchedule(s.autoMessageSchedule);
+    // Schedule precise timer for the new trigger
+    if (typeof scheduleNextAutoCheck === 'function') scheduleNextAutoCheck();
 }
 
 function renderAutoMessageSchedule(schedule) {
@@ -4078,10 +4080,55 @@ async function checkAutoInteractions() {
         console.error(e);
     }
     isCheckingAutoInteractions = false;
+    // After each check, schedule the next precise timeout
+    scheduleNextAutoCheck();
 }
 
-// Check every 30 seconds for better responsiveness
-setInterval(checkAutoInteractions, 30 * 1000);
+// --- Precise scheduling: setTimeout to the next trigger time ---
+let nextAutoCheckTimer = null;
+function scheduleNextAutoCheck() {
+    if (nextAutoCheckTimer) clearTimeout(nextAutoCheckTimer);
+    const now = Date.now();
+    let soonest = Infinity;
+    // Find the soonest scheduled trigger across all chats
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('faye-phone-chatsettings-')) {
+            try {
+                const s = JSON.parse(localStorage.getItem(key));
+                if (s && s.autoMessageEnabled && s.autoMessageSchedule && s.autoMessageSchedule.length > 0) {
+                    const next = s.autoMessageSchedule[0];
+                    if (next < soonest) soonest = next;
+                }
+                if (s && s.autoMomentEnabled) {
+                    const intervalMs = (s.autoMomentInterval || 60) * 60000;
+                    const last = s.autoMomentLastTrigger || now;
+                    const nextMoment = last + intervalMs;
+                    if (nextMoment < soonest) soonest = nextMoment;
+                }
+            } catch (e) { }
+        }
+    }
+    if (soonest < Infinity) {
+        const delay = Math.max(soonest - now, 1000); // At least 1s
+        console.log('[AutoCheck] Next trigger in', Math.round(delay / 1000) + 's at', new Date(now + delay).toLocaleTimeString());
+        nextAutoCheckTimer = setTimeout(checkAutoInteractions, delay);
+    }
+}
+
+// When page becomes visible (phone wakes up), immediately check for missed triggers
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+        console.log('[AutoCheck] Page visible, checking for missed triggers');
+        checkAutoInteractions();
+    }
+});
+
+// Safety-net fallback: check every 60s in case setTimeout was killed
+setInterval(checkAutoInteractions, 60 * 1000);
+
+// Initial schedule on load
+scheduleNextAutoCheck();
 
 async function triggerAIAutoMoment(tag) {
     const isGroup = tag.startsWith('group:');
@@ -4187,8 +4234,7 @@ async function triggerAIAutoMessage(tag) {
         let targetGroup = null;
         let currentUserName = '';
         let mappedNpcName = '';
-        const nowTime = new Date();
-        const timeStr = `${nowTime.getHours().toString().padStart(2, '0')}:${nowTime.getMinutes().toString().padStart(2, '0')}`;
+        const timeStr = (typeof getTime === 'function') ? getTime(false) : `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`;
 
         if (!isGroup) {
             const npc = npcCharacters.find(n => n.name === npcName);
@@ -4199,7 +4245,7 @@ async function triggerAIAutoMessage(tag) {
             let persona = npc.persona || npc.desc || '';
             if (npc.personality) persona += '\n性格: ' + npc.personality;
             if (npc.scenario) persona += '\n背景: ' + npc.scenario;
-            systemPrompt = '你是' + npc.name + '。\n设定：' + persona + '\n你现在突然想起来要主动给 ' + currentUserName + ' 发一条消息，可能是早晚安、分享日常，或者找话题聊天。';
+            systemPrompt = '你是' + npc.name + '。\n设定：' + persona + '\n你现在要主动给 ' + currentUserName + ' 发一条消息，可能是早晚安、分享日常，或者找话题聊天。\n\n【时间规则】当前真实时间是 ' + timeStr + '。你的消息时间必须是 ' + timeStr + '，禁止编造其他时间、跳跃时间线、描述"几小时后"等时间推移。只回复当下这一刻的消息。';
         } else {
             const groupSearchName = tag.replace(/^group:/, '');
             targetGroup = appSettings.groups.find(g => g.id === tag || g.name === groupSearchName);
@@ -4214,7 +4260,7 @@ async function triggerAIAutoMessage(tag) {
             let personaStr = npc.persona || npc.desc || '';
             if (npc.personality) personaStr += '\n性格: ' + npc.personality;
             if (npc.scenario) personaStr += '\n背景: ' + npc.scenario;
-            systemPrompt = '你现在在群聊"' + targetGroup.name + '"中。你是' + npc.name + '。\n群内有' + currentUserName + '。\n设定：' + personaStr + '\n你想主动在群里发一条消息，开启新话题或者打招呼。';
+            systemPrompt = '你现在在群聊"' + targetGroup.name + '"中。你是' + npc.name + '。\n群内有' + currentUserName + '。\n设定：' + personaStr + '\n你想主动在群里发一条消息，开启新话题或者打招呼。\n\n【重要时间规则】当前真实时间是 ' + timeStr + '。你的消息时间必须是 ' + timeStr + '，禁止编造其他时间、跳跃时间线、描述"几小时后"等时间推移。只回复当下这一刻的消息。';
         }
 
         // Append the same communication protocol as normal chat
@@ -13284,14 +13330,14 @@ function showAINotification(charName, message, options = {}) {
         left: '8px',
         right: '8px',
         transform: 'translateY(-120%)',
-        background: 'rgba(245, 245, 247, 0.92)',
+        background: 'rgba(245, 245, 247, 0.9)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         padding: '12px 14px',
         borderRadius: '14px',
         zIndex: '99999',
         boxShadow: '0 2px 20px rgba(0, 0, 0, 0.15), 0 0 1px rgba(0, 0, 0, 0.1)',
-        transition: 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)',
+        transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)',
         cursor: 'pointer',
         userSelect: 'none',
         lineHeight: '1.35'
