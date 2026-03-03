@@ -4198,7 +4198,21 @@ ${chatContext ? '最近和' + currentUserName + '的聊天记录：\n' + chatCon
             { role: 'user', content: '请发一条朋友圈动态。' }
         ];
 
-        const stream = await callLLM(messages);
+        // 调用 LLM（带重试 — 后台网络可能不稳定）
+        let stream;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                stream = await callLLM(messages);
+                break;
+            } catch (fetchErr) {
+                console.warn(`[AutoMoment] callLLM 第${attempt}次失败:`, fetchErr.message);
+                if (attempt < 3) {
+                    await new Promise(r => setTimeout(r, attempt * 3000));
+                } else {
+                    throw fetchErr;
+                }
+            }
+        }
         let momentText = '';
         const reader = stream.getReader();
         const decoder = new TextDecoder();
@@ -4309,7 +4323,21 @@ async function triggerAIAutoMessage(tag) {
             { role: 'user', content: '请主动发一条消息。' }
         ];
 
-        const stream = await callLLM(llmMessages);
+        // 调用 LLM（带重试机制 — 后台/锁屏时网络可能不稳定）
+        let stream;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                stream = await callLLM(llmMessages);
+                break; // 成功则跳出
+            } catch (fetchErr) {
+                console.warn(`[AutoMsg] callLLM 第${attempt}次失败:`, fetchErr.message);
+                if (attempt < 3) {
+                    await new Promise(r => setTimeout(r, attempt * 3000)); // 3s, 6s 重试间隔
+                } else {
+                    throw fetchErr; // 3次都失败，抛出让外层 catch 处理
+                }
+            }
+        }
         let responseText = '';
         const reader = stream.getReader();
         const decoder = new TextDecoder();
