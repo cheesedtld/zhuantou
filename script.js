@@ -4198,41 +4198,37 @@ ${chatContext ? '最近和' + currentUserName + '的聊天记录：\n' + chatCon
             { role: 'user', content: '请发一条朋友圈动态。' }
         ];
 
-        // 调用 LLM（带重试 — 后台网络可能不稳定）
-        let stream;
+        // 后台朋友圈也使用非流式请求（同理 — 流式请求在后台会被杀）
+        const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
+        const apiHeaders = { 'Content-Type': 'application/json' };
+        if (appSettings.apiKey) apiHeaders['Authorization'] = `Bearer ${appSettings.apiKey}`;
+
+        let momentText = '';
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                stream = await callLLM(messages);
+                const res = await fetch(`${endpoint}/chat/completions`, {
+                    method: 'POST',
+                    headers: apiHeaders,
+                    body: JSON.stringify({
+                        model: appSettings.apiModel,
+                        messages: messages,
+                        temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
+                        stream: false
+                    })
+                });
+                if (!res.ok) {
+                    const errTxt = await res.text();
+                    throw new Error(`API ${res.status}: ${errTxt.substring(0, 200)}`);
+                }
+                const data = await res.json();
+                momentText = data.choices?.[0]?.message?.content || '';
                 break;
             } catch (fetchErr) {
-                console.warn(`[AutoMoment] callLLM 第${attempt}次失败:`, fetchErr.message);
+                console.warn(`[AutoMoment] 第${attempt}次请求失败:`, fetchErr.message);
                 if (attempt < 3) {
                     await new Promise(r => setTimeout(r, attempt * 3000));
                 } else {
                     throw fetchErr;
-                }
-            }
-        }
-        let momentText = '';
-        const reader = stream.getReader();
-        const decoder = new TextDecoder();
-        let streamBuffer = '';
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            streamBuffer += chunk;
-            const lines = streamBuffer.split('\n');
-            streamBuffer = lines.pop();
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6).trim();
-                    if (data === '[DONE]') break;
-                    try {
-                        const json = JSON.parse(data);
-                        const content = json.choices?.[0]?.delta?.content;
-                        if (content) momentText += content;
-                    } catch (e) { }
                 }
             }
         }
@@ -4323,41 +4319,39 @@ async function triggerAIAutoMessage(tag) {
             { role: 'user', content: '请主动发一条消息。' }
         ];
 
-        // 调用 LLM（带重试机制 — 后台/锁屏时网络可能不稳定）
-        let stream;
+        // 后台自动消息使用非流式请求（stream:false）
+        // 原因：手机浏览器在后台/锁屏时会终止 SSE 流式长连接，导致 Failed to fetch
+        // 非流式请求是单次 HTTP 请求-响应，不受后台限制影响
+        const endpoint = appSettings.apiEndpoint.replace(/\/$/, '');
+        const apiHeaders = { 'Content-Type': 'application/json' };
+        if (appSettings.apiKey) apiHeaders['Authorization'] = `Bearer ${appSettings.apiKey}`;
+
+        let responseText = '';
         for (let attempt = 1; attempt <= 3; attempt++) {
             try {
-                stream = await callLLM(llmMessages);
-                break; // 成功则跳出
-            } catch (fetchErr) {
-                console.warn(`[AutoMsg] callLLM 第${attempt}次失败:`, fetchErr.message);
-                if (attempt < 3) {
-                    await new Promise(r => setTimeout(r, attempt * 3000)); // 3s, 6s 重试间隔
-                } else {
-                    throw fetchErr; // 3次都失败，抛出让外层 catch 处理
+                const res = await fetch(`${endpoint}/chat/completions`, {
+                    method: 'POST',
+                    headers: apiHeaders,
+                    body: JSON.stringify({
+                        model: appSettings.apiModel,
+                        messages: llmMessages,
+                        temperature: appSettings.apiTemperature !== undefined ? appSettings.apiTemperature : 1.0,
+                        stream: false
+                    })
+                });
+                if (!res.ok) {
+                    const errTxt = await res.text();
+                    throw new Error(`API ${res.status}: ${errTxt.substring(0, 200)}`);
                 }
-            }
-        }
-        let responseText = '';
-        const reader = stream.getReader();
-        const decoder = new TextDecoder();
-        let streamBuffer = '';
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            streamBuffer += chunk;
-            const lines = streamBuffer.split('\n');
-            streamBuffer = lines.pop();
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6).trim();
-                    if (data === '[DONE]') break;
-                    try {
-                        const json = JSON.parse(data);
-                        const content = json.choices?.[0]?.delta?.content;
-                        if (content) responseText += content;
-                    } catch (e) { }
+                const data = await res.json();
+                responseText = data.choices?.[0]?.message?.content || '';
+                break; // 成功
+            } catch (fetchErr) {
+                console.warn(`[AutoMsg] 第${attempt}次请求失败:`, fetchErr.message);
+                if (attempt < 3) {
+                    await new Promise(r => setTimeout(r, attempt * 3000));
+                } else {
+                    throw fetchErr;
                 }
             }
         }
