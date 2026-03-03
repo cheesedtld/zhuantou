@@ -218,7 +218,7 @@ async function migrateFromLocalStorage() {
 
 
 const APP_VERSION = '1.0.5';
-const BUILD_VERSION = '2026-3-3-1';
+const BUILD_VERSION = '2026-3-3-2';
 const UPDATE_LOG = 'v1.0.0\n砖头机初始内测版\nv1.0.1\n修复了部分bug\n增加酒馆角色卡json导入\n增加ai角色边回消息边回朋友圈？的功能\n增加一些零零散散小功能\nv1.0.2\n修复部分bug\n完善酒馆json导入功能\n增加听歌功能,可导入网易云音乐的分享链接（支持vip歌曲）也可上传url或文件\n增加番茄钟功能，有学习/工作、运动两种可选（可能没啥区别）\n增加tts缓存，最多可缓存50条语音消息\nv1.0.3\n修复一些bug\n注意注意！备份一下数据，正在进行储存升级，请先行备份以免数据丢失\nv1.0.4\n储存升级，不再局限于浏览器的5MB储存\n修复一些bug\nv1.0.5\n重构TTS，CORS留空即可应用，现在应该更稳定了！\n修改一些我强迫症看着别扭的UI\n修复一些bug';
 function checkUpdate() {
     const lastVersion = localStorage.getItem('faye-phone-version');
@@ -3998,8 +3998,10 @@ function renderAutoMessageSchedule(schedule) {
         el.textContent = '所有计划已完成';
         return;
     }
+    // Apply custom time offset for display
+    const offset = (appSettings.customTime && typeof appSettings.timeOffset === 'number') ? appSettings.timeOffset : 0;
     const timeStrs = pending.map(t => {
-        const d = new Date(t);
+        const d = new Date(t + offset);
         return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
     });
     el.innerHTML = '计划触发: ' + timeStrs.map(t => '<b>' + t + '</b>').join(' → ');
@@ -4367,7 +4369,7 @@ async function triggerAIAutoMessage(tag) {
                 body: seg.body,
                 isUser: false,
                 charName: seg.charName,
-                timestamp: Date.now()
+                timestamp: Date.now() + ((appSettings.customTime && typeof appSettings.timeOffset === 'number') ? appSettings.timeOffset : 0)
             });
         }
         console.log('[AutoMsg] Saving', segments.length, 'new messages to', chatHistoryTag, '(total history:', history.length, ')');
