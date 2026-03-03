@@ -15769,7 +15769,7 @@ window.renderHomeGrid = function () {
             const timeTextColor = appSettings.homeTextColor || '#333';
             el.innerHTML = `
                 <div style="max-width:none; width:100%; border-radius:14px; display:flex; align-items:center; justify-content:center; padding:8px 12px; background: ${timeBg}; box-shadow: 0 2px 8px rgba(0,0,0,0.08); box-sizing:border-box;">
-                    <input type="text" value="${savedTime}" placeholder="HH:MM" 
+                    <input type="text" value="${savedTime}" placeholder="HH:MM" inputmode="numeric" enterkeyhint="done"
                         style="width:100%; text-align:center; font-size:15px; font-weight:bold; color:${timeTextColor}; border:none; border-radius:8px; padding:6px 10px; background:transparent; outline:none;"
                         onblur="promptCustomTime(this.value)"
                         onkeydown="if(event.key==='Enter'){this.blur();}" />
