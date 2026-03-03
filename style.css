@@ -863,6 +863,30 @@ input:checked+.slider:before {
     border: 1px dashed rgba(180, 180, 180, 0.5);
 }
 
+/* 双语消息翻译样式 */
+.msg-translation-divider {
+    border-top: 1px dashed rgba(150, 150, 150, 0.4);
+    margin: 6px -4px;
+    height: 0;
+}
+
+.msg-translation {
+    font-size: 12px;
+    color: rgba(100, 100, 100, 0.85);
+    line-height: 1.5;
+    word-break: break-word;
+    padding-top: 2px;
+}
+
+/* 发送方的翻译文字颜色调整 */
+.bubble-sent .msg-translation {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.bubble-sent .msg-translation-divider {
+    border-top-color: rgba(255, 255, 255, 0.25);
+}
+
 /* 思考过程样式 (DeepSeek R1) */
 .msg-thinking-container {
     margin-bottom: 5px;

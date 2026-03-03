@@ -1,7 +1,7 @@
 {
     "name": "砖头机",
     "short_name": "砖头机",
-    "description": "你的专属虚拟手机 - AI角色互动聊天",
+    "description": "AI角色互动聊天手机",
     "icons": [
         {
             "src": "icon.png",
@@ -23,5 +23,8 @@
     "theme_color": "#c8d8a0",
     "orientation": "portrait",
     "id": "zhuantouji-pwa",
-    "categories": ["entertainment", "social"]
+    "categories": [
+        "entertainment",
+        "social"
+    ]
 }

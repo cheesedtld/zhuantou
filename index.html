@@ -209,6 +209,22 @@
             </div>
         </div>
 
+        <!-- Favorites Screen -->
+        <div id="favorites-screen" class="screen" style="display: none; background: #f5f5f5;">
+            <div class="app-header">
+                <div class="header-content">
+                    <div class="header-btn" onclick="goBack()"><svg viewBox="0 0 24 24">
+                            <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"></path>
+                        </svg></div>
+                    <span class="header-title">收藏</span>
+                    <div class="header-btn header-btn-right" style="visibility:hidden;"></div>
+                </div>
+            </div>
+            <div id="favorites-body" style="flex:1; overflow-y:auto; padding:10px 12px;">
+                <!-- Favorites will be rendered by JS -->
+            </div>
+        </div>
+
         <!-- Calendar Full Screen App -->
         <div id="calendar-screen" class="screen" style="display: none; background: #f5f5f5;">
             <div class="app-header" style="background: transparent; backdrop-filter: none; border-bottom: none;">
@@ -1533,6 +1549,14 @@
                             </div>
                             <label class="wb-entry-switch"><input type="checkbox" id="set-inner-voice-mode"
                                     onchange="saveChatInnerVoiceModeAuto()"><span class="wb-slider"></span></label>
+                        </div>
+                        <div class="setting-row">
+                            <div style="display:flex; flex-direction:column; gap:2px; flex:1;">
+                                <label style="font-size:14px;">双语显示</label>
+                                <span style="font-size:11px; color:#aaa; line-height:1.4;">开启后，角色用母语发消息并附中文翻译</span>
+                            </div>
+                            <label class="wb-entry-switch"><input type="checkbox" id="set-bilingual-mode"
+                                    onchange="saveChatBilingualModeAuto()"><span class="wb-slider"></span></label>
                         </div>
                         <div class="setting-row">
                             <div style="display:flex; flex-direction:column; gap:2px; flex:1;">

@@ -378,6 +378,26 @@ function getCharName() {
     return currentChatTarget || 'AI';
 }
 
+// Helper: replace macro variables in user-defined text
+// Supported: {{user}}, {{char}}, {{time}}, {{date}}, {{weekday}}
+function replaceMacros(text) {
+    if (!text || typeof text !== 'string') return text;
+    const userName = getUserName();
+    const charName = getCharName();
+    const now = (typeof window !== 'undefined' && window.getSimulatedDate) ? window.getSimulatedDate() : new Date();
+    const timeStr = getTime();
+    const dateStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    const weekdayStr = `星期${weekdays[now.getDay()]}`;
+
+    return text
+        .replace(/\{\{user\}\}/gi, userName)
+        .replace(/\{\{char\}\}/gi, charName)
+        .replace(/\{\{time\}\}/gi, timeStr)
+        .replace(/\{\{date\}\}/gi, dateStr)
+        .replace(/\{\{weekday\}\}/gi, weekdayStr);
+}
+
 // Helper: build character context (NPC persona + user persona + world book)
 function buildCharacterContext() {
     let context = '';
@@ -560,7 +580,7 @@ function buildCharacterContext() {
         context += `请在对话中参考这个时间设定相关的活动（例如节假日、特殊日期或早晚作息）。\n`;
     }
 
-    return context.trim();
+    return replaceMacros(context.trim());
 }
 
 // DOM Elements (Initialized in init to be safe)
@@ -1309,6 +1329,15 @@ function goBack() {
         return;
     }
 
+    // Favorites Screen -> Home
+    const favScreenBack = document.getElementById('favorites-screen');
+    if (favScreenBack && favScreenBack.style.display === 'flex') {
+        favScreenBack.style.display = 'none';
+        if (homeScreen) homeScreen.style.display = 'flex';
+        updateStatusBar('home');
+        return;
+    }
+
     // Fallback
     if (homeScreen) homeScreen.style.display = 'flex';
     updateStatusBar('home');
@@ -1432,8 +1461,12 @@ async function renderMessageList() {
         // Blob URLs
         if (body.startsWith('blob:')) return '[媒体文件]';
 
-        // 5. Strip quotes and return a text snippet
-        return body.replace(/「`回复.*?`」/g, '').replace(/<blocked>/g, '').trim().substring(0, 50);
+        // 5. Strip quotes, bilingual/inner-voice markers, and return a text snippet
+        let previewBody = body.replace(/「`回复.*?`」/g, '').replace(/<blocked>/g, '').trim();
+        // Strip bilingual translation / inner voice markers
+        previewBody = previewBody.replace(/\{\{翻译[:：][\s\S]*?\}\}\s*$/g, '').trim();
+        previewBody = previewBody.replace(/\{\{心声[:：][\s\S]*?\}\}\s*$/g, '').trim();
+        return previewBody.substring(0, 50);
     };
 
     // Pre-fetch all chat histories from IndexedDB
@@ -2808,6 +2841,10 @@ async function exportAllData() {
                 <input type="checkbox" class="export-base-cb" value="pomodoro" checked>
                 <span>番茄钟</span>
             </label>
+            <label style="display:flex; align-items:center; gap:8px; font-size:14px; color:#333;">
+                <input type="checkbox" class="export-base-cb" value="faye-phone-favorites" checked>
+                <span>收藏</span>
+            </label>
         </div>
         
         <div style="font-size:14px; color:#666; font-weight:bold; margin-top:4px;">聊天记录 (${availableChats.length})</div>
@@ -3183,6 +3220,34 @@ async function executeDataImport(data, conflictAction) {
             }
         }
     });
+
+    // 8. Favorites data
+    if (data['faye-phone-favorites']) {
+        const existing = localStorage.getItem('faye-phone-favorites');
+        if (existing) {
+            if (conflictAction === 'overwrite') {
+                localStorage.setItem('faye-phone-favorites', data['faye-phone-favorites']);
+                successCount++;
+            } else {
+                // Merge: append imported favorites that don't already exist by ID
+                try {
+                    const existingFavs = JSON.parse(existing);
+                    const importedFavs = JSON.parse(data['faye-phone-favorites']);
+                    const existingIds = new Set(existingFavs.map(f => f.id));
+                    const newFavs = importedFavs.filter(f => !existingIds.has(f.id));
+                    localStorage.setItem('faye-phone-favorites', JSON.stringify([...existingFavs, ...newFavs]));
+                    successCount += newFavs.length;
+                    skipCount += importedFavs.length - newFavs.length;
+                } catch (e) {
+                    localStorage.setItem('faye-phone-favorites', data['faye-phone-favorites']);
+                    successCount++;
+                }
+            }
+        } else {
+            localStorage.setItem('faye-phone-favorites', data['faye-phone-favorites']);
+            successCount++;
+        }
+    }
 
     showToast(`✅ 导入完成！成功 ${successCount} 项，跳过 ${skipCount} 项。即将刷新...`);
     setTimeout(() => location.reload(), 2000);
@@ -3893,6 +3958,9 @@ function openChatSettings() {
 
     // Load inner voice mode setting
     loadChatInnerVoiceModeUI();
+
+    // Load bilingual mode setting
+    loadChatBilingualModeUI();
 
     // Load remark setting
     loadChatRemarkUI();
@@ -6227,6 +6295,42 @@ function saveChatInnerVoiceModeAuto() {
     saveSettingsToStorage();
 }
 
+// --- Bilingual Mode Logic ---
+// Per-chat bilingual mode flag. Stored in appSettings.chatBilingualModes = { 'chat:Name': true, ... }
+
+function getChatBilingualMode() {
+    if (!currentChatTag) return false;
+    if (!appSettings.chatBilingualModes) return false;
+    return !!appSettings.chatBilingualModes[currentChatTag];
+}
+
+function getChatBilingualModeFor(tag) {
+    if (!tag) return false;
+    if (!appSettings.chatBilingualModes) return false;
+    return !!appSettings.chatBilingualModes[tag];
+}
+
+function loadChatBilingualModeUI() {
+    const toggle = document.getElementById('set-bilingual-mode');
+    if (toggle) toggle.checked = getChatBilingualMode();
+}
+
+function saveChatBilingualMode() {
+    if (!currentChatTag) return;
+    if (!appSettings.chatBilingualModes) appSettings.chatBilingualModes = {};
+    const toggle = document.getElementById('set-bilingual-mode');
+    if (toggle && toggle.checked) {
+        appSettings.chatBilingualModes[currentChatTag] = true;
+    } else {
+        delete appSettings.chatBilingualModes[currentChatTag];
+    }
+}
+
+function saveChatBilingualModeAuto() {
+    saveChatBilingualMode();
+    saveSettingsToStorage();
+}
+
 // --- Group Sync Mode Logic ---
 // Per-chat group sync flag. Stored in appSettings.chatGroupSyncModes = { 'chat:Name': true, ... }
 
@@ -8420,6 +8524,17 @@ function renderMessageToUI(msg, isHistoryLoad = false) {
         }
     }
 
+    // Bilingual mode: extract {{翻译:中文翻译}} from message body
+    let displayTranslation = '';
+    if (displayBody) {
+        const transMatch = displayBody.match(/^([\s\S]*?)\{\{翻译[:：]([\s\S]*?)\}\}\s*$/);
+        if (transMatch) {
+            displayBody = transMatch[1].trim();
+            displayTranslation = transMatch[2].trim();
+        }
+    }
+
+
     // Auto-detect Pollinations AI images or Markdown images OR <img> tag images
     if (!isLoc && !isTra && !isFile && !isVoice && !isSticker && !isCallMsg && !isLink && !isForum && !isDeliver && !isPomo) {
         if (/^!\[.*?\]\(.*?\)$/.test(displayBody) ||
@@ -8823,7 +8938,11 @@ function renderMessageToUI(msg, isHistoryLoad = false) {
         }
     } else {
         el = document.createElement('div'); el.className = `bubble ${msg.isUser ? 'bubble-sent' : 'bubble-received'} `;
-        const textHtml = displayBody ? `<div class="msg-text">${displayBody.replace(/\n/g, '<br>')}</div>` : '';
+        let textHtml = displayBody ? `<div class="msg-text">${displayBody.replace(/\n/g, '<br>')}</div>` : '';
+        // Bilingual: append translation with dashed separator
+        if (displayTranslation) {
+            textHtml += `<div class="msg-translation-divider"></div><div class="msg-translation">${displayTranslation.replace(/\n/g, '<br>')}</div>`;
+        }
         el.innerHTML = textHtml;
         el.dataset.rawBody = rawBodyForHistory;
         // Bubble colors are applied via CSS variables, not inline styles
@@ -9435,6 +9554,17 @@ function showMessageActionMenu(el) {
         };
         menu.appendChild(btnTts);
     }
+
+    // Favorite
+    const btnFav = document.createElement('div');
+    btnFav.className = 'msg-action-item';
+    btnFav.innerHTML = '<img src="https://api.iconify.design/mdi:star-outline.svg" class="msg-action-icon">';
+    btnFav.onclick = (e) => {
+        e.stopPropagation();
+        closeMsgMenu();
+        if (typeof addToFavorites === 'function') addToFavorites(el);
+    };
+    menu.appendChild(btnFav);
 
     // Multi-select
     const btnMulti = document.createElement('div');
@@ -11924,13 +12054,20 @@ async function triggerGenerate() {
 - type: 固定为 text (线下模式仅支持文本消息)${isGroupGeneration ? `
 - from: 发送者名字 (群聊必填！可选值: ${groupMembers.join(', ')})` : ''}
 
-2. 格式示例:${isGroupGeneration ? `
-- <msg t="12:00" type="text" from="${groupMembers[0] || charName}">推了你一"你怎么来了？"</msg>
-- <msg t="12:00" type="text" from="${groupMembers.length > 1 ? groupMembers[1] : charName}">抬头看了看,"谁啊？"</msg>` : `
-- <msg t="12:00" type="text">*抬起头看向你,"你来了啊，快坐。"</msg>
-- <msg t="12:01" type="text">*给你倒了杯水,"今天怎么有空过来？"</msg>`}
+2. 符号规则（线下模式 — 适配「只读引号」TTS朗读）:
+- 对话/台词：用双引号 "" 包裹
+- 动作/神态/环境描写：直接书写，不使用任何符号包裹（不用*号、不用括号）
+- 禁止使用 *星号* 包裹动作！
+- 这样 TTS 朗读时，只朗读引号内的对话部分
 
-3. 注意:
+3. 格式示例:${isGroupGeneration ? `
+- <msg t="12:00" type="text" from="${groupMembers[0] || charName}">推了你一下，"你怎么来了？"</msg>
+- <msg t="12:00" type="text" from="${groupMembers.length > 1 ? groupMembers[1] : charName}">抬头看了看，"谁啊？"</msg>` : `
+- <msg t="12:00" type="text">抬起头看向你，"你来了啊，快坐。"</msg>
+- <msg t="12:01" type="text">给你倒了杯水，"今天怎么有空过来？"</msg>
+- <msg t="12:01" type="text">沉默了一会儿，低头玩着手指，"其实我想说……"</msg>`}
+
+4. 注意:
 - 仅使用 type="text"，不要使用 voice/img/sticker/video/file/trans/call 等类型。
 - NO Markdown code blocks.
 - NO <think> tags.`;
@@ -11944,7 +12081,8 @@ async function triggerGenerate() {
     - 不要输出用户 ${getUserName()} 的言行。
 2. 线下互动规则
     - 这是面对面交流，角色可以有丰富的肢体语言、表情和动作。
-    - 语言描写使用双引号包裹，其它描写不需要符号。例如：站起来伸了个懒腰，"唉，好无聊啊。"
+    - 语言描写使用双引号 "" 包裹，动作和其它描写直接书写不使用任何符号。例如：站起来伸了个懒腰，"唉，好无聊啊。"
+    - 禁止使用 *星号* 包裹动作描写！
     - 不是每个人都必须发言。根据话题和性格，有的人可能旁观、有的人可能主动出击。
     - 每次回复总共 3~6 条消息。
 3. 临场感
@@ -11956,7 +12094,8 @@ async function triggerGenerate() {
                 mobileChatPrompt = `<线下交流>
 1. 线下见面。
     - 当前场景：${charName}正在和${getUserName()}进行线下面对面交流，请输出丰富的行为动作描述。
-    - 对话描写：动作和神态描写不需要符号包裹，直接写在对话文本中，如：微微歪头看着你,"嗯？怎么了？"
+    - 对话描写：对话台词用双引号 "" 包裹，动作和神态描写直接书写不使用任何符号。如：微微歪头看着你，"嗯？怎么了？"
+    - 禁止使用 *星号* 包裹动作描写！
     - 每次回复2~3条消息，内容应包含对话和行为动作的混合。
 2. 现场感与沉浸感
     - 感官描写：描述触觉、嗅觉、听觉、视觉等感官体验，让场景生动。
@@ -12092,11 +12231,19 @@ async function triggerGenerate() {
 - dur: 语音时长(秒), 仅 type="voice" 时有效${isGroupGeneration ? `
 - from: 发送者名字 (群聊必填！标明是哪个群成员发送的消息，可选值: ${groupMembers.join(', ')})` : ''}
 
-2. 格式示例:${isGroupGeneration ? `
+2. 符号规则（线上模式 — 适配「不读括号」TTS朗读）:
+- text消息正文：直接书写，不使用引号包裹对话
+- 补充描述（心情/语气/环境）：用中文圆括号（）包裹，如：（叹了口气）算了不聊了
+- voice语音消息：只写纯对话内容，禁止加任何符号（不用引号、不用括号、不用*号）
+- 禁止在线上模式使用 *星号* 包裹任何内容！
+- 这样 TTS 朗读时，（括号内容）会被跳过，只朗读正文
+
+3. 格式示例:${isGroupGeneration ? `
 - 文本: <msg t="12:00" type="text" from="${groupMembers[0] || charName}">哈哈哈你又来了</msg>
 - 文本: <msg t="12:00" type="text" from="${groupMembers.length > 1 ? groupMembers[1] : charName}">谁呢？</msg>
 - 语音: <msg t="12:01" type="voice" from="${groupMembers[0] || charName}" dur="5">哈哈，笑死我了</msg>` : `
 - 文本: <msg t="12:00" type="text">你好呀，在干嘛呢？</msg>
+- 文本: <msg t="12:00" type="text">（无奈地摇摇头）你又忘了</msg>
 - 语音: <msg t="12:01" type="voice" dur="5">哈哈，笑死我了</msg>
 - 表情: <msg t="12:02" type="sticker">爱你h5o1k5.jpeg</msg>
 - 图片: <msg t="12:03" type="img">一只可爱的小猫</msg>
@@ -12108,7 +12255,7 @@ async function triggerGenerate() {
 - 红包: <msg t="12:08" type="redpacket">{"totalAmount":520,"note":"节日快乐","type":"normal","count":1,"target":"","perAmount":520,"openedList":[]}</msg>
 - 通话: <msg t="12:09" type="call">发起语音通话</msg>`}
 
-3. Special Operations:
+4. Special Operations:
 - [BLOCK USER]:
   - If you decide to block the user (angry/upset), output: <cmd action="block"/>
   - After blocking, you will not receive user messages (marked with <blocked>).
@@ -12152,7 +12299,7 @@ async function triggerGenerate() {
   - 发送红包之后，通常会伴随一句普通的文本发言。
   - 若你想抢别人发的红包，或者是用户让你领红包，输出指令：<cmd action="rp_open" from="你的名字"/>
 
-4. Notes:
+5. Notes:
 - NO Markdown code blocks.
 - NO <think> tags.`;
 
@@ -12352,6 +12499,30 @@ Apply the following substitutions based on current language (CN/EN).
         // Inner Voice Mode: AI adds inner thoughts using stable marker format
         if (getChatInnerVoiceMode()) {
             systemContent += `\n\n[Inner Voice Mode - ACTIVE]\n在部分回复的末尾，用 {{心声:内容}} 格式附加角色内心独白。\n\n规则：\n- 每次回复只在1-2条消息末尾附加心声\n- 格式示例：正常对话内容{{心声:这里是内心想法}}\n- 心声内容简短(10-30字)，口语化，表达真实想法（可以和表面话矛盾）\n- 不要每条都加，适度使用`;
+        }
+
+        // Bilingual Mode: AI outputs in native language + Chinese translation
+        if (typeof getChatBilingualMode === 'function' && getChatBilingualMode()) {
+            // Try to detect native language from persona
+            let nativeLang = 'English';
+            const npc = npcCharacters.find(n => n.name === charName);
+            if (npc) {
+                const fullDesc = (npc.persona || '') + ' ' + (npc.desc || '') + ' ' + (npc.personality || '');
+                // Common language detection patterns
+                if (/日本|Japanese|日语|にほん/i.test(fullDesc)) nativeLang = '日本語';
+                else if (/韩国|Korean|韩语|한국/i.test(fullDesc)) nativeLang = '한국어';
+                else if (/英国|美国|English|英语|British|American/i.test(fullDesc)) nativeLang = 'English';
+                else if (/法国|French|法语|français/i.test(fullDesc)) nativeLang = 'Français';
+                else if (/德国|German|德语|Deutsch/i.test(fullDesc)) nativeLang = 'Deutsch';
+                else if (/西班牙|Spanish|西语|español/i.test(fullDesc)) nativeLang = 'Español';
+                else if (/俄国|俄罗斯|Russian|俄语|русский/i.test(fullDesc)) nativeLang = 'Русский';
+                else if (/意大利|Italian|意语/i.test(fullDesc)) nativeLang = 'Italiano';
+                else if (/泰国|Thai|泰语|ไทย/i.test(fullDesc)) nativeLang = 'ภาษาไทย';
+                else if (/越南|Vietnamese|越语/i.test(fullDesc)) nativeLang = 'Tiếng Việt';
+                else if (/阿拉伯|Arabic|阿语/i.test(fullDesc)) nativeLang = 'العربية';
+                else if (/葡萄牙|Portuguese|葡语/i.test(fullDesc)) nativeLang = 'Português';
+            }
+            systemContent += `\n\n[Bilingual Mode - ACTIVE / 双语模式]\n你必须用 ${nativeLang} 作为主要语言发消息。在每条消息末尾，用 {{翻译:中文翻译内容}} 格式附上中文翻译。\n\n规则：\n- 每条消息的主体内容必须用 ${nativeLang} 书写\n- 翻译放在消息末尾，格式：原文内容{{翻译:这里是中文翻译}}\n- 翻译要准确自然，不是逐字翻译\n- 保持角色的语气和性格\n- 示例（假设母语是English）：Hey, how are you doing today?{{翻译:嘿，你今天怎么样？}}`;
         }
 
         // Memory Summary: inject memory context into system prompt
@@ -12580,17 +12751,22 @@ Apply the following substitutions based on current language (CN/EN).
                     if (content) {
                         content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
                     }
+                    // Strip bilingual translation and inner voice markers from AI context
+                    if (content) {
+                        content = content.replace(/\{\{翻译[:：][\s\S]*?\}\}\s*$/g, '').trim();
+                        content = content.replace(/\{\{心声[:：][\s\S]*?\}\}\s*$/g, '').trim();
+                    }
 
                     // Handle special message types for context
                     // Derive type from header type marker for accurate AI context
                     const h = msg.header || '';
-                    const isUserPhoto = h.includes('|\u56fe\u7247|') || h.includes('| \u56fe\u7247 |') || msg.type === 'photo';
-                    const isUserSticker = h.includes('|\u8868\u60c5\u5305|') || h.includes('| \u8868\u60c5\u5305 |') || msg.type === 'sticker';
-                    const isUserVoice = h.includes('|\u8bed\u97f3|') || h.includes('| \u8bed\u97f3 |') || msg.type === 'voice';
-                    const isUserVideo = h.includes('|\u89c6\u9891|') || h.includes('| \u89c6\u9891 |') || msg.type === 'video';
-                    const isUserFile = h.includes('|\u6587\u4ef6|') || h.includes('| \u6587\u4ef6 |') || msg.type === 'file';
-                    const isUserTrans = h.includes('|TRANS|') || h.includes('| TRANS |') || h.includes('|\u8f6c\u8d26|') || msg.type === 'transfer';
-                    const isUserLoc = h.includes('|\u4f4d\u7f6e|') || h.includes('| \u4f4d\u7f6e |') || msg.type === 'location';
+                    const isUserPhoto = h.includes('|图片|') || h.includes('| 图片 |') || msg.type === 'photo';
+                    const isUserSticker = h.includes('|表情包|') || h.includes('| 表情包 |') || msg.type === 'sticker';
+                    const isUserVoice = h.includes('|语音|') || h.includes('| 语音 |') || msg.type === 'voice';
+                    const isUserVideo = h.includes('|视频|') || h.includes('| 视频 |') || msg.type === 'video';
+                    const isUserFile = h.includes('|文件|') || h.includes('| 文件 |') || msg.type === 'file';
+                    const isUserTrans = h.includes('|TRANS|') || h.includes('| TRANS |') || h.includes('|转账|') || msg.type === 'transfer';
+                    const isUserLoc = h.includes('|位置|') || h.includes('| 位置 |') || msg.type === 'location';
                     const isUserLink = h.includes('|LINK|') || h.includes('| LINK |') || msg.type === 'link';
                     const isUserMusic = h.includes('|MUSIC|') || h.includes('| MUSIC |') || msg.type === 'music';
 
@@ -15157,6 +15333,8 @@ function toggleVConsole(on) {
     saveChatMateModeAuto,
     // Inner Voice Mode
     saveChatInnerVoiceModeAuto,
+    // Bilingual Mode
+    saveChatBilingualModeAuto,
     // Multi-select & Recall
     enterMultiSelectMode,
     exitMultiSelectMode,
@@ -15434,7 +15612,8 @@ const defaultGridLayout = [
     { id: 'app-world', name: '世界书', icon: 'bxs:book-heart', action: () => openCharacterSetup("world"), col: 3, row: 2 },
     { id: 'app-regex', name: '正则', icon: 'tabler:regex', action: () => openRegexScreen(), col: 4, row: 2 },
     { id: 'app-chat', name: '聊天', icon: 'basil:wechat-solid', action: () => openMessageList(), col: 1, row: 4 },
-    { id: 'app-forum', name: '论坛', icon: 'material-symbols:forum-rounded', action: () => openForumApp(), col: 2, row: 4 },
+    { id: 'app-favorites', name: '收藏', icon: 'mdi:star', color: '#f0a500', action: () => openFavoritesApp(), col: 2, row: 4 },
+    { id: 'app-forum', name: '论坛', icon: 'material-symbols:forum-rounded', action: () => openForumApp(), col: 3, row: 3 },
     { id: 'app-calendar', name: '日历组件', icon: 'tabler:calendar', widget: true, action: () => openCalendarApp(), col: 3, row: 4, w: 2, h: 2 },
     { id: 'app-pomodoro', name: '番茄钟', icon: 'mdi:timer-outline', color: '#ff6b6b', action: () => openPomodoroApp(), col: 1, row: 6 },
     { id: 'app-shopping', name: '购物', icon: 'mdi:shopping-outline', color: '#ff7e67', action: () => openStoreApp('shopping'), col: 2, row: 6 },
@@ -16020,6 +16199,160 @@ if (document.readyState === 'loading') {
     initColorPickers();
 }
 
+// ========== 收藏系统 ==========
+const FAVORITES_KEY = 'faye-phone-favorites';
+
+function getFavorites() {
+    try {
+        const raw = localStorage.getItem(FAVORITES_KEY);
+        return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+}
+
+function saveFavorites(favs) {
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+}
+
+window.addToFavorites = function (el) {
+    const row = el.closest('.message-row');
+    if (!row) { showToast('收藏失败'); return; }
+
+    const isUser = row.classList.contains('sent');
+    const header = el.dataset.fullHeader || '';
+    const rawBody = el.dataset.rawBody || el.textContent || '';
+
+    // Extract body text
+    let body = rawBody;
+    // Try to get cleaner text from msg-text div
+    const msgTextEl = el.querySelector('.msg-text');
+    if (msgTextEl) body = msgTextEl.textContent || rawBody;
+
+    // Determine sender
+    const nameEl = row.querySelector('.msg-name');
+    const senderName = nameEl ? nameEl.textContent.trim() : (isUser ? getUserName() : getCharName());
+
+    // Determine time from meta
+    const timeEl = row.querySelector('.msg-time');
+    const msgTime = timeEl ? timeEl.textContent.trim() : '';
+
+    // Determine message type
+    let msgType = 'text';
+    if (el.classList.contains('voice-card-container')) msgType = 'voice';
+    else if (el.classList.contains('photo-card')) msgType = 'photo';
+    else if (el.classList.contains('sticker-bubble')) msgType = 'sticker';
+    else if (el.classList.contains('location-card')) msgType = 'location';
+    else if (el.classList.contains('transfer-card')) msgType = 'transfer';
+    else if (el.classList.contains('file-card')) msgType = 'file';
+    else if (el.classList.contains('link-card')) msgType = 'link';
+
+    // Chat context
+    const chatTag = currentChatTag || '';
+    const charName = getCharName() || '';
+    const userName = getUserName() || '';
+
+    const favItem = {
+        id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        body: body.substring(0, 500),
+        header: header,
+        sender: senderName,
+        isUser: isUser,
+        time: msgTime,
+        type: msgType,
+        chatTag: chatTag,
+        charName: charName,
+        userName: userName,
+        savedAt: new Date().toISOString()
+    };
+
+    const favs = getFavorites();
+    favs.unshift(favItem);
+    saveFavorites(favs);
+    showToast('⭐ 已收藏');
+};
+
+window.openFavoritesApp = function () {
+    const homeScreen = document.getElementById('home-screen');
+    if (homeScreen) homeScreen.style.display = 'none';
+    const favScreen = document.getElementById('favorites-screen');
+    if (favScreen) {
+        favScreen.style.display = 'flex';
+        favScreen.style.flexDirection = 'column';
+    }
+    renderFavorites();
+};
+
+function renderFavorites() {
+    const container = document.getElementById('favorites-body');
+    if (!container) return;
+    const favs = getFavorites();
+
+    if (favs.length === 0) {
+        container.innerHTML = '<div style="text-align:center; color:#999; padding:60px 20px; font-size:14px;">暂无收藏<br><span style="font-size:12px; color:#bbb;">长按聊天消息可添加收藏</span></div>';
+        return;
+    }
+
+    // Group by chatTag (charName + userName)
+    const groups = {};
+    favs.forEach(fav => {
+        const key = fav.charName && fav.userName ? `${fav.charName} · ${fav.userName}` : (fav.chatTag || '未知聊天');
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(fav);
+    });
+
+    let html = '';
+    for (const [groupName, items] of Object.entries(groups)) {
+        html += `<div style="margin-bottom:16px;">
+            <div style="font-size:13px; font-weight:bold; color:#666; padding:6px 4px; border-bottom:1px solid #eee; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+                <img src="https://api.iconify.design/mdi:account-group.svg" style="width:16px; height:16px; opacity:0.5;">
+                ${groupName}
+                <span style="font-size:11px; font-weight:normal; color:#aaa;">(${items.length})</span>
+            </div>`;
+
+        items.forEach(fav => {
+            const typeLabel = { voice: '🎤', photo: '🖼️', sticker: '😊', location: '📍', transfer: '💰', file: '📄', link: '🔗', text: '' }[fav.type] || '';
+            const savedDate = fav.savedAt ? new Date(fav.savedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+            const bodyPreview = (fav.body || '').replace(/<[^>]+>/g, '').substring(0, 80);
+
+            html += `<div class="fav-item" data-fav-id="${fav.id}" style="background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <div style="font-size:12px; font-weight:bold; color:${fav.isUser ? 'var(--pink-500,#e8a0b4)' : '#555'};">
+                        ${fav.sender || '未知'}
+                        <span style="font-weight:normal; color:#bbb; margin-left:4px;">${fav.time || ''}</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:10px; color:#ccc;">${savedDate}</span>
+                        <div onclick="removeFavorite('${fav.id}')" style="cursor:pointer; padding:2px;">
+                            <img src="https://api.iconify.design/mdi:close-circle-outline.svg" style="width:16px; height:16px; opacity:0.35;">
+                        </div>
+                    </div>
+                </div>
+                <div style="font-size:13px; color:#333; line-height:1.5; word-break:break-word;">
+                    ${typeLabel ? typeLabel + ' ' : ''}${bodyPreview || '[空消息]'}
+                </div>
+            </div>`;
+        });
+
+        html += '</div>';
+    }
+
+    container.innerHTML = html;
+}
+
+window.removeFavorite = function (id) {
+    let favs = getFavorites();
+    favs = favs.filter(f => f.id !== id);
+    saveFavorites(favs);
+    // Animate removal
+    const el = document.querySelector(`.fav-item[data-fav-id="${id}"]`);
+    if (el) {
+        el.style.transition = 'opacity 0.3s, transform 0.3s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(30px)';
+        setTimeout(() => renderFavorites(), 300);
+    } else {
+        renderFavorites();
+    }
+};
 
 // ========== Store / Marketplace Apps (外卖 & 购物) ==========
 

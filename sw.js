@@ -21,7 +21,6 @@ self.addEventListener('push', (event) => {
         try {
             data = Object.assign(data, event.data.json());
         } catch (e) {
-            // 如果不是 JSON，当作纯文本处理
             data.body = event.data.text();
         }
     }
@@ -31,18 +30,14 @@ self.addEventListener('push', (event) => {
         icon: data.icon || './icon.png',
         badge: './icon.png',
         tag: data.tag || 'default',
-        renotify: true,                   // 同 tag 也重新通知（震动/声音）
-        vibrate: [200, 100, 200],          // 震动模式
+        renotify: true,
+        requireInteraction: false,    // 不强制用户交互 — 减少 Chrome 垃圾判定
+        silent: false,
         data: {
             chatTag: data.chatTag || '',
             charName: data.charName || '',
             url: data.url || './'
-        },
-        // iOS 不支持 actions，但不影响（自动忽略）
-        actions: [
-            { action: 'open', title: '查看' },
-            { action: 'dismiss', title: '忽略' }
-        ]
+        }
     };
 
     event.waitUntil(
@@ -54,19 +49,14 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    if (event.action === 'dismiss') return;
-
-    // 尝试聚焦到已打开的窗口，否则打开新窗口
     const targetUrl = event.notification.data?.url || './';
     const chatTag = event.notification.data?.chatTag || '';
     const charName = event.notification.data?.charName || '';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-            // 查找已打开的窗口
             for (const client of windowClients) {
                 if (client.url.includes('index.html') || client.url.endsWith('/')) {
-                    // 通知页面打开对应聊天
                     client.postMessage({
                         type: 'NOTIFICATION_CLICK',
                         chatTag: chatTag,
@@ -75,7 +65,6 @@ self.addEventListener('notificationclick', (event) => {
                     return client.focus();
                 }
             }
-            // 没有已打开的窗口 → 打开新窗口
             return clients.openWindow(targetUrl);
         })
     );
@@ -85,7 +74,7 @@ self.addEventListener('notificationclick', (event) => {
 // 主线程通过 postMessage 发送通知请求
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
-        const { title, body, icon, tag, chatTag, charName, vibrate } = event.data;
+        const { title, body, icon, tag, chatTag, charName } = event.data;
 
         self.registration.showNotification(title || '砖头机', {
             body: body || '',
@@ -93,7 +82,8 @@ self.addEventListener('message', (event) => {
             badge: './icon.png',
             tag: tag || `msg-${Date.now()}`,
             renotify: true,
-            vibrate: vibrate || [200, 100, 200],
+            requireInteraction: false,
+            silent: false,
             data: {
                 chatTag: chatTag || '',
                 charName: charName || '',
