@@ -1,20 +1,27 @@
 {
     "name": "砖头机",
     "short_name": "砖头机",
+    "description": "你的专属虚拟手机 - AI角色互动聊天",
     "icons": [
         {
             "src": "icon.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         },
         {
             "src": "icon.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any maskable"
         }
     ],
-    "start_url": "/",
+    "start_url": "./index.html",
+    "scope": "./",
     "display": "standalone",
     "background_color": "#c8d8a0",
-    "theme_color": "#c8d8a0"
+    "theme_color": "#c8d8a0",
+    "orientation": "portrait",
+    "id": "zhuantouji-pwa",
+    "categories": ["entertainment", "social"]
 }

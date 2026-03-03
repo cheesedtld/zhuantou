@@ -217,9 +217,9 @@ async function migrateFromLocalStorage() {
 }
 
 
-const APP_VERSION = '1.0.5';
-const BUILD_VERSION = '2026-3-3-2';
-const UPDATE_LOG = 'v1.0.0\n砖头机初始内测版\nv1.0.1\n修复了部分bug\n增加酒馆角色卡json导入\n增加ai角色边回消息边回朋友圈？的功能\n增加一些零零散散小功能\nv1.0.2\n修复部分bug\n完善酒馆json导入功能\n增加听歌功能,可导入网易云音乐的分享链接（支持vip歌曲）也可上传url或文件\n增加番茄钟功能，有学习/工作、运动两种可选（可能没啥区别）\n增加tts缓存，最多可缓存50条语音消息\nv1.0.3\n修复一些bug\n注意注意！备份一下数据，正在进行储存升级，请先行备份以免数据丢失\nv1.0.4\n储存升级，不再局限于浏览器的5MB储存\n修复一些bug\nv1.0.5\n重构TTS，CORS留空即可应用，现在应该更稳定了！\n修改一些我强迫症看着别扭的UI\n修复一些bug';
+const APP_VERSION = '1.0.6';
+const BUILD_VERSION = '2026-3-3-3';
+const UPDATE_LOG = 'v1.0.0\n砖头机初始内测版\nv1.0.1\n修复了部分bug\n增加酒馆角色卡json导入\n增加ai角色边回消息边回朋友圈？的功能\n增加一些零零散散小功能\nv1.0.2\n修复部分bug\n完善酒馆json导入功能\n增加听歌功能,可导入网易云音乐的分享链接（支持vip歌曲）也可上传url或文件\n增加番茄钟功能，有学�?工作、运动两种可选（可能没啥区别）\n增加tts缓存，最多可缓存50条语音消息\nv1.0.3\n修复一些bug\n注意注意！备份一下数据，正在进行储存升级，请先行备份以免数据丢失\nv1.0.4\n储存升级，不再局限于浏览器的5MB储存\n修复一些bug\nv1.0.5\n重构TTS，CORS留空即可应用，现在应该更稳定了！\n修改一些我强迫症看着别扭的UI\n修复一些bug\nv1.0.6\n修复一些bug和ui\n修复主动发消息和发动态功能，现在可以设定主动发间隔时长和次数、完成后自动关闭\n新增了几个TTS模型可选择';
 function checkUpdate() {
     const lastVersion = localStorage.getItem('faye-phone-version');
     if (lastVersion !== APP_VERSION) {
@@ -253,19 +253,19 @@ const defaultAppSettings = {
     msgNameColor: '#ad9a9e',
     msgTimeColor: '#c5b8ba',
     fontSize: 14, // 默认字体大小
-    chatBtnColor: '#f0e8e9', // 按钮背景色
-    chatBtnText: '#bcaaae', // 按钮文字/图标色
+    chatBtnColor: '#f0e8e9', // 按钮背景�?
+    chatBtnText: '#bcaaae', // 按钮文字/图标�?
     customTime: '', // 格式 HH:MM，为空则使用系统时间
-    timeOffset: 0, // 时间偏移量 (ms)
+    timeOffset: 0, // 时间偏移�?(ms)
     blockChar: false, // User blocks Char (DEPRECATED global, use chatBlockStates)
     blockUser: false, // Char blocks User (DEPRECATED global, use chatBlockStates)
-    chatBlockStates: {}, // 每个聊天的拉黑状态 { 'chat:Name': { blockChar: bool, blockUser: bool }, ... }
+    chatBlockStates: {}, // 每个聊天的拉黑状�?{ 'chat:Name': { blockChar: bool, blockUser: bool }, ... }
     groups: [], // 群组列表 [{name: 'GroupName', members: ['A', 'B']}]
     privateChats: [], // 私聊列表 ['Name1', 'Name2']
     memberAvatars: {}, // NEW: 成员头像列表 { 'Name': 'url', ... }
-    chatTimezones: {}, // 每个聊天的角色时区偏移 (小时) { 'chat:Name': offset_hours, ... }
-    chatMateModes: {}, // 每个聊天的mate模式开关 { 'chat:Name': true/false, ... }
-    chatUserIds: {}, // 每个聊天绑定的用户ID { 'chat:NPC名': userId, 'group:群名': userId }
+    chatTimezones: {}, // 每个聊天的角色时区偏�?(小时) { 'chat:Name': offset_hours, ... }
+    chatMateModes: {}, // 每个聊天的mate模式开�?{ 'chat:Name': true/false, ... }
+    chatUserIds: {}, // 每个聊天绑定的用户ID { 'chat:NPC�?: userId, 'group:群名': userId }
     useSunbox: true, // Default to true
     // API Settings
     apiEndpoint: 'https://api.openai.com/v1',
@@ -301,7 +301,7 @@ const defaultAppSettings = {
 let appSettings = { ...defaultAppSettings };
 let userCharacters = []; // New: To store user characters
 let editingUserIndex = null; // New: To track which user is being edited
-let currentChatTag = null; // 当前聊天标签 (e.g. chat:Name or group:Name5人)
+let currentChatTag = null; // 当前聊天标签 (e.g. chat:Name or group:Name5�?
 let currentChatTarget = null; // 当前聊天显示名称
 let isOfflineMode = false; // 线下交流模式
 
@@ -1379,18 +1379,45 @@ async function renderMessageList() {
     // Function to get a simplified message preview
     const getPreviewText = (msg) => {
         if (!msg) return '';
+        // 1. Check msg.type first
         if (msg.type === 'sticker') return '[表情包]';
         if (msg.type === 'photo') return '[图片]';
-        if (msg.type === 'voice') return '[语音]';
+        if (msg.type === 'voice') return '[语音消息]';
         if (msg.type === 'video') return '[视频]';
         if (msg.type === 'file') return '[文件]';
         if (msg.type === 'location') return '[位置]';
         if (msg.type === 'music') return '[音乐]';
+        if (msg.type === 'transfer') return '[转账]';
+        if (msg.type === 'redpacket') return '[红包]';
+        if (msg.type === 'link') return '[链接]';
+        if (msg.type === 'deliver') return '[订单]';
+        if (msg.type === 'call_message' || msg.type === 'call_end' || msg.type === 'call_reject') return '[通话]';
+        if (msg.type === 'pomo') return '[番茄钟]';
+        if (msg.type === 'toyinvite') return '[玩具邀请]';
 
+        // 2. Check header for type markers
+        const header = msg.header || '';
+        if (header.includes('|语音|') || header.includes('|VOC|')) return '[语音消息]';
+        if (header.includes('|图片|') || header.includes('|IMG|')) return '[图片]';
+        if (header.includes('|视频|')) return '[视频]';
+        if (header.includes('|表情包|')) return '[表情包]';
+        if (header.includes('|文件|') || header.includes('|FILE|')) return '[文件]';
+        if (header.includes('|位置|') || header.includes('|LOC|')) return '[位置]';
+        if (header.includes('|转账|') || header.includes('|TRANS|')) return '[转账]';
+        if (header.includes('|MUSIC|')) return '[音乐]';
+        if (header.includes('|REDPACKET|')) return '[红包]';
+        if (header.includes('|LINK|')) return '[链接]';
+        if (header.includes('|DELIVER|') || header.includes('|ORDER|')) return '[订单]';
+        if (header.includes('|通话|') || header.includes('|CALL|')) return '[通话]';
+        if (header.includes('|POMO|')) return '[番茄钟]';
+        if (header.includes('|TOYINVITE|')) return '[玩具邀请]';
+        if (header.includes('|撤回|') || header.includes('|RECALL')) return '[撤回消息]';
+
+        // 3. Check body patterns for legacy formats
         const body = msg.body || '';
         if (body.includes('[') && body.includes(']')) {
             if (body.includes('|图片|')) return '[图片]';
-            if (body.includes('|语音|')) return '[语音]';
+            if (body.includes('|语音|')) return '[语音消息]';
             if (body.includes('|视频|')) return '[视频]';
             if (body.includes('|文件|')) return '[文件]';
             if (body.includes('|位置|')) return '[位置]';
@@ -1398,8 +1425,15 @@ async function renderMessageList() {
             if (body.includes('|表情包|')) return '[表情包]';
             if (body.includes('|MUSIC|')) return '[音乐]';
         }
-        // Strip quotes and return a snippet
-        return body.replace(/「`回复.*?`」/g, '').trim().substring(0, 50);
+
+        // 4. Check for body patterns that indicate non-text content
+        // base64 images / data URLs
+        if (body.startsWith('data:image/') || body.startsWith('data:video/') || body.startsWith('data:audio/')) return '[媒体文件]';
+        // Blob URLs
+        if (body.startsWith('blob:')) return '[媒体文件]';
+
+        // 5. Strip quotes and return a text snippet
+        return body.replace(/「`回复.*?`」/g, '').replace(/<blocked>/g, '').trim().substring(0, 50);
     };
 
     // Pre-fetch all chat histories from IndexedDB
@@ -1422,7 +1456,7 @@ async function renderMessageList() {
 
         let displayAvatar = chat.avatar;
         const unreadCount = parseInt(localStorage.getItem(`unread-${chat.tag}`) || '0');
-        const unreadBadge = unreadCount > 0 ? `<span style="position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:#e53935;color:#fff;font-size:10px;text-align:center;padding:0 4px;box-sizing:border-box;">${unreadCount > 99 ? '99+' : unreadCount}</span>` : '';
+        const unreadBadge = unreadCount > 0 ? `<span style="position:absolute;top:-6px;right:5px;min-width:16px;height:16px;line-height:16px;border-radius:8px;background:#e53935;color:#fff;font-size:10px;text-align:center;padding:0 4px;box-sizing:border-box;">${unreadCount > 99 ? '99+' : unreadCount}</span>` : '';
 
         item.innerHTML = `
             <div style="position:relative;flex-shrink:0;">
@@ -3908,6 +3942,7 @@ function loadChatAutoInteractionsUI() {
     const s = getChatSettings();
     const autoMomentEnabled = s.autoMomentEnabled || false;
     const autoMomentInterval = s.autoMomentInterval || 60;
+    const autoMomentCount = s.autoMomentCount || 1;
     const autoMessageEnabled = s.autoMessageEnabled || false;
     const autoMessageInterval = s.autoMessageInterval || 60;
     const autoMessageCount = s.autoMessageCount || 1;
@@ -3916,8 +3951,11 @@ function loadChatAutoInteractionsUI() {
     if (amE) amE.checked = autoMomentEnabled;
     const amI = document.getElementById('chat-auto-moment-interval');
     if (amI) amI.value = autoMomentInterval;
+    const amC = document.getElementById('chat-auto-moment-count');
+    if (amC) amC.value = autoMomentCount;
     const amD = document.getElementById('chat-auto-moment-detail');
     if (amD) amD.style.display = autoMomentEnabled ? 'block' : 'none';
+    renderScheduleDisplay('chat-auto-moment-schedule', s.autoMomentSchedule);
 
     const amsgE = document.getElementById('chat-auto-message-enabled');
     if (amsgE) amsgE.checked = autoMessageEnabled;
@@ -3927,47 +3965,59 @@ function loadChatAutoInteractionsUI() {
     if (amsgC) amsgC.value = autoMessageCount;
     const amsgD = document.getElementById('chat-auto-message-detail');
     if (amsgD) amsgD.style.display = autoMessageEnabled ? 'block' : 'none';
-
-    renderAutoMessageSchedule(s.autoMessageSchedule);
+    renderScheduleDisplay('chat-auto-message-schedule', s.autoMessageSchedule);
 }
 
-function saveChatAutoInteractions(forceRecalc) {
+function saveChatAutoInteractions(forceRecalcMsg, forceRecalcMoment) {
     const s = getChatSettings();
     const amE = document.getElementById('chat-auto-moment-enabled');
     const amI = document.getElementById('chat-auto-moment-interval');
+    const amC = document.getElementById('chat-auto-moment-count');
     const amsgE = document.getElementById('chat-auto-message-enabled');
     const amsgI = document.getElementById('chat-auto-message-interval');
     const amsgC = document.getElementById('chat-auto-message-count');
 
-    s.autoMomentEnabled = amE ? amE.checked : false;
     s.autoMomentInterval = amI ? (parseInt(amI.value) || 60) : 60;
+    s.autoMomentCount = amC ? (parseInt(amC.value) || 1) : 1;
     s.autoMessageInterval = amsgI ? (parseInt(amsgI.value) || 60) : 60;
     s.autoMessageCount = amsgC ? (parseInt(amsgC.value) || 1) : 1;
 
-    // If forceRecalc (confirm button), force enable and recalculate
-    if (forceRecalc) {
+    const now = Date.now();
+
+    // --- Auto Moment schedule ---
+    if (forceRecalcMoment) {
+        s.autoMomentEnabled = true;
+        if (amE) amE.checked = true;
+    } else {
+        s.autoMomentEnabled = amE ? amE.checked : false;
+    }
+    if (s.autoMomentEnabled) {
+        const intervalMs = s.autoMomentInterval * 60000;
+        const count = Math.min(Math.max(s.autoMomentCount || 1, 1), 10);
+        const existing = s.autoMomentSchedule || [];
+        if (forceRecalcMoment || !existing.length || existing.every(t => t < now)) {
+            const schedule = [];
+            for (let i = 1; i <= count; i++) schedule.push(now + intervalMs * i);
+            s.autoMomentSchedule = schedule;
+        }
+    } else {
+        s.autoMomentSchedule = [];
+    }
+
+    // --- Auto Message schedule ---
+    if (forceRecalcMsg) {
         s.autoMessageEnabled = true;
         if (amsgE) amsgE.checked = true;
     } else {
         s.autoMessageEnabled = amsgE ? amsgE.checked : false;
     }
-
-    const now = Date.now();
-    if (s.autoMomentEnabled && !s.autoMomentLastTrigger) {
-        s.autoMomentLastTrigger = now;
-    }
-
-    // Compute absolute trigger schedule for auto-message
     if (s.autoMessageEnabled) {
         const intervalMs = s.autoMessageInterval * 60000;
         const count = Math.min(Math.max(s.autoMessageCount || 1, 1), 10);
-        const existingSchedule = s.autoMessageSchedule || [];
-        // Force recalculate if confirm button pressed, or if no pending triggers
-        if (forceRecalc || !existingSchedule.length || existingSchedule.every(t => t < now)) {
+        const existing = s.autoMessageSchedule || [];
+        if (forceRecalcMsg || !existing.length || existing.every(t => t < now)) {
             const schedule = [];
-            for (let i = 1; i <= count; i++) {
-                schedule.push(now + intervalMs * i);
-            }
+            for (let i = 1; i <= count; i++) schedule.push(now + intervalMs * i);
             s.autoMessageSchedule = schedule;
         }
     } else {
@@ -3981,13 +4031,13 @@ function saveChatAutoInteractions(forceRecalc) {
     const amsgD = document.getElementById('chat-auto-message-detail');
     if (amsgD) amsgD.style.display = s.autoMessageEnabled ? 'block' : 'none';
 
-    renderAutoMessageSchedule(s.autoMessageSchedule);
-    // Schedule precise timer for the new trigger
+    renderScheduleDisplay('chat-auto-moment-schedule', s.autoMomentSchedule);
+    renderScheduleDisplay('chat-auto-message-schedule', s.autoMessageSchedule);
     if (typeof scheduleNextAutoCheck === 'function') scheduleNextAutoCheck();
 }
 
-function renderAutoMessageSchedule(schedule) {
-    const el = document.getElementById('chat-auto-message-schedule');
+function renderScheduleDisplay(elementId, schedule) {
+    const el = document.getElementById(elementId);
     if (!el) return;
     if (!schedule || !schedule.length) {
         el.textContent = '';
@@ -4012,33 +4062,6 @@ function renderAutoMessageSchedule(schedule) {
     el.innerHTML = '计划触发: ' + timeStrs.map(t => '<b>' + t + '</b>').join(' → ');
 }
 
-function confirmAutoMessageSchedule() {
-    const s = getChatSettings();
-    const amsgI = document.getElementById('chat-auto-message-interval');
-    const amsgC = document.getElementById('chat-auto-message-count');
-
-    s.autoMessageInterval = amsgI ? (parseInt(amsgI.value) || 60) : 60;
-    s.autoMessageCount = amsgC ? (parseInt(amsgC.value) || 1) : 1;
-
-    const now = Date.now();
-    const intervalMs = s.autoMessageInterval * 60000;
-    const count = Math.min(Math.max(s.autoMessageCount, 1), 10);
-
-    // Force recalculate schedule from now
-    const schedule = [];
-    for (let i = 1; i <= count; i++) {
-        schedule.push(now + intervalMs * i);
-    }
-    s.autoMessageSchedule = schedule;
-    s.autoMessageEnabled = true;
-
-    saveChatSettingsObj(s);
-    renderAutoMessageSchedule(schedule);
-
-    // Update toggle UI
-    const amsgE = document.getElementById('chat-auto-message-enabled');
-    if (amsgE) amsgE.checked = true;
-}
 
 let isCheckingAutoInteractions = false;
 async function checkAutoInteractions() {
@@ -4053,11 +4076,15 @@ async function checkAutoInteractions() {
                 let s;
                 try { s = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
 
-                if (s && s.autoMomentEnabled) {
-                    const intervalMs = (s.autoMomentInterval || 60) * 60000;
-                    const last = s.autoMomentLastTrigger || now;
-                    if (now - last >= intervalMs - 2000) {
-                        s.autoMomentLastTrigger = now;
+                // Schedule-based auto-moment check
+                if (s && s.autoMomentEnabled && s.autoMomentSchedule && s.autoMomentSchedule.length > 0) {
+                    const nextTrigger = s.autoMomentSchedule[0];
+                    if (now >= nextTrigger) {
+                        console.log('[AutoCheck] TRIGGERING scheduled auto moment for', tag);
+                        s.autoMomentSchedule.shift();
+                        if (s.autoMomentSchedule.length === 0) {
+                            s.autoMomentEnabled = false;
+                        }
                         localStorage.setItem(key, JSON.stringify(s));
                         await triggerAIAutoMoment(tag);
                     }
@@ -4067,14 +4094,12 @@ async function checkAutoInteractions() {
                 if (s && s.autoMessageEnabled && s.autoMessageSchedule && s.autoMessageSchedule.length > 0) {
                     const nextTrigger = s.autoMessageSchedule[0];
                     const timeStr = new Date(nextTrigger).toLocaleTimeString();
-                    console.log(`[AutoCheck] tag=${tag}, nextTrigger=${timeStr}, inMs=${Math.round((nextTrigger - now) / 1000)}s`);
+                    console.log(`[AutoCheck] tag=${tag}, nextMsgTrigger=${timeStr}, inMs=${Math.round((nextTrigger - now) / 1000)}s`);
                     if (now >= nextTrigger) {
                         console.log('[AutoCheck] TRIGGERING scheduled auto message for', tag, 'at', timeStr);
-                        // Remove triggered timestamp
                         s.autoMessageSchedule.shift();
-                        // If all triggers consumed, disable
                         if (s.autoMessageSchedule.length === 0) {
-                            console.log('[AutoCheck] All scheduled triggers completed for', tag);
+                            console.log('[AutoCheck] All scheduled message triggers completed for', tag);
                             s.autoMessageEnabled = false;
                         }
                         localStorage.setItem(key, JSON.stringify(s));
@@ -4087,7 +4112,6 @@ async function checkAutoInteractions() {
         console.error(e);
     }
     isCheckingAutoInteractions = false;
-    // After each check, schedule the next precise timeout
     scheduleNextAutoCheck();
 }
 
@@ -4097,27 +4121,22 @@ function scheduleNextAutoCheck() {
     if (nextAutoCheckTimer) clearTimeout(nextAutoCheckTimer);
     const now = Date.now();
     let soonest = Infinity;
-    // Find the soonest scheduled trigger across all chats
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('faye-phone-chatsettings-')) {
             try {
                 const s = JSON.parse(localStorage.getItem(key));
                 if (s && s.autoMessageEnabled && s.autoMessageSchedule && s.autoMessageSchedule.length > 0) {
-                    const next = s.autoMessageSchedule[0];
-                    if (next < soonest) soonest = next;
+                    if (s.autoMessageSchedule[0] < soonest) soonest = s.autoMessageSchedule[0];
                 }
-                if (s && s.autoMomentEnabled) {
-                    const intervalMs = (s.autoMomentInterval || 60) * 60000;
-                    const last = s.autoMomentLastTrigger || now;
-                    const nextMoment = last + intervalMs;
-                    if (nextMoment < soonest) soonest = nextMoment;
+                if (s && s.autoMomentEnabled && s.autoMomentSchedule && s.autoMomentSchedule.length > 0) {
+                    if (s.autoMomentSchedule[0] < soonest) soonest = s.autoMomentSchedule[0];
                 }
             } catch (e) { }
         }
     }
     if (soonest < Infinity) {
-        const delay = Math.max(soonest - now, 1000); // At least 1s
+        const delay = Math.max(soonest - now, 1000);
         console.log('[AutoCheck] Next trigger in', Math.round(delay / 1000) + 's at', new Date(now + delay).toLocaleTimeString());
         nextAutoCheckTimer = setTimeout(checkAutoInteractions, delay);
     }
@@ -4171,7 +4190,7 @@ ${chatContext ? '最近和' + currentUserName + '的聊天记录：\n' + chatCon
 1. 必须完全以角色身份说话，风格自然、生活化
 2. 可以参考最近的事情，或者只是简单分享感悟或记录生活
 3. 30-80字，不要太长
-4. 如果你想配一张或多张图片，请在文中加上：[图片：照片的详细描述]
+4. 请配1-3张图片，每张用 [图片：照片的详细描述] 格式，描述要具体生动
 5. 只输出正文和图片标签，不要加引号、标签或前缀`;
 
         const messages = [
@@ -4390,6 +4409,7 @@ async function triggerAIAutoMessage(tag) {
 
         const chatTag = isGroup ? ('group:' + (targetGroup.name || targetGroup.id)) : ('chat:' + npcName);
         const firstBody = segments[0].body;
+        const firstHeader = segments[0].header || '';
 
         // Check if user is currently VIEWING this specific chat (DOM-based, not variable-based)
         const chatScreenEl = document.getElementById('chat-screen');
@@ -4404,10 +4424,11 @@ async function triggerAIAutoMessage(tag) {
             console.log('[AutoMsg] Calling showAINotification for', mappedNpcName);
             showAINotification(mappedNpcName, firstBody, {
                 chatTag: chatTag,
-                time: timeStr
+                time: timeStr,
+                header: firstHeader
             });
 
-            sendWebNotification(mappedNpcName, firstBody, chatTag);
+            sendWebNotification(mappedNpcName, firstBody, chatTag, firstHeader);
         } else {
             console.log('[AutoMsg] Currently VIEWING target chat, just refreshing');
             if (typeof loadInitialChat === 'function') loadInitialChat();
@@ -4420,33 +4441,165 @@ async function triggerAIAutoMessage(tag) {
     } catch (e) { console.error('Auto message error', e); }
 }
 
-// ===== Web Notifications (Browser-Level Push) =====
+// ===== Web Notifications (PWA Service Worker Push) =====
 
-// Request notification permission
-function requestNotificationPermission() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-        Notification.requestPermission().then(perm => {
-            console.log('[Web Notification] Permission:', perm);
+// SW 注册引用，供全局使用
+let _swRegistration = null;
+
+/**
+ * 注册 Service Worker 并设置通知点击消息通道
+ * iOS 16.4+ 必须「添加到主屏幕」才能支持 SW 通知
+ */
+async function registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) {
+        console.warn('[SW] 此浏览器不支持 Service Worker');
+        return;
+    }
+
+    try {
+        const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+        _swRegistration = reg;
+        console.log('[SW] Service Worker 注册成功, scope:', reg.scope);
+
+        // 监听 SW 更新
+        reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'activated') {
+                        console.log('[SW] 新 Service Worker 已激活');
+                    }
+                });
+            }
         });
+
+        // 监听 SW 发来的消息（通知点击后的导航指令）
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'NOTIFICATION_CLICK') {
+                const { chatTag, charName } = event.data;
+                if (chatTag && typeof openChat === 'function') {
+                    openChat(chatTag, charName || '');
+                }
+            }
+        });
+
+        // 配合 Keep-Alive：定期向 SW 发送心跳，防止 SW 被杀
+        setInterval(() => {
+            if (_swRegistration && _swRegistration.active) {
+                _swRegistration.active.postMessage({ type: 'KEEPALIVE' });
+            }
+        }, 25000); // 每25秒
+
+    } catch (err) {
+        console.error('[SW] Service Worker 注册失败:', err);
     }
 }
 
-// Send a browser-level notification
-function sendWebNotification(charName, message, chatTag) {
-    // Check if enabled in settings
+/**
+ * 检测是否为 iOS 系统
+ */
+function _isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+/**
+ * 检测是否以 PWA 模式运行（添加到主屏幕）
+ */
+function _isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
+}
+
+/**
+ * 请求通知权限（异步，返回是否成功）
+ * iOS 特殊处理：必须先添加到主屏幕
+ */
+async function requestNotificationPermission() {
+    // iOS 未以 PWA 模式运行时，提示用户添加到主屏幕
+    if (_isIOS() && !_isStandalone()) {
+        if (typeof showToast === 'function') {
+            showToast('📱 iOS 需要先「添加到主屏幕」才能接收通知推送\n请点击 Safari 分享按钮 → 添加到主屏幕', 5000);
+        }
+        console.warn('[Notification] iOS 需要添加到主屏幕才能使用通知');
+        return false;
+    }
+
+    if (!('Notification' in window)) {
+        console.warn('[Notification] 此浏览器不支持通知');
+        return false;
+    }
+
+    if (Notification.permission === 'granted') return true;
+
+    if (Notification.permission === 'denied') {
+        if (typeof showToast === 'function') {
+            showToast('⚠️ 通知权限已被拒绝，请在浏览器设置中手动开启');
+        }
+        return false;
+    }
+
+    // 请求权限（必须由用户手势触发时效果最佳）
+    try {
+        const perm = await Notification.requestPermission();
+        console.log('[Notification] 权限结果:', perm);
+        return perm === 'granted';
+    } catch (e) {
+        console.error('[Notification] 权限请求失败:', e);
+        return false;
+    }
+}
+
+/**
+ * 发送一条系统通知（通过 Service Worker，支持后台/锁屏）
+ * @param {string} charName - 角色名（作为通知标题）
+ * @param {string} message - 消息内容（原始 body）
+ * @param {string} chatTag - 聊天标识
+ * @param {string} msgHeader - 消息头（用于类型检测）
+ */
+function sendWebNotification(charName, message, chatTag, msgHeader) {
+    // 检查是否在该聊天中启用了通知
     const s = getChatSettingsFor(chatTag);
     if (s.webNotifDisabled) return;
 
-    if (!('Notification' in window)) return;
-
-    // Only send if page is hidden (user is not looking at it)
+    // 仅在页面不可见时发送通知
     if (!document.hidden) return;
 
-    const preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
+    // 转换原始消息为用户友好的预览文本
+    let preview = message;
+    const hdr = msgHeader || '';
+    if (hdr.includes('|语音|') || hdr.includes('|VOC|')) {
+        preview = '[语音消息]';
+    } else if (hdr.includes('|图片|') || hdr.includes('|IMG|')) {
+        preview = '[图片]';
+    } else if (hdr.includes('|视频|')) {
+        preview = '[视频]';
+    } else if (hdr.includes('|表情包|')) {
+        preview = '[表情包]';
+    } else if (hdr.includes('|文件|') || hdr.includes('|FILE|')) {
+        preview = '[文件]';
+    } else if (hdr.includes('|位置|') || hdr.includes('|LOC|')) {
+        preview = '[位置]';
+    } else if (hdr.includes('|转账|') || hdr.includes('|TRANS|')) {
+        preview = '[转账]';
+    } else if (hdr.includes('|MUSIC|')) {
+        preview = '[音乐]';
+    } else if (hdr.includes('|REDPACKET|')) {
+        preview = '[红包]';
+    } else if (hdr.includes('|LINK|')) {
+        preview = '[链接]';
+    } else if (hdr.includes('|DELIVER|') || hdr.includes('|ORDER|')) {
+        preview = '[订单]';
+    } else if (hdr.includes('|通话|') || hdr.includes('|CALL|')) {
+        preview = '[通话]';
+    } else if (message.startsWith('data:image/') || message.startsWith('data:video/') || message.startsWith('data:audio/') || message.startsWith('blob:')) {
+        preview = '[媒体文件]';
+    } else {
+        preview = message.length > 80 ? message.substring(0, 80) + '...' : message;
+    }
 
-    // Find avatar for icon
-    let iconUrl = '';
+    // 查找角色头像（仅限 URL 类型，data: URI 不可用于通知图标）
+    let iconUrl = './icon.png';
     if (typeof npcCharacters !== 'undefined' && Array.isArray(npcCharacters)) {
         const npc = npcCharacters.find(n => n.name === charName);
         if (npc && npc.avatar && !npc.avatar.startsWith('data:')) {
@@ -4454,11 +4607,30 @@ function sendWebNotification(charName, message, chatTag) {
         }
     }
 
+    // === 优先通过 Service Worker 发送通知（支持后台/锁屏） ===
+    if (_swRegistration && _swRegistration.active) {
+        _swRegistration.active.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            title: charName,
+            body: preview,
+            icon: iconUrl,
+            tag: `ai-msg-${chatTag}`,
+            chatTag: chatTag,
+            charName: charName,
+            vibrate: [200, 100, 200]
+        });
+        console.log('[Notification] 已通过 SW 发送通知:', charName, preview);
+        return;
+    }
+
+    // === 降级方案：直接使用 Notification API（仅前台/标签页切换有效） ===
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
     try {
         const notif = new Notification(charName, {
             body: preview,
-            icon: iconUrl || undefined,
-            tag: `ai-msg-${chatTag}`, // Prevent duplicate notifications
+            icon: iconUrl,
+            tag: `ai-msg-${chatTag}`,
             silent: false
         });
 
@@ -4470,11 +4642,55 @@ function sendWebNotification(charName, message, chatTag) {
             notif.close();
         };
 
-        // Auto close after 6 seconds
         setTimeout(() => notif.close(), 6000);
     } catch (e) {
-        console.warn('[Web Notification] Failed:', e);
+        console.warn('[Notification] 降级通知失败:', e);
     }
+}
+
+/**
+ * 发送测试通知 — 验证 SW 通知是否正常工作
+ * 包含标题、内容、图标和震动反馈
+ */
+async function sendTestNotification() {
+    // 1. 确保有权限
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+        if (typeof showToast === 'function') showToast('⚠️ 未获得通知权限');
+        return;
+    }
+
+    // 2. 通过 SW 发送
+    if (_swRegistration && _swRegistration.active) {
+        _swRegistration.active.postMessage({
+            type: 'SHOW_NOTIFICATION',
+            title: '砖头机',
+            body: '🎉 通知功能正常！你将能在后台/锁屏时收到角色消息。',
+            icon: './icon.png',
+            tag: 'test-notification',
+            chatTag: '',
+            charName: '',
+            vibrate: [100, 50, 100, 50, 200]
+        });
+        if (typeof showToast === 'function') showToast('✅ 测试通知已发送');
+    } else {
+        // SW 未就绪，降级
+        try {
+            new Notification('砖头机', {
+                body: '🎉 通知功能正常！（降级模式 - 未使用 Service Worker）',
+                icon: './icon.png',
+                tag: 'test-notification'
+            });
+            if (typeof showToast === 'function') showToast('✅ 测试通知已发送（降级模式）');
+        } catch (e) {
+            if (typeof showToast === 'function') showToast('❌ 通知发送失败: ' + e.message);
+        }
+    }
+}
+
+// Request notification permission (legacy compat entry point)
+function requestNotificationPermissionLegacy() {
+    requestNotificationPermission();
 }
 
 // ===== Web Notification Toggle =====
@@ -4486,7 +4702,7 @@ function toggleWebNotification() {
     const s = getChatSettings();
 
     if (el.checked) {
-        // Always save setting first (force mode)
+        // 保存设置
         s.webNotifDisabled = false;
         saveChatSettingsObj(s);
 
@@ -4496,24 +4712,23 @@ function toggleWebNotification() {
             statusEl.style.color = '#4caf50';
         }
 
-        // Try to request permission in background (best effort, won't block toggle)
-        if ('Notification' in window) {
-            Notification.requestPermission().then(perm => {
-                if (perm === 'granted') {
-                    try {
-                        new Notification('通知已开启', {
-                            body: '你现在可以接收角色的消息通知了。',
-                            tag: 'test-notif'
-                        });
-                    } catch (e) { }
-                } else if (statusEl) {
+        // 请求通知权限并发送测试通知（通过 SW）
+        requestNotificationPermission().then(granted => {
+            if (granted) {
+                // 通过 SW 发送确认通知
+                sendTestNotification();
+            } else if (statusEl) {
+                // iOS 未添加到主屏幕 或 权限被拒绝
+                if (_isIOS() && !_isStandalone()) {
+                    statusEl.textContent = '通知推送已开启（iOS 需先添加到主屏幕）';
+                } else {
                     statusEl.textContent = '通知推送已开启（浏览器权限未授予，应用内通知仍有效）';
-                    statusEl.style.color = '#ff9800';
                 }
-            }).catch(() => { });
-        }
+                statusEl.style.color = '#ff9800';
+            }
+        });
     } else {
-        // Disable
+        // 关闭通知
         s.webNotifDisabled = true;
         saveChatSettingsObj(s);
         if (statusEl) {
@@ -10843,6 +11058,7 @@ async function init() {
     // try { loadInitialChat(); setTimeout(loadInitialChat, 500); } catch (e) { }
     checkUpdate(); // Check for updates
     initKeepAlive(); // Start background keep-alive if enabled
+    registerServiceWorker(); // Register PWA Service Worker
 }
 
 // Attach globally
@@ -13312,9 +13528,43 @@ function showAINotification(charName, message, options = {}) {
     const notification = document.createElement('div');
     notification.className = 'ai-push-notification';
 
-    // Truncate message preview
-    const preview = message.length > 60 ? message.substring(0, 60) + '...' : message;
-    const appName = options.appName || '微信';
+    // Convert raw message body to user-friendly preview
+    let preview = message;
+    const msgHeader = options.header || '';
+    // Detect message type from header markers
+    if (msgHeader.includes('|语音|') || msgHeader.includes('|VOC|')) {
+        preview = '[语音消息]';
+    } else if (msgHeader.includes('|图片|') || msgHeader.includes('|IMG|')) {
+        preview = '[图片]';
+    } else if (msgHeader.includes('|视频|')) {
+        preview = '[视频]';
+    } else if (msgHeader.includes('|表情包|')) {
+        preview = '[表情包]';
+    } else if (msgHeader.includes('|文件|') || msgHeader.includes('|FILE|')) {
+        preview = '[文件]';
+    } else if (msgHeader.includes('|位置|') || msgHeader.includes('|LOC|')) {
+        preview = '[位置]';
+    } else if (msgHeader.includes('|转账|') || msgHeader.includes('|TRANS|')) {
+        preview = '[转账]';
+    } else if (msgHeader.includes('|MUSIC|')) {
+        preview = '[音乐]';
+    } else if (msgHeader.includes('|REDPACKET|')) {
+        preview = '[红包]';
+    } else if (msgHeader.includes('|LINK|')) {
+        preview = '[链接]';
+    } else if (msgHeader.includes('|DELIVER|') || msgHeader.includes('|ORDER|')) {
+        preview = '[订单]';
+    } else if (msgHeader.includes('|通话|') || msgHeader.includes('|CALL|')) {
+        preview = '[通话]';
+    } else if (msgHeader.includes('|POMO|')) {
+        preview = '[番茄钟]';
+    } else if (msgHeader.includes('|TOYINVITE|')) {
+        preview = '[玩具邀请]';
+    } else if (message.startsWith('data:image/') || message.startsWith('data:video/') || message.startsWith('data:audio/') || message.startsWith('blob:')) {
+        preview = '[媒体文件]';
+    } else {
+        preview = message.length > 60 ? message.substring(0, 60) + '...' : message;
+    }
     const timeStr = options.time || (typeof getTime === 'function' ? getTime(true) : '');
 
     notification.innerHTML = `
@@ -13322,10 +13572,9 @@ function showAINotification(charName, message, options = {}) {
             <img src="${avatar || placeholderAvatar}" style="width:36px;height:36px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#f0f0f0;">
             <div style="flex:1;min-width:0;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-                    <span style="font-size:13px;font-weight:600;color:#1c1c1e;">${appName}</span>
+                    <span style="font-size:14px;font-weight:600;color:#1c1c1e;">${charName}</span>
                     <span style="font-size:11px;color:#8e8e93;flex-shrink:0;">${timeStr}</span>
                 </div>
-                <div style="font-size:14px;font-weight:600;color:#1c1c1e;margin-bottom:1px;">${charName}</div>
                 <div style="font-size:13px;color:#3c3c43;opacity:0.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${preview}</div>
             </div>
         </div>
@@ -13717,8 +13966,7 @@ function renderMoments() {
                             评论
                         </button>
                         <button class="moment-popup-btn" onclick="triggerAICommentOnPost('${post.id}')">
-                            <svg viewBox="0 0 24 24"><path d="M12 2l2.09 6.26L20.18 9.27l-5.09 3.89L17.09 19.5 12 15.77 6.91 19.5l2-6.34L3.82 9.27l6.09-1.01z" fill="rgba(255,255,255,0.9)"></path></svg>
-                            AI回复${momentsInteractors[post.id] && momentsInteractors[post.id].length > 0 ? '<span class="interactor-badge">' + momentsInteractors[post.id].length + '</span>' : ''}
+                            AI回复${momentsInteractors[post.id] && momentsInteractors[post.id].length > 0 ? '<span style="display:inline-flex;align-items:center;justify-content:center;width:10px;height:10px;border-radius:50%;background:#bbb;color:#fff;font-size:6px;margin-left:1px;position:relative;top:1px;">' + momentsInteractors[post.id].length + '</span>' : ''}
                         </button>
                         <button class="moment-popup-btn" onclick="openInteractorPicker('${post.id}')">
                             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" fill="none" stroke="currentColor" stroke-width="1.5"></path><circle cx="9" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.5"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87" fill="none" stroke="currentColor" stroke-width="1.5"></path><path d="M16 3.13a4 4 0 0 1 0 7.75" fill="none" stroke="currentColor" stroke-width="1.5"></path></svg>
@@ -14071,10 +14319,18 @@ function renderComposeImages() {
 
     let html = '';
     composeImages.forEach((img, index) => {
-        html += `<div class="compose-image-item">
-                <img src="${img}">
-                <button class="compose-image-remove" onclick="removeComposeImage(${index})">×</button>
-            </div>`;
+        if (typeof img === 'string' && img.startsWith('txt:')) {
+            const desc = img.substring(4);
+            html += `<div class="compose-image-item" style="display:flex;align-items:center;justify-content:center;padding:6px;text-align:center;background:#f0f0f0;">
+                    <span style="font-size:11px;color:#666;word-break:break-all;line-height:1.3;overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;">${escapeHtml(desc)}</span>
+                    <button class="compose-image-remove" onclick="removeComposeImage(${index})">×</button>
+                </div>`;
+        } else {
+            html += `<div class="compose-image-item">
+                    <img src="${img}">
+                    <button class="compose-image-remove" onclick="removeComposeImage(${index})">×</button>
+                </div>`;
+        }
     });
 
     if (composeImages.length < 9) {
@@ -14083,10 +14339,29 @@ function renderComposeImages() {
                     <path d="M12 5v14M5 12h14" stroke-linecap="round"></path>
                 </svg>
             </div>`;
+        html += `<div class="compose-add-image" onclick="addTextMomentImage()" style="font-size:11px;color:#999;flex-direction:column;gap:2px;">
+                <svg viewBox="0 0 24 24" style="width:20px;height:20px;">
+                    <path d="M12 5v14M5 12h14" stroke-linecap="round"></path>
+                </svg>
+                <span>文字图</span>
+            </div>`;
     }
 
     grid.innerHTML = html;
 }
+
+function addTextMomentImage() {
+    if (composeImages.length >= 9) {
+        showToast('最多添加9张图片');
+        return;
+    }
+    const desc = prompt('请输入图片的文字描述：');
+    if (desc && desc.trim()) {
+        composeImages.push('txt:' + desc.trim());
+        renderComposeImages();
+    }
+}
+window.addTextMomentImage = addTextMomentImage;
 
 function removeComposeImage(index) {
     composeImages.splice(index, 1);
@@ -14235,7 +14510,7 @@ ${memoryContext ? memoryContext + '\n' : ''}${chatContext ? '最近和' + curren
 2. 可以参考聊天记录中的事件或话题，增加沉浸感
 3. 内容可以是日常感悟、分享心情、记录生活等
 4. 30-80字，不要太长
-5. 如果你想配一张或多张图片，请在文中加入 [图片：照片的详细描述]
+5. 请配1-3张图片，每张用 [图片：照片的描述] 格式，描述要具体生动
 6. 只输出正文和图片标签，不要加引号、标签或前缀`;
 
             const messages = [
@@ -14458,6 +14733,12 @@ function openInteractorPicker(postId) {
     let html = '<div class="interactor-picker-overlay" id="interactor-picker-overlay" onclick="closeInteractorPicker()">';
     html += '<div class="interactor-picker-panel" onclick="event.stopPropagation()">';
     html += '<div class="interactor-picker-title">选择互动角色</div>';
+    // Select-all checkbox row
+    const allSelected = available.every(npc => currentSelected.includes(npc.name));
+    html += `<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--pink-200);cursor:pointer;user-select:none;">
+        <input type="checkbox" ${allSelected ? 'checked' : ''} onchange="if(this.checked){selectAllInteractors('${postId}')}else{deselectAllInteractors('${postId}')}" style="width:18px;height:18px;accent-color:var(--pink-500);cursor:pointer;">
+        <span style="font-size:13px;color:#666;">全选</span>
+    </label>`;
     html += '<div class="interactor-picker-list">';
 
     available.forEach(npc => {
@@ -14473,7 +14754,7 @@ function openInteractorPicker(postId) {
 
     html += '</div>';
     html += `<div class="interactor-picker-actions">
-            <button class="interactor-select-all-btn" onclick="selectAllInteractors('${postId}')">全选</button>
+            <button class="interactor-select-all-btn" onclick="closeInteractorPicker()">取消</button>
             <button class="interactor-confirm-btn" onclick="closeInteractorPicker()">确定</button>
         </div>`;
     html += '</div></div>';
@@ -14515,10 +14796,23 @@ function selectAllInteractors(postId) {
 
     const overlay = document.getElementById('interactor-picker-overlay');
     if (overlay) {
-        const inputs = overlay.querySelectorAll('input[type=checkbox]');
+        const inputs = overlay.querySelectorAll('.interactor-item input[type=checkbox]');
         inputs.forEach(input => {
             input.checked = true;
             input.closest('.interactor-item')?.classList.add('selected');
+        });
+    }
+}
+
+function deselectAllInteractors(postId) {
+    momentsInteractors[postId] = [];
+
+    const overlay = document.getElementById('interactor-picker-overlay');
+    if (overlay) {
+        const inputs = overlay.querySelectorAll('.interactor-item input[type=checkbox]');
+        inputs.forEach(input => {
+            input.checked = false;
+            input.closest('.interactor-item')?.classList.remove('selected');
         });
     }
 }
@@ -14925,6 +15219,9 @@ function toggleVConsole(on) {
     loadWebNotifUI,
     requestNotificationPermission,
     sendWebNotification,
+    // PWA Service Worker
+    registerServiceWorker,
+    sendTestNotification,
 
     // Forum (星海社区)
     openForumApp,

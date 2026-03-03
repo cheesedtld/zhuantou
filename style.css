@@ -5566,6 +5566,7 @@ textarea.setting-input {
     border-radius: 0;
     overflow: hidden;
     flex-direction: row;
+    min-width: 280px;
     box-shadow: 0 2px 12px rgba(200, 200, 200, 0.3);
     animation: popupSlideIn 0.2s ease;
     z-index: 10;
@@ -5590,8 +5591,10 @@ textarea.setting-input {
 .moment-popup-btn {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    padding: 7px 14px;
+    padding: 7px 0;
+    flex: 1;
     color: var(--pink-600);
     font-size: 13px;
     cursor: pointer;
@@ -5613,6 +5616,21 @@ textarea.setting-input {
     width: 14px;
     height: 14px;
     fill: var(--pink-600);
+}
+
+.interactor-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
+    border-radius: 8px;
+    background: #ccc;
+    color: #fff;
+    font-size: 10px;
+    padding: 0 4px;
+    margin-left: 2px;
 }
 
 /* Likes Section */
@@ -6165,7 +6183,8 @@ textarea.setting-input {
 }
 
 .interactor-picker-panel {
-    background: #fff;
+    background: var(--pink-50);
+    border: 1px solid var(--pink-200);
     border-radius: 0;
     width: 85%;
     max-width: 360px;
@@ -6173,6 +6192,7 @@ textarea.setting-input {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: 0 10px 30px rgba(200, 200, 200, 0.25);
     animation: fadeScaleIn 0.2s ease;
 }
 
@@ -6194,7 +6214,7 @@ textarea.setting-input {
     font-weight: 600;
     color: #333;
     padding: 16px 16px 12px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid var(--pink-200);
     flex-shrink: 0;
 }
 
@@ -6220,14 +6240,14 @@ textarea.setting-input {
 }
 
 .interactor-item.selected {
-    background: rgba(7, 193, 96, 0.08);
+    background: var(--pink-100);
 }
 
 .interactor-item input[type="checkbox"] {
     width: 18px;
     height: 18px;
     flex-shrink: 0;
-    accent-color: #07c160;
+    accent-color: var(--pink-500);
     cursor: pointer;
 }
 
@@ -6263,15 +6283,15 @@ textarea.setting-input {
     display: flex;
     gap: 10px;
     padding: 12px 16px;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid var(--pink-200);
     flex-shrink: 0;
 }
 
 .interactor-select-all-btn {
     flex: 1;
     padding: 10px;
-    border: 1px solid #ddd;
-    background: #fff;
+    border: 1px solid var(--pink-200);
+    background: var(--pink-50);
     border-radius: 0;
     font-size: 14px;
     color: #333;
@@ -6280,24 +6300,25 @@ textarea.setting-input {
 }
 
 .interactor-select-all-btn:hover {
-    background: #f5f5f5;
+    background: var(--pink-100);
 }
 
 .interactor-confirm-btn {
     flex: 1;
     padding: 10px;
     border: none;
-    background: #07c160;
+    background: #333;
     border-radius: 0;
     font-size: 14px;
     color: #fff;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.15s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .interactor-confirm-btn:hover {
-    background: #06ae56;
+    background: #444;
 }
 
 /* ================================
