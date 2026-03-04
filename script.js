@@ -11046,6 +11046,36 @@ async function init() {
         setTimeout(setAppHeight, 200);
     });
 
+    // Auto-enter fullscreen on first touch (PWA or browser)
+    // Hides Android system status bar for immersive experience
+    function tryFullscreen() {
+        const el = document.documentElement;
+        const rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (rfs) {
+            rfs.call(el).then(() => {
+                // Update height after fullscreen
+                setTimeout(setAppHeight, 300);
+            }).catch(() => { });
+        }
+        // Remove listener after first attempt
+        document.removeEventListener('touchstart', tryFullscreen);
+        document.removeEventListener('click', tryFullscreen);
+    }
+    // Only auto-fullscreen if running as PWA or on mobile
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches || window.matchMedia('(display-mode: fullscreen)').matches || window.navigator.standalone;
+    if (isPWA) {
+        // PWA: try immediately, then on first touch as fallback
+        try {
+            const el = document.documentElement;
+            const rfs = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (rfs) rfs.call(el).catch(() => { });
+        } catch (e) { }
+        document.addEventListener('touchstart', tryFullscreen, { once: true });
+    } else {
+        // In browser: offer fullscreen on first touch (user gesture required)
+        document.addEventListener('touchstart', tryFullscreen, { once: true });
+    }
+
     // Initialize IndexedDB for chat history storage
     try {
         await initChatDB();
