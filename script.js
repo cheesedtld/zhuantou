@@ -217,9 +217,9 @@ async function migrateFromLocalStorage() {
 }
 
 
-const APP_VERSION = '1.0.6';
-const BUILD_VERSION = '2026-3-4-1';
-const UPDATE_LOG = 'v1.0.0\n砖头机初始内测版\nv1.0.1\n修复了部分bug\n增加酒馆角色卡json导入\n增加ai角色边回消息边回朋友圈？的功能\n增加一些零零散散小功能\nv1.0.2\n修复部分bug\n完善酒馆json导入功能\n增加听歌功能,可导入网易云音乐的分享链接（支持vip歌曲）也可上传url或文件\n增加番茄钟功能，有学�?工作、运动两种可选（可能没啥区别）\n增加tts缓存，最多可缓存50条语音消息\nv1.0.3\n修复一些bug\n注意注意！备份一下数据，正在进行储存升级，请先行备份以免数据丢失\nv1.0.4\n储存升级，不再局限于浏览器的5MB储存\n修复一些bug\nv1.0.5\n重构TTS，CORS留空即可应用，现在应该更稳定了！\n修改一些我强迫症看着别扭的UI\n修复一些bug\nv1.0.6\n修复一些bug和ui\n修复主动发消息和发动态功能，现在可以设定主动发间隔时长和次数、完成后自动关闭\n新增了几个TTS模型可选择';
+const APP_VERSION = '1.0.7';
+const BUILD_VERSION = '2026-3-4-2';
+const UPDATE_LOG = 'v1.0.0\n砖头机初始内测版\nv1.0.1\n修复了部分bug\n增加酒馆角色卡json导入\n增加ai角色边回消息边回朋友圈？的功能\n增加一些零零散散小功能\nv1.0.2\n修复部分bug\n完善酒馆json导入功能\n增加听歌功能,可导入网易云音乐的分享链接（支持vip歌曲）也可上传url或文件\n增加番茄钟功能，有学�?工作、运动两种可选（可能没啥区别）\n增加tts缓存，最多可缓存50条语音消息\nv1.0.3\n修复一些bug\n注意注意！备份一下数据，正在进行储存升级，请先行备份以免数据丢失\nv1.0.4\n储存升级，不再局限于浏览器的5MB储存\n修复一些bug\nv1.0.5\n重构TTS，CORS留空即可应用，现在应该更稳定了！\n修改一些我强迫症看着别扭的UI\n修复一些bug\nv1.0.6\n修复一些bug和ui\n修复主动发消息和发动态功能，现在可以设定主动发间隔时长和次数、完成后自动关闭\n新增了几个TTS模型可选择\nv.1.0.7\n主界面布局修复，现在电脑打开也能正常显示了\n新增收藏，聊天消息长按可收藏，再主屏幕收藏中可查看\n修复一些bug和ui';
 function checkUpdate() {
     const lastVersion = localStorage.getItem('faye-phone-version');
     if (lastVersion !== APP_VERSION) {
@@ -16274,30 +16274,47 @@ if (document.readyState === 'loading') {
 // ========== 收藏系统 ==========
 const FAVORITES_KEY = 'faye-phone-favorites';
 
-function getFavorites() {
+async function getFavorites() {
     try {
+        let docs;
+        if (typeof getChatHistory === 'function') {
+            docs = await getChatHistory('sys_favorites');
+        }
+        if (docs && docs.length > 0) return docs;
+
+        // Migration from localStorage
         const raw = localStorage.getItem(FAVORITES_KEY);
-        return raw ? JSON.parse(raw) : [];
+        if (raw) {
+            const favs = JSON.parse(raw);
+            if (favs && Array.isArray(favs) && favs.length > 0) {
+                if (typeof saveChatHistory === 'function') {
+                    await saveChatHistory('sys_favorites', favs);
+                }
+                localStorage.removeItem(FAVORITES_KEY); // Clean up old data
+                return favs;
+            }
+        }
+        return [];
     } catch (e) { return []; }
 }
 
-function saveFavorites(favs) {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+async function saveFavorites(favs) {
+    try {
+        if (typeof saveChatHistory === 'function') {
+            await saveChatHistory('sys_favorites', favs);
+        } else {
+            localStorage.setItem(FAVORITES_KEY, JSON.stringify(favs));
+        }
+    } catch (e) { }
 }
 
-window.addToFavorites = function (el) {
+window.addToFavorites = async function (el) {
     const row = el.closest('.message-row');
     if (!row) { showToast('收藏失败'); return; }
 
     const isUser = row.classList.contains('sent');
     const header = el.dataset.fullHeader || '';
     const rawBody = el.dataset.rawBody || el.textContent || '';
-
-    // Extract body text
-    let body = rawBody;
-    // Try to get cleaner text from msg-text div
-    const msgTextEl = el.querySelector('.msg-text');
-    if (msgTextEl) body = msgTextEl.textContent || rawBody;
 
     // Determine sender
     const nameEl = row.querySelector('.msg-name');
@@ -16309,22 +16326,35 @@ window.addToFavorites = function (el) {
 
     // Determine message type
     let msgType = 'text';
-    if (el.classList.contains('voice-card-container')) msgType = 'voice';
+    if (el.classList.contains('voice-card-container') || el.classList.contains('real-audio-card')) msgType = 'voice';
     else if (el.classList.contains('photo-card')) msgType = 'photo';
     else if (el.classList.contains('sticker-bubble')) msgType = 'sticker';
     else if (el.classList.contains('location-card')) msgType = 'location';
     else if (el.classList.contains('transfer-card')) msgType = 'transfer';
     else if (el.classList.contains('file-card')) msgType = 'file';
-    else if (el.classList.contains('link-card')) msgType = 'link';
+    else if (el.classList.contains('link-card') || el.classList.contains('music-card')) msgType = 'link';
+
+    // Extract body text
+    let body = rawBody;
+    if (msgType === 'text') {
+        const msgTextEl = el.querySelector('.msg-text');
+        if (msgTextEl) body = msgTextEl.textContent || rawBody;
+    }
 
     // Chat context
     const chatTag = currentChatTag || '';
     const charName = getCharName() || '';
     const userName = getUserName() || '';
 
+    let storeBody = body;
+    // For normal text, truncating to 1000 is fine, but for media we need the full base64 data URL
+    if (msgType === 'text') {
+        if (storeBody.length > 2000) storeBody = storeBody.substring(0, 2000);
+    }
+
     const favItem = {
         id: Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-        body: body.substring(0, 500),
+        body: storeBody,
         header: header,
         sender: senderName,
         isUser: isUser,
@@ -16336,13 +16366,13 @@ window.addToFavorites = function (el) {
         savedAt: new Date().toISOString()
     };
 
-    const favs = getFavorites();
+    const favs = await getFavorites();
     favs.unshift(favItem);
-    saveFavorites(favs);
+    await saveFavorites(favs);
     showToast('⭐ 已收藏');
 };
 
-window.openFavoritesApp = function () {
+window.openFavoritesApp = async function () {
     const homeScreen = document.getElementById('home-screen');
     if (homeScreen) homeScreen.style.display = 'none';
     const favScreen = document.getElementById('favorites-screen');
@@ -16350,13 +16380,13 @@ window.openFavoritesApp = function () {
         favScreen.style.display = 'flex';
         favScreen.style.flexDirection = 'column';
     }
-    renderFavorites();
+    await renderFavorites();
 };
 
-function renderFavorites() {
+async function renderFavorites() {
     const container = document.getElementById('favorites-body');
     if (!container) return;
-    const favs = getFavorites();
+    const favs = await getFavorites();
 
     if (favs.length === 0) {
         container.innerHTML = '<div style="text-align:center; color:#999; padding:60px 20px; font-size:14px;">暂无收藏<br><span style="font-size:12px; color:#bbb;">长按聊天消息可添加收藏</span></div>';
@@ -16381,25 +16411,56 @@ function renderFavorites() {
             </div>`;
 
         items.forEach(fav => {
-            const typeLabel = { voice: '🎤', photo: '🖼️', sticker: '😊', location: '📍', transfer: '💰', file: '📄', link: '🔗', text: '' }[fav.type] || '';
+            const typeLabel = { voice: '🎤', photo: '🖼️', sticker: '😊', location: '📍', transfer: '💰', file: '📄', link: '🔗', music: '🎵', text: '' }[fav.type] || '';
             const savedDate = fav.savedAt ? new Date(fav.savedAt).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
-            const bodyPreview = (fav.body || '').replace(/<[^>]+>/g, '').substring(0, 80);
 
-            html += `<div class="fav-item" data-fav-id="${fav.id}" style="background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <div style="font-size:12px; font-weight:bold; color:${fav.isUser ? '#888' : '#555'};">
+            let bodyPreview = (fav.body || '').replace(/<[^>]+>/g, '').substring(0, 80);
+            let richHtml = '';
+
+            if (fav.type === 'voice') {
+                if (fav.body.startsWith('data:audio') || fav.body.startsWith('blob:') || fav.body.startsWith('http')) {
+                    bodyPreview = '[音频语音]';
+                    let audioSrc = fav.body;
+                    richHtml = `<audio controls src="${audioSrc}" style="width:100%; height:36px; margin-top:8px; border-radius:24px; outline:none; display:block;"></audio>`;
+                } else {
+                    const parts = fav.body.split('|');
+                    const dur = parts[0] ? parseInt(parts[0]) + '"' : '';
+                    const txt = parts.slice(1).join('|');
+                    bodyPreview = txt ? `${dur} ${txt}` : `${dur} [语音]`;
+                }
+            } else if (fav.type === 'photo' || fav.type === 'sticker') {
+                let src = fav.body;
+                const mdMatch = src.match(/!\[.*?\]\((.*?)\)/);
+                const imgTagMatch = src.match(/<img>(.*?)<\/img>/);
+                if (mdMatch) src = mdMatch[1];
+                else if (imgTagMatch) src = imgTagMatch[1];
+                else if (src.includes('|')) src = src.split('|')[0];
+
+                bodyPreview = fav.type === 'photo' ? '[图片]' : '[表情包]';
+                if (src && (src.startsWith('http') || src.startsWith('data:') || src.startsWith('/'))) {
+                    richHtml = `<img src="${src}" style="max-width:140px; max-height:140px; border-radius:8px; margin-top:8px; object-fit:cover; display:block; border:1px solid #f0f0f0;">`;
+                }
+            } else if (fav.type === 'link' || fav.type === 'music') {
+                const parts = fav.body.split('|');
+                bodyPreview = parts[0] ? `[链接] ${parts[0]}` : '[链接]';
+            }
+
+            html += `<div class="fav-item" data-fav-id="${fav.id}" style="background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:12px; box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div style="font-size:12px; font-weight:bold; color:${fav.isUser ? '#7E57C2' : '#555'};">
                         ${fav.sender || '未知'}
-                        <span style="font-weight:normal; color:#bbb; margin-left:4px;">${fav.time || ''}</span>
+                        <span style="font-weight:normal; color:#bbb; margin-left:6px;">${fav.time || ''}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
                         <span style="font-size:10px; color:#ccc;">${savedDate}</span>
-                        <div onclick="removeFavorite('${fav.id}')" style="cursor:pointer; padding:2px;">
-                            <img src="https://api.iconify.design/mdi:close-circle-outline.svg" style="width:16px; height:16px; opacity:0.35;">
+                        <div onclick="removeFavorite('${fav.id}')" style="cursor:pointer; padding:2px; display:flex; align-items:center; justify-content:center;">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ccc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
                         </div>
                     </div>
                 </div>
-                <div style="font-size:13px; color:#333; line-height:1.5; word-break:break-word;">
-                    ${typeLabel ? typeLabel + ' ' : ''}${bodyPreview || '[空消息]'}
+                <div style="font-size:14px; color:#333; line-height:1.5; word-break:break-word;">
+                    ${typeLabel ? `<span style="opacity:0.8;font-size:12px;margin-right:2px">${typeLabel}</span> ` : ''}${bodyPreview || '[空消息]'}
+                    ${richHtml}
                 </div>
             </div>`;
         });
@@ -16410,10 +16471,10 @@ function renderFavorites() {
     container.innerHTML = html;
 }
 
-window.removeFavorite = function (id) {
-    let favs = getFavorites();
+window.removeFavorite = async function (id) {
+    let favs = await getFavorites();
     favs = favs.filter(f => f.id !== id);
-    saveFavorites(favs);
+    await saveFavorites(favs);
     // Animate removal
     const el = document.querySelector(`.fav-item[data-fav-id="${id}"]`);
     if (el) {
