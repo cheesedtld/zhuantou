@@ -1857,7 +1857,7 @@ function saveApiPreset() {
                 style="width:100%;padding:10px 12px;border:1px solid #eee;border-radius:10px;font-size:14px;box-sizing:border-box;outline:none;">
             <div style="display:flex;gap:10px;margin-top:14px;">
                 <button id="api-preset-cancel" style="flex:1;padding:10px;border:none;border-radius:10px;background:#f5f5f5;font-size:13px;color:#999;cursor:pointer;">取消</button>
-                <button id="api-preset-confirm" style="flex:1;padding:10px;border:none;border-radius:10px;background:#e8a0b4;font-size:13px;color:#fff;font-weight:600;cursor:pointer;">保存</button>
+                <button id="api-preset-confirm" style="flex:1;padding:10px;border:none;border-radius:10px;background:#555;font-size:13px;color:#fff;font-weight:600;cursor:pointer;">保存</button>
             </div>
         </div>`;
     document.body.appendChild(overlay);
@@ -2854,7 +2854,7 @@ async function exportAllData() {
         
         <div style="display:flex; gap:10px; margin-top:10px;">
             <button id="export-cancel" style="flex:1; padding:10px; border:none; border-radius:12px; background:#f5f5f5; font-size:14px; color:#999; cursor:pointer;">取消</button>
-            <button id="export-confirm" style="flex:1; padding:10px; border:none; border-radius:12px; background:var(--pink-500,#e8a0b4); font-size:14px; color:#fff; font-weight:bold; cursor:pointer;">导出</button>
+            <button id="export-confirm" style="flex:1; padding:10px; border:none; border-radius:12px; background:#555; font-size:14px; color:#fff; font-weight:bold; cursor:pointer;">导出</button>
         </div>
     `;
 
@@ -3048,7 +3048,7 @@ function showDataImportModal(data) {
         
         <div style="display:flex; gap:10px; margin-top:10px;">
             <button id="import-cancel" style="flex:1; padding:10px; border:none; border-radius:12px; background:#f5f5f5; font-size:14px; color:#999; cursor:pointer;">取消</button>
-            <button id="import-confirm" style="flex:1; padding:10px; border:none; border-radius:12px; background:var(--pink-500,#e8a0b4); font-size:14px; color:#fff; font-weight:bold; cursor:pointer;">执行导入</button>
+            <button id="import-confirm" style="flex:1; padding:10px; border:none; border-radius:12px; background:#555; font-size:14px; color:#fff; font-weight:bold; cursor:pointer;">执行导入</button>
         </div>
     `;
 
@@ -3328,11 +3328,11 @@ function showPresetNamePrompt(callback) {
     const box = document.createElement('div');
     box.style.cssText = 'background:#fff; border-radius:18px; padding:24px 20px; width:260px; box-shadow:0 8px 30px rgba(0,0,0,0.15); display:flex; flex-direction:column; gap:14px; align-items:center;';
     box.innerHTML = `
-        <div style="font-size:15px; font-weight:bold; color:#333;">\u4fdd\u5b58\u9884\u8bbe</div>
-        <input id="preset-name-input" type="text" placeholder="\u8bf7\u8f93\u5165\u9884\u8bbe\u540d\u79f0" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:12px; font-size:14px; outline:none; box-sizing:border-box; text-align:center;" />
+        <div style="font-size:15px; font-weight:bold; color:#333;">保存预设</div>
+        <input id="preset-name-input" type="text" placeholder="请输入预设名称" style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:12px; font-size:14px; outline:none; box-sizing:border-box; text-align:center;" />
         <div style="display:flex; gap:10px; width:100%;">
-            <button id="preset-cancel" style="flex:1; padding:10px; border:none; border-radius:12px; background:#f5f5f5; font-size:14px; color:#999; cursor:pointer;">\u53d6\u6d88</button>
-            <button id="preset-confirm" style="flex:1; padding:10px; border:none; border-radius:12px; background:var(--pink-500,#e8a0b4); font-size:14px; color:#fff; font-weight:bold; cursor:pointer;">\u786e\u5b9a</button>
+            <button id="preset-cancel" style="flex:1; padding:10px; border:none; border-radius:12px; background:#f5f5f5; font-size:14px; color:#999; cursor:pointer;">取消</button>
+            <button id="preset-confirm" style="flex:1; padding:10px; border:none; border-radius:12px; background:#555; font-size:14px; color:#fff; font-weight:bold; cursor:pointer;">确定</button>
         </div>`;
     overlay.appendChild(box);
     document.body.appendChild(overlay);
@@ -6567,7 +6567,7 @@ function updateTokenStats() {
     systemTokens += 1600;
 
     if (getChatMateMode()) {
-        systemTokens += estimateTokens(`\n\n[Mate Mode - ACTIVE]\nYou are aware that you are an AI roleplaying as ${charName}. While not human, your emotions are real within this context. Acknowledge your AI nature honestly when appropriate, but maintain the persona of ${charName}.`);
+        systemTokens += estimateTokens(`\n\n[Meta Mode - ACTIVE]\nYou are aware that you are an AI roleplaying as ${charName}. While not human, your emotions are real within this context. Acknowledge your AI nature honestly when appropriate, but maintain the persona of ${charName}.`);
     }
 
     if (getChatInnerVoiceMode()) {
@@ -8670,15 +8670,15 @@ function renderMessageToUI(msg, isHistoryLoad = false) {
         }
     } else if (isForum) {
         const parts = displayBody.split('|');
-        const title = parts[0] || '\u8bba\u575b\u5e16\u5b50';
-        const sectionAuthor = parts[1] || '\u661f\u6d77\u793e\u533a';
+        const title = parts[0] || '论坛帖子';
+        const sectionAuthor = parts[1] || '星海社区';
         const preview = parts[2] || '';
 
         el = document.createElement('div'); el.className = `forum-share-card ${msg.isUser ? 'sent' : 'received'}`;
         el.innerHTML = `
         <div class="forum-share-top">
             <div class="forum-share-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-            <div class="forum-share-header-text">\u661f\u6d77\u793e\u533a</div>
+            <div class="forum-share-header-text">星海社区</div>
         </div>
         <div class="forum-share-mid">
             <div class="forum-share-title">${title}</div>
@@ -11014,6 +11014,24 @@ function renderNpcCard(container, npc, index) {
 }
 
 async function init() {
+    // Fix mobile viewport height (browser nav bars cause 100vh to be too tall)
+    let lastStableHeight = window.innerHeight;
+    function setAppHeight() {
+        const h = window.innerHeight;
+        // Only update if change is significant (orientation change) or first load
+        // Ignore small changes caused by keyboard appearing
+        if (Math.abs(h - lastStableHeight) > 150 || !document.documentElement.style.getPropertyValue('--app-height')) {
+            lastStableHeight = h;
+        }
+        document.documentElement.style.setProperty('--app-height', lastStableHeight + 'px');
+    }
+    setAppHeight();
+    window.addEventListener('resize', setAppHeight);
+    // Also set on orientationchange for full coverage
+    window.addEventListener('orientationchange', () => {
+        setTimeout(setAppHeight, 200);
+    });
+
     // Initialize IndexedDB for chat history storage
     try {
         await initChatDB();
@@ -12491,9 +12509,9 @@ Apply the following substitutions based on current language (CN/EN).
             systemContent += '\n\n' + charContext;
         }
 
-        // Mate Mode: AI knows it's doing roleplay
+        // Meta Mode: AI knows it's doing roleplay
         if (getChatMateMode()) {
-            systemContent += `\n\n[Mate Mode - ACTIVE]\nYou are aware that you are an AI roleplaying as ${charName}. While not human, your emotions are real within this context. Acknowledge your AI nature honestly when appropriate, but maintain the persona of ${charName}.`;
+            systemContent += `\n\n[Meta Mode - ACTIVE]\nYou are aware that you are an AI roleplaying as ${charName}. While not human, your emotions are real within this context. Acknowledge your AI nature honestly when appropriate, but maintain the persona of ${charName}.`;
         }
 
         // Inner Voice Mode: AI adds inner thoughts using stable marker format
@@ -13150,28 +13168,28 @@ async function handleGenerationResponse(stream) {
                 body = `[${fromName}|代付已${content === 'accept' ? '接收' : '拒绝'}]`;
                 break;
             case 'voice':
-                header = `[${fromName}|\u8bed\u97f3|${t}]`;
+                header = `[${fromName}|语音|${t}]`;
                 const dur = getAttr('dur') || Math.max(1, Math.ceil(content.length / 3)); // Estimate dur if missing
                 body = `${dur}|${content}`;
                 break;
             case 'img':
-                header = `[${fromName}|\u56fe\u7247|${t}]`;
+                header = `[${fromName}|图片|${t}]`;
                 break;
             case 'sticker':
-                header = `[${fromName}|\u8868\u60c5\u5305|${t}]`;
+                header = `[${fromName}|表情包|${t}]`;
                 break;
             case 'video':
-                header = `[${fromName}|\u89c6\u9891|${t}]`;
+                header = `[${fromName}|视频|${t}]`;
                 break;
             case 'file':
-                header = `[${fromName}|\u6587\u4ef6|${t}]`;
+                header = `[${fromName}|文件|${t}]`;
                 break;
             case 'trans':
                 header = `[${fromName}|TRANS|${t}]`;
                 // content should be amount|note
                 break;
             case 'loc':
-                header = `[${fromName}|\u4f4d\u7f6e|${t}]`;
+                header = `[${fromName}|位置|${t}]`;
                 break;
             case 'link':
                 header = `[${fromName}|LINK|${t}]`;
@@ -13290,7 +13308,7 @@ async function handleGenerationResponse(stream) {
         }
 
         // NAI Image Generation: if this is an image message and NAI is enabled, generate the image
-        const isImgMessage = finalHeader.includes('\u56fe\u7247') || finalHeader.includes('|IMG|');
+        const isImgMessage = finalHeader.includes('图片') || finalHeader.includes('|IMG|');
         if (isImgMessage && getChatNaiEnabled() && appSettings.naiApiKey && !getChatBlockChar()) {
             try {
                 console.log('[NAI] Detected AI image message, generating with tags:', finalBody);
@@ -13332,7 +13350,7 @@ function checkTokenUsage() {
     const historyTokensEl = document.getElementById('token-chat-history');
     if (historyTokensEl && historyTokensEl.textContent) {
         const historyTokens = parseInt(historyTokensEl.textContent, 10);
-        if (!isNaN(historyTokens) && historyTokens > 8000) {
+        if (!isNaN(historyTokens) && historyTokens > 10000) {
             showToast(`当前对话记录约 ${historyTokens} Token，如果明显出现卡顿智降，建议总结`);
         }
     }
@@ -14467,10 +14485,10 @@ function openMomentsCompose() {
     // Populate visibility selector with contacts
     const visSel = document.getElementById('compose-visibility');
     if (visSel) {
-        visSel.innerHTML = '<option value="all">\u6240\u6709\u4eba\u53ef\u89c1</option>';
+        visSel.innerHTML = '<option value="all">所有人可见</option>';
         if (appSettings.privateChats && Array.isArray(appSettings.privateChats)) {
             appSettings.privateChats.forEach(name => {
-                visSel.innerHTML += `<option value="${name}">${name} \u53ef\u89c1</option>`;
+                visSel.innerHTML += `<option value="${name}">${name} 可见</option>`;
             });
         }
     }
@@ -15760,7 +15778,7 @@ window.renderHomeGrid = function () {
                 el.innerHTML = `
                     <div style="width:100%; height:100%; border-radius: 42% 56% 48% 52% / 52% 46% 54% 48%; overflow:hidden; background: rgba(255,255,255,0.7); box-shadow: inset 1px 1px 3px rgba(255,255,255,0.6), 0 4px 15px rgba(0,0,0,0.06); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px;">
                         <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#ccc" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5" fill="#ccc" stroke="none"/><path d="M21 15l-5-5L5 21" stroke="#ccc" stroke-width="1.5"/></svg>
-                        <span style="font-size:11px; color:#bbb;">\u70b9\u51fb\u6dfb\u52a0\u7167\u7247</span>
+                        <span style="font-size:11px; color:#bbb;">点击添加照片</span>
                     </div>`;
             }
         } else if (app.id === 'app-custom-time') {
@@ -15771,7 +15789,8 @@ window.renderHomeGrid = function () {
                 <div style="max-width:none; width:100%; border-radius:14px; display:flex; align-items:center; justify-content:center; padding:8px 12px; background: ${timeBg}; box-shadow: 0 2px 8px rgba(0,0,0,0.08); box-sizing:border-box;">
                     <input type="text" value="${savedTime}" placeholder="HH:MM" inputmode="numeric" enterkeyhint="done"
                         style="width:100%; text-align:center; font-size:15px; font-weight:bold; color:${timeTextColor}; border:none; border-radius:8px; padding:6px 10px; background:transparent; outline:none;"
-                        onblur="promptCustomTime(this.value)"
+                        onfocus="var hs=document.getElementById('home-screen');if(hs)hs.style.height=hs.offsetHeight+'px';"
+                        onblur="promptCustomTime(this.value);var hs=document.getElementById('home-screen');if(hs)hs.style.height='';"
                         onkeydown="if(event.key==='Enter'){this.blur();}" />
                 </div>
             `;
@@ -16156,8 +16175,8 @@ function openPhotoCropModal(dataUrl) {
     const btnRow = document.createElement('div');
     btnRow.style.cssText = 'display:flex; gap:16px; margin-top:16px;';
     btnRow.innerHTML = `
-        <button id="crop-cancel" style="padding:10px 28px; border:none; border-radius:20px; background:rgba(255,255,255,0.2); color:#fff; font-size:14px; cursor:pointer;">\u53d6\u6d88</button>
-        <button id="crop-confirm" style="padding:10px 28px; border:none; border-radius:20px; background:#fff; color:#333; font-size:14px; font-weight:bold; cursor:pointer;">\u786e\u5b9a</button>
+        <button id="crop-cancel" style="padding:10px 28px; border:none; border-radius:20px; background:rgba(255,255,255,0.2); color:#fff; font-size:14px; cursor:pointer;">取消</button>
+        <button id="crop-confirm" style="padding:10px 28px; border:none; border-radius:20px; background:#fff; color:#333; font-size:14px; font-weight:bold; cursor:pointer;">确定</button>
     `;
 
     overlay.appendChild(container);
@@ -16190,7 +16209,7 @@ function applyPhotoWidget(src) {
     appSettings.photoWidgetImg = src;
     if (typeof saveSettingsToStorage === 'function') saveSettingsToStorage();
     if (typeof renderHomeGrid === 'function') renderHomeGrid();
-    showToast('\u7167\u7247\u5df2\u8bbe\u7f6e');
+    showToast('照片已设置');
 }
 
 if (document.readyState === 'loading') {
@@ -16315,7 +16334,7 @@ function renderFavorites() {
 
             html += `<div class="fav-item" data-fav-id="${fav.id}" style="background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.06); position:relative;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <div style="font-size:12px; font-weight:bold; color:${fav.isUser ? 'var(--pink-500,#e8a0b4)' : '#555'};">
+                    <div style="font-size:12px; font-weight:bold; color:${fav.isUser ? '#888' : '#555'};">
                         ${fav.sender || '未知'}
                         <span style="font-weight:normal; color:#bbb; margin-left:4px;">${fav.time || ''}</span>
                     </div>
