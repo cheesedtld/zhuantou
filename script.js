@@ -11046,45 +11046,6 @@ async function init() {
         setTimeout(setAppHeight, 200);
     });
 
-    // Fullscreen support: manual toggle + auto on first touch in browser
-    function syncFullscreenCheckbox() {
-        const cb = document.getElementById('set-fullscreen-mode');
-        if (cb) cb.checked = !!document.fullscreenElement;
-    }
-    window.toggleFullscreen = function () {
-        if (document.fullscreenElement) {
-            document.exitFullscreen().then(() => {
-                setTimeout(setAppHeight, 300);
-                syncFullscreenCheckbox();
-            }).catch(() => { });
-        } else {
-            document.documentElement.requestFullscreen().then(() => {
-                setTimeout(setAppHeight, 300);
-                syncFullscreenCheckbox();
-            }).catch(() => {
-                syncFullscreenCheckbox();
-                showToast('当前环境不支持全屏模式');
-            });
-        }
-    };
-    // Keep checkbox in sync when user exits fullscreen via system gesture
-    document.addEventListener('fullscreenchange', () => {
-        syncFullscreenCheckbox();
-        setTimeout(setAppHeight, 300);
-    });
-
-    // In regular browser (not PWA): auto-enter fullscreen on first touch
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches
-        || window.matchMedia('(display-mode: fullscreen)').matches
-        || window.navigator.standalone;
-    if (!isPWA) {
-        document.addEventListener('touchstart', function onFirstTouch() {
-            document.documentElement.requestFullscreen().then(() => {
-                setTimeout(setAppHeight, 300);
-            }).catch(() => { });
-            document.removeEventListener('touchstart', onFirstTouch);
-        }, { once: true });
-    }
 
     // Initialize IndexedDB for chat history storage
     try {
