@@ -65,7 +65,14 @@ self.addEventListener('notificationclick', (event) => {
                     return client.focus();
                 }
             }
-            return clients.openWindow(targetUrl);
+            let url = targetUrl;
+            if (chatTag) {
+                const urlObj = new URL(url, self.location.origin);
+                urlObj.searchParams.set('chat', chatTag);
+                if (charName) urlObj.searchParams.set('name', charName);
+                url = urlObj.href;
+            }
+            return clients.openWindow(url);
         })
     );
 });

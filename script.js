@@ -4175,13 +4175,13 @@ async function checkAutoInteractions() {
                 // Schedule-based auto-message check
                 if (s && s.autoMessageEnabled && s.autoMessageSchedule && s.autoMessageSchedule.length > 0) {
                     const nextTrigger = s.autoMessageSchedule[0];
-                    const timeStr = new Date(nextTrigger).toLocaleTimeString();
-                    console.log(`[AutoCheck] tag=${tag}, nextMsgTrigger=${timeStr}, inMs=${Math.round((nextTrigger - now) / 1000)}s`);
+                    // const timeStr = new Date(nextTrigger).toLocaleTimeString();
+                    // console.log(`[AutoCheck] tag=${tag}, nextMsgTrigger=${timeStr}, inMs=${Math.round((nextTrigger - now) / 1000)}s`);
                     if (now >= nextTrigger) {
-                        console.log('[AutoCheck] TRIGGERING scheduled auto message for', tag, 'at', timeStr);
+                        // console.log('[AutoCheck] TRIGGERING scheduled auto message for', tag, 'at', timeStr);
                         s.autoMessageSchedule.shift();
                         if (s.autoMessageSchedule.length === 0) {
-                            console.log('[AutoCheck] All scheduled message triggers completed for', tag);
+                            // console.log('[AutoCheck] All scheduled message triggers completed for', tag);
                             s.autoMessageEnabled = false;
                         }
                         localStorage.setItem(key, JSON.stringify(s));
@@ -4219,7 +4219,7 @@ function scheduleNextAutoCheck() {
     }
     if (soonest < Infinity) {
         const delay = Math.max(soonest - now, 1000);
-        console.log('[AutoCheck] Next trigger in', Math.round(delay / 1000) + 's at', new Date(now + delay).toLocaleTimeString());
+        // console.log('[AutoCheck] Next trigger in', Math.round(delay / 1000) + 's at', new Date(now + delay).toLocaleTimeString());
         nextAutoCheckTimer = setTimeout(checkAutoInteractions, delay);
     }
 }
@@ -4227,7 +4227,7 @@ function scheduleNextAutoCheck() {
 // When page becomes visible (phone wakes up), immediately check for missed triggers
 document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-        console.log('[AutoCheck] Page visible, checking for missed triggers');
+        // console.log('[AutoCheck] Page visible, checking for missed triggers');
         checkAutoInteractions();
     }
 });
@@ -4338,6 +4338,25 @@ ${chatContext ? '最近和' + currentUserName + '的聊天记录：\n' + chatCon
             momentsPosts.unshift(post);
             saveMomentsData();
             if (typeof renderMoments === 'function') renderMoments();
+
+            // Notify user of the new moment
+            let momentPreview = momentText;
+            if (!momentPreview && extractedImages.length > 0) momentPreview = '[图片]';
+            if (momentPreview.length > 60) momentPreview = momentPreview.substring(0, 60) + '...';
+
+            console.log(`[AutoMoment] ${npc.name} posted a new moment. Content length: ${momentText.length}`);
+
+            // Check if moments screen is visible
+            const momentsScreen = document.getElementById('moments-screen');
+            if (!momentsScreen || momentsScreen.style.display === 'none') {
+                if (typeof showAIMomentNotification === 'function') {
+                    showAIMomentNotification(npc.name, momentPreview);
+                }
+                if (typeof sendWebNotification === 'function') {
+                    // Send to Service Worker (PWA push)
+                    sendWebNotification(npc.name, `[新动态] ${momentPreview}`, 'moment', '');
+                }
+            }
         }
     } catch (e) { console.error('Auto moment error', e); }
 }
@@ -4500,13 +4519,13 @@ async function triggerAIAutoMessage(tag) {
                 timestamp: Date.now() + ((appSettings.customTime && typeof appSettings.timeOffset === 'number') ? appSettings.timeOffset : 0)
             });
         }
-        console.log('[AutoMsg] Saving', segments.length, 'new messages to', chatHistoryTag, '(total history:', history.length, ')');
+        // console.log('[AutoMsg] Saving', segments.length, 'new messages to', chatHistoryTag, '(total history:', history.length, ')');
         try {
             await saveChatHistory(chatHistoryTag, history);
-            console.log('[AutoMsg] saveChatHistory SUCCESS for', chatHistoryTag);
+            // console.log('[AutoMsg] saveChatHistory SUCCESS for', chatHistoryTag);
             // Verify save
-            const verify = await getChatHistory(chatHistoryTag);
-            console.log('[AutoMsg] Verify: stored', verify ? verify.length : 0, 'messages');
+            // const verify = await getChatHistory(chatHistoryTag);
+            // console.log('[AutoMsg] Verify: stored', verify ? verify.length : 0, 'messages');
         } catch (saveErr) {
             console.error('[AutoMsg] saveChatHistory FAILED:', saveErr);
         }
@@ -4520,12 +4539,12 @@ async function triggerAIAutoMessage(tag) {
         const isViewingTargetChat = chatScreenEl && chatScreenEl.style.display === 'flex' && currentChatTag === chatTag;
 
         if (!isViewingTargetChat) {
-            console.log('[AutoMsg] Not viewing target chat, showing notification. chatScreen=' + (chatScreenEl ? chatScreenEl.style.display : 'null') + ', currentTag=' + currentChatTag + ', target=' + chatTag);
+            // console.log('[AutoMsg] Not viewing target chat, showing notification.');
             const currentUnread = parseInt(localStorage.getItem('unread-' + chatTag) || '0');
             localStorage.setItem('unread-' + chatTag, (currentUnread + segments.length).toString());
-            console.log('[AutoMsg] Unread set to', currentUnread + segments.length);
+            // console.log('[AutoMsg] Unread set to', currentUnread + segments.length);
 
-            console.log('[AutoMsg] Calling showAINotification for', mappedNpcName);
+            // console.log('[AutoMsg] Calling showAINotification for', mappedNpcName);
             showAINotification(mappedNpcName, firstBody, {
                 chatTag: chatTag,
                 time: timeStr,
@@ -4534,7 +4553,7 @@ async function triggerAIAutoMessage(tag) {
 
             sendWebNotification(mappedNpcName, firstBody, chatTag, firstHeader);
         } else {
-            console.log('[AutoMsg] Currently VIEWING target chat, just refreshing');
+            // console.log('[AutoMsg] Currently VIEWING target chat, just refreshing');
             if (typeof loadInitialChat === 'function') loadInitialChat();
         }
         // Small delay to ensure IndexedDB write is committed before re-reading for preview
@@ -4581,7 +4600,9 @@ async function registerServiceWorker() {
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.type === 'NOTIFICATION_CLICK') {
                 const { chatTag, charName } = event.data;
-                if (chatTag && typeof openChat === 'function') {
+                if (chatTag === 'moment' && typeof renderMoments === 'function') {
+                    renderMoments();
+                } else if (chatTag && typeof openChat === 'function') {
                     openChat(chatTag, charName || '');
                 }
             }
@@ -15614,13 +15635,30 @@ window.lockKeyPress = function (val) {
     // Unlock condition: exactly 4 digits
     if (currentLockPin.length >= 4) {
         setTimeout(() => {
-            setScreenDisplay('home-screen');
             currentLockPin = '';
             updateLockDots();
             const prompt = document.getElementById('lock-prompt');
             const container = document.getElementById('lock-keypad-container');
             if (prompt) prompt.style.display = 'block';
             if (container) container.style.display = 'none';
+
+            // Check if launched from a push notification
+            const params = new URLSearchParams(window.location.search);
+            const chatToOpen = params.get('chat');
+            if (chatToOpen) {
+                // Remove parameter from URL to prevent reopening on refresh
+                window.history.replaceState({}, document.title, window.location.pathname);
+
+                if (chatToOpen === 'moment') {
+                    setScreenDisplay('home-screen');
+                    if (typeof renderMoments === 'function') renderMoments();
+                } else {
+                    setScreenDisplay('home-screen'); // Open chat needs home screen in history usually
+                    if (typeof openChat === 'function') openChat(chatToOpen, params.get('name') || '');
+                }
+            } else {
+                setScreenDisplay('home-screen');
+            }
         }, 200);
     }
 }
