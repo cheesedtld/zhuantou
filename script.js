@@ -3540,6 +3540,20 @@ function updateStatusBar(screen) {
     if (screen === 'chat' && !appSettings.chatBg) isDark = false;
 
     if (statusBar) statusBar.className = isDark ? 'status-bar text-light' : 'status-bar text-dark';
+
+    // Dynamically update system status bar color to match current page
+    let themeColor = '#fafafa'; // default
+    if (isDark) {
+        themeColor = '#111111';
+    } else if (screen === 'home') {
+        themeColor = '#f5f5f5';
+    } else if (screen === 'chat') {
+        themeColor = '#fafafa';
+    } else if (screen === 'settings' || screen === 'message-list') {
+        themeColor = '#fafafa';
+    }
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', themeColor);
 }
 
 function analyzeImageBrightness(base64) {
