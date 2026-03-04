@@ -1,0 +1,14 @@
+[
+    {
+        "relation": [
+            "delegate_permission/common.handle_all_urls"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "dev.pages.zhuantou_3z5.twa",
+            "sha256_cert_fingerprints": [
+                "89:15:21:A4:7C:57:75:21:1E:EE:70:D8:13:56:E5:CC:D8:75:8B:3F:90:E7:EA:C3:1A:02:8D:28:C8:CC:23:1C"
+            ]
+        }
+    }
+]
