@@ -218,7 +218,7 @@ async function migrateFromLocalStorage() {
 
 
 const APP_VERSION = '1.0.6';
-const BUILD_VERSION = '2026-3-3-3';
+const BUILD_VERSION = '2026-3-4-1';
 const UPDATE_LOG = 'v1.0.0\n砖头机初始内测版\nv1.0.1\n修复了部分bug\n增加酒馆角色卡json导入\n增加ai角色边回消息边回朋友圈？的功能\n增加一些零零散散小功能\nv1.0.2\n修复部分bug\n完善酒馆json导入功能\n增加听歌功能,可导入网易云音乐的分享链接（支持vip歌曲）也可上传url或文件\n增加番茄钟功能，有学�?工作、运动两种可选（可能没啥区别）\n增加tts缓存，最多可缓存50条语音消息\nv1.0.3\n修复一些bug\n注意注意！备份一下数据，正在进行储存升级，请先行备份以免数据丢失\nv1.0.4\n储存升级，不再局限于浏览器的5MB储存\n修复一些bug\nv1.0.5\n重构TTS，CORS留空即可应用，现在应该更稳定了！\n修改一些我强迫症看着别扭的UI\n修复一些bug\nv1.0.6\n修复一些bug和ui\n修复主动发消息和发动态功能，现在可以设定主动发间隔时长和次数、完成后自动关闭\n新增了几个TTS模型可选择';
 function checkUpdate() {
     const lastVersion = localStorage.getItem('faye-phone-version');
