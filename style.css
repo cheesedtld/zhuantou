@@ -53,7 +53,7 @@
 html {
     height: 100%;
     height: 100dvh;
-    height: var(--app-height, 100dvh);
+    height: var(--app-height-stable, 100dvh);
 }
 
 body {
@@ -64,7 +64,7 @@ body {
     -webkit-user-select: none;
     height: 100%;
     height: 100dvh;
-    height: var(--app-height, 100dvh);
+    height: var(--app-height-stable, 100dvh);
     overflow: hidden;
 }
 
@@ -73,7 +73,7 @@ body {
     width: 100%;
     height: 100%;
     height: 100dvh;
-    height: var(--app-height, 100dvh);
+    height: var(--app-height-stable, 100dvh);
     border: none;
     border-radius: 0;
     background: var(--bg-primary);
@@ -190,11 +190,12 @@ body {
 }
 
 /* Right side sliders */
-#chat-screen,
-#dark-search-screen {
+#chat-screen {
     z-index: 10;
     box-shadow: -5px 0 15px rgba(0, 0, 0, 0.05);
     background-color: var(--interface-bg);
+    /* 聊天屏幕使用动态高度，键盘弹出时自动收缩 */
+    height: var(--app-height, 100%) !important;
 }
 
 #chat-settings-screen {
@@ -205,8 +206,7 @@ body {
 }
 
 /* Left side sliders */
-#settings-screen,
-#diary-screen {
+#settings-screen {
     z-index: 10;
     box-shadow: 5px 0 15px rgba(0, 0, 0, 0.05);
 }
@@ -451,7 +451,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    scroll-behavior: smooth;
+    /* scroll-behavior: auto — instant jump to bottom, no animation */
     scrollbar-width: none;
 }
 
@@ -856,10 +856,11 @@ input:checked+.slider:before {
 .msg-thought {
     font-size: 12px;
     color: #666;
-    background-color: rgba(200, 200, 200, 0.25);
+    background-color: rgba(219, 219, 219, 0.8);
     border-radius: 12px;
     padding: 5px 12px;
-    margin-top: 4px;
+    margin-top: 0;
+    margin-bottom: 0;
     line-height: 1.4;
     word-wrap: break-word;
     max-width: 100%;
@@ -867,6 +868,12 @@ input:checked+.slider:before {
     text-align: left;
     font-style: italic;
     border: 1px dashed rgba(180, 180, 180, 0.5);
+}
+
+/* 引用消息显示在气泡上方，无缝衔接 */
+.msg-quote-above {
+    margin-bottom: 0;
+    font-style: normal;
 }
 
 /* 双语消息翻译样式 */
@@ -979,6 +986,19 @@ input:checked+.slider:before {
     font-size: var(--msg-font-size, 14px);
 }
 
+/* 自定义字体时增加气泡内边距，防止文字被裁切 */
+.custom-font-active .bubble {
+    padding-top: 10px;
+    padding-bottom: 10px;
+    line-height: 1.65;
+}
+
+.custom-font-active .voice-text-bubble {
+    padding-top: 9px;
+    padding-bottom: 9px;
+    line-height: 1.65;
+}
+
 /* 发送方文本气泡 */
 .bubble-sent {
     background: var(--bubble-sent);
@@ -1028,10 +1048,13 @@ input:checked+.slider:before {
 
 .photo-card.sent {
     border-top-right-radius: 0;
+    background: var(--bubble-sent);
 }
 
 .photo-card.received {
     border-top-left-radius: 0;
+    background: var(--bubble-received);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
 .photo-card img {
@@ -1080,7 +1103,6 @@ input:checked+.slider:before {
 .sticker-bubble {
     border-radius: 0;
     overflow: visible;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     font-size: 0;
     max-width: 120px;
 }
@@ -1172,14 +1194,13 @@ input:checked+.slider:before {
 
 /* 语音文字气泡 - 单独的小气泡 */
 .voice-text-bubble {
-    font-size: 13px;
+    font-size: var(--msg-font-size, 14px);
     line-height: 1.5;
     word-break: break-word;
     overflow-wrap: anywhere;
     display: none;
     padding: 7px 10px;
     margin: 0;
-    color: inherit;
     margin-top: 0;
     flex-shrink: 0;
     border-radius: 6px !important;
